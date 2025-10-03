@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1in;
+            @bottom-right {
+                content: "Page " counter(page) " of " counter(pages);
+            }
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #2c3e50;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 30px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            margin: 10px 0 0 0;
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .summary-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .summary-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .summary-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .section {
+            margin: 40px 0;
+            page-break-inside: avoid;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .chart-container {
+            margin: 30px 0;
+            text-align: center;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .chart-container img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            text-align: left;
+        }
+
+        th {
+            background: #2c3e50;
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        tr:hover {
+            background: #e9ecef;
+        }
+
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .highlight {
+            background: linear-gradient(90deg, #ffeaa7 0%, #fab1a0 100%);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .price-positive {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .price-negative {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .metadata {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .metadata strong {
+            color: #2c3e50;
+        }
+    </style>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ title }}</h1>
+        <div class="subtitle">254Carbon Market Intelligence Platform</div>
+    </div>
+
+    <div class="metadata">
+        <strong>Report Details:</strong><br>
+        <strong>Market:</strong> {{ market | upper }} |
+        <strong>Report Date:</strong> {{ as_of_date }} |
+        <strong>Period:</strong> {{ start_date }} to {{ end_date }} |
+        <strong>Report Type:</strong> {{ report_type | title }}
+    </div>
+
+    <div class="section">
+        <h2>📊 Executive Summary</h2>
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-value">{{ "${:,.2f}" | format(avg_price) }}</div>
+                <div class="summary-label">Average Price</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value">{{ "${:,.2f}" | format(min_price) }} - {{ "${:,.2f}" | format(max_price) }}</div>
+                <div class="summary-label">Price Range</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value">{{ "{:,}" | format(total_volume) }}</div>
+                <div class="summary-label">Data Points</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value">{{ "{:.1f}%" | format(volatility) }}</div>
+                <div class="summary-label">Volatility</div>
+            </div>
+        </div>
+    </div>
+
+    {% if charts.price_trend %}
+    <div class="section">
+        <h2>📈 Price Trends</h2>
+        <div class="chart-container">
+            {{ charts.price_trend|safe }}
+        </div>
+        <p><em>Daily average prices for key instruments in the {{ market }} market.</em></p>
+    </div>
+    {% endif %}
+
+    {% if charts.forward_curve %}
+    <div class="section">
+        <h2>🔮 Forward Curves</h2>
+        <div class="chart-container">
+            {{ charts.forward_curve|safe }}
+        </div>
+        <p><em>Forward price curves showing market expectations for future delivery periods.</em></p>
+    </div>
+    {% endif %}
+
+    {% if price_data %}
+    <div class="section">
+        <h2>📋 Detailed Price Data</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Instrument</th>
+                    <th>Avg Price</th>
+                    <th>Min Price</th>
+                    <th>Max Price</th>
+                    <th>Samples</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in price_data[:25] %}
+                <tr>
+                    <td>{{ row[0] }}</td>
+                    <td>{{ row[2] }}</td>
+                    <td class="price-{{ 'positive' if row[3] > 40 else 'negative' }}">${{ "%.2f"|format(row[3]) }}</td>
+                    <td>${{ "%.2f"|format(row[4]) }}</td>
+                    <td>${{ "%.2f"|format(row[5]) }}</td>
+                    <td>{{ "{:,}"|format(row[6]) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if price_data|length > 25 %}
+        <p><em>Showing first 25 records. Total: {{ "{:,}"|format(price_data|length) }} records analyzed.</em></p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if curve_data %}
+    <div class="section">
+        <h2>📊 Forward Curve Analysis</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Instrument</th>
+                    <th>Delivery Period</th>
+                    <th>Forward Price</th>
+                    <th>As-of Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in curve_data[:20] %}
+                <tr>
+                    <td>{{ row[0] }}</td>
+                    <td>{{ row[1] }}</td>
+                    <td class="price-{{ 'positive' if row[2] > 40 else 'negative' }}">${{ "%.2f"|format(row[2]) }}</td>
+                    <td>{{ row[3] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if curve_data|length > 20 %}
+        <p><em>Showing first 20 records. Total: {{ "{:,}"|format(curve_data|length) }} curve points.</em></p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="section">
+        <h2>💡 Key Insights</h2>
+        <ul>
+            {% if avg_price > 50 %}
+            <li><span class="highlight">High Price Alert:</span> Average prices are elevated, indicating potential supply constraints or increased demand.</li>
+            {% elif avg_price < 30 %}
+            <li><span class="highlight">Low Price Opportunity:</span> Current price levels may present attractive entry points for long positions.</li>
+            {% endif %}
+
+            {% if volatility > 15 %}
+            <li><span class="highlight">High Volatility:</span> Market shows increased uncertainty - consider risk management strategies.</li>
+            {% endif %}
+
+            {% if price_data|length > 1000 %}
+            <li><span class="highlight">Strong Liquidity:</span> High data volume indicates active market participation and reliable price discovery.</li>
+            {% endif %}
+        </ul>
+    </div>
+
+    <div class="footer">
+        <p>Report generated by 254Carbon Market Intelligence Platform</p>
+        <p>Generated on: {{ generation_time }} | Data Sources: Real-time market feeds</p>
+        <p>For questions or custom analysis, contact: analytics@254carbon.ai</p>
+    </div>
+</body>
+</html>

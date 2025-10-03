@@ -309,9 +309,103 @@ async def forecast_congestion(
             "forecasted_congestion": congestion_forecast,
             "binding_constraints": binding_constraints[:5],  # Top 5
         }
-        
+
     except Exception as e:
         logger.error(f"Error forecasting congestion: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/lmp/visualization/ptdf-matrix")
+async def get_ptdf_matrix_visualization(
+    source_nodes: List[str],
+    sink_nodes: List[str],
+    constraints: List[str],
+    iso: str = "PJM",
+):
+    """
+    Get PTDF matrix visualization data for heatmap display.
+
+    Returns matrix of PTDF values for visualization.
+    """
+    try:
+        # Get network topology
+        network = await ptdf_calc.get_network_topology(iso)
+
+        # Calculate PTDF matrix
+        ptdf_matrix = []
+        for source in source_nodes:
+            row = []
+            for sink in sink_nodes:
+                for constraint in constraints:
+                    ptdf = ptdf_calc.calculate_ptdf(source, sink, constraint, network)
+                    row.append({
+                        "source": source,
+                        "sink": sink,
+                        "constraint": constraint,
+                        "ptdf": ptdf
+                    })
+            ptdf_matrix.append(row)
+
+        return {
+            "source_nodes": source_nodes,
+            "sink_nodes": sink_nodes,
+            "constraints": constraints,
+            "ptdf_matrix": ptdf_matrix,
+            "matrix_shape": [len(source_nodes), len(sink_nodes), len(constraints)]
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating PTDF matrix visualization: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/lmp/visualization/basis-heatmap")
+async def get_basis_heatmap_data(
+    hub_id: str,
+    node_ids: List[str],
+    as_of_date: date,
+    iso: str = "PJM",
+):
+    """
+    Get basis surface data for heatmap visualization.
+
+    Returns grid of basis values for spatial visualization.
+    """
+    try:
+        # Get basis statistics for all nodes
+        basis_data = []
+
+        for node_id in node_ids:
+            try:
+                # Get prices
+                hub_prices = await basis_modeler.get_hub_prices(hub_id, as_of_date, iso)
+                node_prices = await basis_modeler.get_node_prices([node_id], as_of_date, iso)
+
+                if node_id in node_prices and not node_prices[node_id].empty:
+                    # Calculate basis statistics
+                    stats = basis_modeler.calculate_basis_statistics(
+                        hub_prices, node_prices[node_id]
+                    )
+
+                    basis_data.append({
+                        "node_id": node_id,
+                        "mean_basis": stats["mean"],
+                        "std_basis": stats["std"],
+                        "correlation": stats["correlation"],
+                        "volatility_ratio": stats["volatility_ratio"]
+                    })
+            except Exception as e:
+                logger.warning(f"Error calculating basis for {node_id}: {e}")
+
+        return {
+            "hub_id": hub_id,
+            "as_of_date": as_of_date.isoformat(),
+            "basis_data": basis_data,
+            "node_count": len(basis_data)
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating basis heatmap data: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
