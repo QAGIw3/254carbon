@@ -23,10 +23,7 @@ export default function CurveViewer() {
         </TabsList>
 
         <TabsContent value="3d-curves" className="space-y-6">
-          <ForwardCurve3D
-            height={500}
-            width={800}
-          />
+          <ForwardCurve3D height={500} width={800} />
 
           <Card>
             <CardHeader>

@@ -1,0 +1,54 @@
+{% extends "market_report.html" %}
+{% block content %}
+  <div class="header">
+    <h1>{{ title }}</h1>
+    <div class="subtitle">Market Brief | 254Carbon</div>
+  </div>
+
+  <div class="section">
+    <h2>At a Glance</h2>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="summary-value">{{ "${:,.2f}" | format(avg_price) }}</div>
+        <div class="summary-label">Avg Price</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value">{{ "{:.1f}%" | format(volatility) }}</div>
+        <div class="summary-label">Volatility</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value">{{ "{:,}" | format(total_volume) }}</div>
+        <div class="summary-label">Data Points</div>
+      </div>
+    </div>
+  </div>
+
+  {% if charts.price_trend %}
+  <div class="section">
+    <h2>Price Trend</h2>
+    <div class="chart-container">{{ charts.price_trend|safe }}</div>
+  </div>
+  {% endif %}
+
+  {% if charts.candlestick %}
+  <div class="section">
+    <h2>Candlestick (Representative Instrument)</h2>
+    <div class="chart-container">{{ charts.candlestick|safe }}</div>
+  </div>
+  {% endif %}
+
+  {% if charts.forward_curve %}
+  <div class="section">
+    <h2>Forward Curve</h2>
+    <div class="chart-container">{{ charts.forward_curve|safe }}</div>
+  </div>
+  {% endif %}
+
+  {% if charts.correlation_matrix %}
+  <div class="section">
+    <h2>Correlation Matrix</h2>
+    <div class="chart-container">{{ charts.correlation_matrix|safe }}</div>
+  </div>
+  {% endif %}
+{% endblock %}
+

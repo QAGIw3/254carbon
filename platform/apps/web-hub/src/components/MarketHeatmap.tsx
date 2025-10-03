@@ -86,7 +86,7 @@ export default function MarketHeatmap({
           market
         };
 
-        // Draw cell
+        // Draw cell with click to drill-down placeholder
         g.append("rect")
           .attr("x", x)
           .attr("y", y)
@@ -97,6 +97,9 @@ export default function MarketHeatmap({
           .attr("stroke-width", 1)
           .attr("rx", 4)
           .attr("cursor", "pointer")
+          .on("click", () => {
+            console.log('Drill-down:', cellData.region, cellData.market);
+          })
           .on("mouseover", function() {
             d3.select(this)
               .transition()

@@ -1,0 +1,64 @@
+{% extends "market_report.html" %}
+{% block content %}
+  <div class="header">
+    <h1>{{ title }}</h1>
+    <div class="subtitle">Technical Analysis | 254Carbon Market Intelligence</div>
+  </div>
+
+  <div class="section">
+    <h2>📊 Statistical Summary</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th><th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Average Price</td><td>{{ "${:,.2f}" | format(avg_price) }}</td></tr>
+        <tr><td>Min Price</td><td>{{ "${:,.2f}" | format(min_price) }}</td></tr>
+        <tr><td>Max Price</td><td>{{ "${:,.2f}" | format(max_price) }}</td></tr>
+        <tr><td>Volatility</td><td>{{ "{:.1f}%" | format(volatility) }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  {% if charts.price_trend %}
+  <div class="section">
+    <h2>📈 Rolling Averages</h2>
+    <div class="chart-container">{{ charts.price_trend|safe }}</div>
+  </div>
+  {% endif %}
+
+  {% if charts.forward_curve %}
+  <div class="section">
+    <h2>🔮 Curve Structure</h2>
+    <div class="chart-container">{{ charts.forward_curve|safe }}</div>
+  </div>
+  {% endif %}
+
+  {% if price_data %}
+  <div class="section">
+    <h2>📋 Sampled Data</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Instrument</th><th>Avg</th><th>Min</th><th>Max</th><th>Samples</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in price_data[:25] %}
+        <tr>
+          <td>{{ row[0] }}</td>
+          <td>{{ row[2] }}</td>
+          <td>${{ "%.2f"|format(row[3]) }}</td>
+          <td>${{ "%.2f"|format(row[4]) }}</td>
+          <td>${{ "%.2f"|format(row[5]) }}</td>
+          <td>{{ row[6] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+{% endblock %}
+

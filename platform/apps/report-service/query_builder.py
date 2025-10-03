@@ -1,0 +1,153 @@
+"""
+ClickHouse query builder and helpers for parameterized, safe, and optimized queries
+used by the report-service.
+
+This module centralizes query construction to ensure:
+- Parameters are passed separately from SQL to avoid injection
+- Consistent WHERE/ORDER/GROUP BY clauses
+- Reusable query templates for common report needs
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import date
+from typing import Any, Dict, List, Tuple
+
+
+@dataclass
+class BuiltQuery:
+    sql: str
+    params: Dict[str, Any]
+
+
+class ClickHouseQueryBuilder:
+    """Minimal fluent builder tailored for our reporting queries."""
+
+    def __init__(self) -> None:
+        self._select: List[str] = []
+        self._from: str = ""
+        self._where: List[str] = []
+        self._prewhere: List[str] = []
+        self._group_by: List[str] = []
+        self._order_by: List[str] = []
+        self._limit: int | None = None
+        self._params: Dict[str, Any] = {}
+
+    def select(self, *columns: str) -> ClickHouseQueryBuilder:
+        self._select.extend(columns)
+        return self
+
+    def from_table(self, table: str) -> ClickHouseQueryBuilder:
+        self._from = table
+        return self
+
+    def where(self, condition: str, **params: Any) -> ClickHouseQueryBuilder:
+        self._where.append(condition)
+        self._params.update(params)
+        return self
+
+    def prewhere(self, condition: str, **params: Any) -> ClickHouseQueryBuilder:
+        self._prewhere.append(condition)
+        self._params.update(params)
+        return self
+
+    def group_by(self, *columns: str) -> ClickHouseQueryBuilder:
+        self._group_by.extend(columns)
+        return self
+
+    def order_by(self, *columns: str) -> ClickHouseQueryBuilder:
+        self._order_by.extend(columns)
+        return self
+
+    def limit(self, n: int) -> ClickHouseQueryBuilder:
+        self._limit = n
+        return self
+
+    def add_params(self, **params: Any) -> ClickHouseQueryBuilder:
+        self._params.update(params)
+        return self
+
+    def build(self) -> BuiltQuery:
+        if not self._from:
+            raise ValueError("FROM table must be specified")
+
+        select_sql = ",\n            ".join(self._select) if self._select else "*"
+
+        sql_parts: List[str] = [
+            f"SELECT\n            {select_sql}",
+            f"FROM {self._from}",
+        ]
+
+        if self._prewhere:
+            sql_parts.append("PREWHERE " + " AND ".join(self._prewhere))
+
+        if self._where:
+            sql_parts.append("WHERE " + " AND ".join(self._where))
+
+        if self._group_by:
+            sql_parts.append("GROUP BY " + ", ".join(self._group_by))
+
+        if self._order_by:
+            sql_parts.append("ORDER BY " + ", ".join(self._order_by))
+
+        if self._limit is not None:
+            sql_parts.append(f"LIMIT {self._limit}")
+
+        sql = "\n".join(sql_parts)
+        return BuiltQuery(sql=sql, params=self._params)
+
+
+def build_price_aggregation_query(
+    market: str,
+    start_date: date,
+    end_date: date,
+    table: str = "market_price_ticks",
+) -> BuiltQuery:
+    """Daily aggregation of prices for a market between dates."""
+
+    builder = (
+        ClickHouseQueryBuilder()
+        .select(
+            "toDate(timestamp) as date",
+            "market",
+            "instrument_id",
+            "AVG(price) as avg_price",
+            "MIN(price) as min_price",
+            "MAX(price) as max_price",
+            "argMin(price, timestamp) as open_price",
+            "argMax(price, timestamp) as close_price",
+            "COUNT(*) as sample_count",
+        )
+        .from_table(table)
+        .prewhere("market = %(market)s", market=market)
+        .where("toDate(timestamp) >= %(start_date)s", start_date=start_date)
+        .where("toDate(timestamp) <= %(end_date)s", end_date=end_date)
+        .group_by("date", "market", "instrument_id")
+        .order_by("date", "instrument_id")
+    )
+
+    return builder.build()
+
+
+def build_forward_curve_query(
+    market: str,
+    as_of_date: date,
+    table: str = "forward_curve_points",
+) -> BuiltQuery:
+    builder = (
+        ClickHouseQueryBuilder()
+        .select(
+            "instrument_id",
+            "delivery_period",
+            "price",
+            "as_of_date",
+        )
+        .from_table(table)
+        .prewhere("market = %(market)s", market=market)
+        .where("as_of_date = %(as_of_date)s", as_of_date=as_of_date)
+        .order_by("instrument_id", "delivery_period")
+    )
+    return builder.build()
+
+

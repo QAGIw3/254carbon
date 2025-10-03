@@ -19,6 +19,13 @@ import boto3
 
 # WeasyPrint import will be done conditionally in functions that need it
 
+# Internal modules
+from query_builder import (
+    build_price_aggregation_query,
+    build_forward_curve_query,
+)
+from charts.chart_factory import ChartFactory
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -63,49 +70,13 @@ async def query_clickhouse_data(market: str, as_of_date: date, report_type: str)
             end_date = as_of_date
             start_date = end_date - timedelta(days=30)
 
-        # Query market price data
-        query = """
-        SELECT
-            toDate(timestamp) as date,
-            market,
-            instrument_id,
-            AVG(price) as avg_price,
-            MIN(price) as min_price,
-            MAX(price) as max_price,
-            COUNT(*) as sample_count
-        FROM market_price_ticks
-        WHERE market = %(market)s
-          AND toDate(timestamp) >= %(start_date)s
-          AND toDate(timestamp) <= %(end_date)s
-        GROUP BY date, market, instrument_id
-        ORDER BY date, instrument_id
-        """
+        # Query market price data using builder (fully parameterized)
+        price_built = build_price_aggregation_query(market, start_date, end_date)
+        price_data = client.execute(price_built.sql, price_built.params)
 
-        price_data = client.execute(
-            query,
-            market,
-            start_date,
-            end_date
-        )
-
-        # Query forward curve data
-        curve_query = """
-        SELECT
-            instrument_id,
-            delivery_period,
-            price,
-            as_of_date
-        FROM forward_curve_points
-        WHERE market = %(market)s
-          AND as_of_date = %(as_of_date)s
-        ORDER BY instrument_id, delivery_period
-        """
-
-        curve_data = client.execute(
-            curve_query,
-            market,
-            as_of_date
-        )
+        # Query forward curve data using builder (fully parameterized)
+        curve_built = build_forward_curve_query(market, as_of_date)
+        curve_data = client.execute(curve_built.sql, curve_built.params)
 
         return {
             'price_data': price_data,
@@ -130,77 +101,56 @@ async def generate_charts(data: Dict[str, Any], market: str) -> Dict[str, str]:
         # Price trend chart
         if data['price_data']:
             price_df = data['price_data']
-            # Create plotly figure
-            fig = go.Figure()
-
-            # Group by instrument and create traces
-            instruments = set(row[2] for row in price_df)  # instrument_id is at index 2
-
-            for instrument in list(instruments)[:5]:  # Limit to first 5 instruments
+            traces: Dict[str, Dict[str, List[Any]]] = {}
+            instruments = set(row[2] for row in price_df)
+            for instrument in list(instruments)[:5]:
                 instrument_data = [row for row in price_df if row[2] == instrument]
-                dates = [row[0] for row in instrument_data]
-                prices = [row[3] for row in instrument_data]  # avg_price is at index 3
+                traces[instrument] = {
+                    "x": [row[0] for row in instrument_data],
+                    "y": [row[3] for row in instrument_data],
+                }
 
-                fig.add_trace(go.Scatter(
-                    x=dates,
-                    y=prices,
-                    mode='lines+markers',
-                    name=instrument,
-                    line=dict(width=2),
-                    marker=dict(size=4)
-                ))
-
-            fig.update_layout(
-                title=f'{market} Price Trends',
-                xaxis_title='Date',
-                yaxis_title='Price ($/MWh)',
-                template='plotly_white',
-                height=400,
-                showlegend=True
-            )
-
-            # Convert to HTML
+            fig = ChartFactory.price_trends(traces)
             charts['price_trend'] = fig.to_html(full_html=False, include_plotlyjs=False)
 
         # Forward curve chart
         if data['curve_data']:
             curve_df = data['curve_data']
             if curve_df:
-                # Create forward curve chart
-                fig_curve = go.Figure()
-
-                # Group by instrument
-                instruments = {}
+                curves: Dict[str, Dict[str, List[Any]]] = {}
                 for row in curve_df:
-                    instrument_id = row[0]
-                    if instrument_id not in instruments:
-                        instruments[instrument_id] = []
-                    instruments[instrument_id].append((row[1], row[2]))  # (delivery_period, price)
+                    inst = row[0]
+                    curves.setdefault(inst, {"x": [], "y": []})
+                    curves[inst]["x"].append(row[1])
+                    curves[inst]["y"].append(row[2])
 
-                for instrument, points in list(instruments.items())[:3]:  # Limit to 3 instruments
-                    points.sort(key=lambda x: x[0])  # Sort by delivery period
-                    periods = [p[0] for p in points]
-                    prices = [p[1] for p in points]
-
-                    fig_curve.add_trace(go.Scatter(
-                        x=periods,
-                        y=prices,
-                        mode='lines+markers',
-                        name=instrument,
-                        line=dict(width=3),
-                        marker=dict(size=6)
-                    ))
-
-                fig_curve.update_layout(
-                    title=f'{market} Forward Curves',
-                    xaxis_title='Delivery Period',
-                    yaxis_title='Price ($/MWh)',
-                    template='plotly_white',
-                    height=400,
-                    showlegend=True
-                )
-
+                fig_curve = ChartFactory.forward_curves(curves)
                 charts['forward_curve'] = fig_curve.to_html(full_html=False, include_plotlyjs=False)
+
+        # Correlation matrix (top instruments by volume approximation via sample_count)
+        if data['price_data']:
+            price_df = data['price_data']
+            # Build instrument -> date -> avg_price map
+            instrument_dates: Dict[str, Dict[Any, float]] = {}
+            for row in price_df:
+                d = row[0]
+                inst = row[2]
+                avg = row[3]
+                if avg is None:
+                    continue
+                instrument_dates.setdefault(inst, {})[d] = float(avg)
+
+            # Align series on common dates
+            instruments = list(instrument_dates.keys())[:6]
+            if len(instruments) >= 2:
+                common_dates = sorted(set.intersection(*[set(instrument_dates[i].keys()) for i in instruments]))
+                series = [[instrument_dates[i][d] for d in common_dates] for i in instruments]
+                # Compute correlation matrix
+                if common_dates:
+                    import numpy as _np
+                    mat = _np.corrcoef(_np.array(series))
+                    corr_fig = ChartFactory.correlation_matrix(mat.tolist(), instruments)
+                    charts['correlation_matrix'] = corr_fig.to_html(full_html=False, include_plotlyjs=False)
 
         return charts
 
@@ -219,8 +169,18 @@ async def render_html_template(
         # Setup Jinja2 environment
         env = Environment(loader=FileSystemLoader('templates'))
 
-        # Load template from file
-        template = env.get_template('market_report.html')
+        # Select template based on report type
+        template_name = 'market_report.html'
+        if request.report_type == 'monthly_brief':
+            template_name = 'market_brief.html'
+        elif request.report_type == 'technical_analysis':
+            template_name = 'technical_analysis.html'
+        elif request.report_type == 'executive_summary':
+            template_name = 'executive_summary.html'
+        elif request.report_type == 'custom':
+            template_name = 'custom_report.html'
+
+        template = env.get_template(template_name)
 
         # Calculate comprehensive statistics
         stats = await calculate_report_statistics(data, request.market)
@@ -464,6 +424,20 @@ async def generate_report(request: ReportRequest):
 
         # Generate charts
         charts = await generate_charts(clickhouse_data, request.market)
+
+        # For monthly brief, include candlestick of a top instrument if available
+        if request.report_type in ("monthly_brief", "technical_analysis") and clickhouse_data.get('price_data'):
+            price_rows = clickhouse_data['price_data']
+            # pick the first instrument present
+            inst = price_rows[0][2]
+            dates = [r[0] for r in price_rows if r[2] == inst]
+            open_ = [r[6] if r[6] is not None else r[3] for r in price_rows if r[2] == inst]  # open_price idx 6
+            close = [r[7] if r[7] is not None else r[3] for r in price_rows if r[2] == inst]  # close_price idx 7
+            low = [r[4] for r in price_rows if r[2] == inst]
+            high = [r[5] for r in price_rows if r[2] == inst]
+            if dates and open_ and close and low and high:
+                candle_fig = ChartFactory.candlestick(dates, open_, high, low, close, name=f"{inst}")
+                charts['candlestick'] = candle_fig.to_html(full_html=False, include_plotlyjs=False)
 
         # Render HTML template
         html_content = await render_html_template(

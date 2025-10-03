@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import Keycloak from 'keycloak-js';
+import { webSocketManager } from '../services/api';
 
 interface AuthState {
   keycloak: Keycloak | null;
@@ -43,6 +44,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           keycloak.updateToken(70).catch(() => {
             console.error('Failed to refresh token');
           });
+          // Notify websocket manager to re-send subscription with refreshed token
+          webSocketManager.resubscribe();
         }, 60000);
       }
     } catch (error) {

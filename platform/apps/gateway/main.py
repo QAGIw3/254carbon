@@ -20,6 +20,7 @@ from .db import get_clickhouse_client, get_postgres_pool
 from .entitlements import check_entitlement
 from .metrics import track_request, track_latency
 from .stream import StreamManager
+from .websocket_auth import verify_ws_token
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -375,14 +376,34 @@ async def websocket_stream(websocket: WebSocket):
             instrument_ids = auth_msg.get("instruments", [])
             api_key = auth_msg.get("api_key")
 
-            # For local development, allow dev-key
-            if api_key != "dev-key" and not await verify_token(api_key):
-                await websocket.send_json({
-                    "type": "error",
-                    "message": "Invalid API key"
-                })
-                await websocket.close()
-                return
+            # Production: validate JWT; Dev: allow dev-key
+            if os.getenv("LOCAL_DEV", "true") != "true":
+                try:
+                    await verify_ws_token(api_key)
+                except Exception:
+                    await websocket.send_json({"type": "error", "message": "Unauthorized"})
+                    await websocket.close()
+                    return
+
+            # Optional entitlement checks in production
+            if os.getenv("LOCAL_DEV", "true") != "true":
+                # verify_ws_token already validated; reuse its claims for entitlements
+                try:
+                    user_claims = await verify_ws_token(api_key)
+                except Exception:
+                    await websocket.send_json({"type": "error", "message": "Unauthorized"})
+                    await websocket.close()
+                    return
+
+                for inst_id in instrument_ids:
+                    entitled = await check_entitlement(user_claims, inst_id, "stream")
+                    if not entitled:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"Not entitled to stream {inst_id}"
+                        })
+                        await websocket.close()
+                        return
 
             # Register connection
             await stream_manager.register(websocket, instrument_ids)

@@ -181,6 +181,7 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
+    {% block content %}
     <div class="header">
         <h1>{{ title }}</h1>
         <div class="subtitle">254Carbon Market Intelligence Platform</div>
@@ -322,5 +323,6 @@
         <p>Generated on: {{ generation_time }} | Data Sources: Real-time market feeds</p>
         <p>For questions or custom analysis, contact: analytics@254carbon.ai</p>
     </div>
+    {% endblock %}
 </body>
 </html>

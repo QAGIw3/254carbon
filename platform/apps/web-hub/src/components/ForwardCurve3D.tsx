@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
+import ForwardCurveSurface from './Three/ForwardCurveSurface';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 interface CurvePoint {
@@ -182,45 +183,7 @@ export default function ForwardCurve3D({
         <CardTitle>3D Forward Curve Surface</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="relative">
-          <svg
-            ref={svgRef}
-            className="w-full border rounded"
-            style={{ height: `${height}px` }}
-          />
-
-          {/* Controls */}
-          <div className="flex gap-2 mt-4">
-            <button className="px-3 py-1 text-sm border rounded hover:bg-gray-50">
-              Rotate View
-            </button>
-            <button className="px-3 py-1 text-sm border rounded hover:bg-gray-50">
-              Reset View
-            </button>
-            <button className="px-3 py-1 text-sm border rounded bg-blue-50 border-blue-200">
-              Wireframe
-            </button>
-          </div>
-
-          {/* Legend */}
-          <div className="mt-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <span>Price Range:</span>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-blue-200 rounded"></div>
-                <span>Low</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-green-200 rounded"></div>
-                <span>Medium</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-yellow-200 rounded"></div>
-                <span>High</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ForwardCurveSurface width={width} height={height} />
       </CardContent>
     </Card>
   );

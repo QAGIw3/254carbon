@@ -39,6 +39,7 @@ export class WebSocketManager {
   private reconnectInterval = 1000; // Start with 1 second
   private listeners: Map<string, Set<(data: any) => void>> = new Map();
   private isConnected = false;
+  private lastInstruments: string[] = [];
 
   connect(instrumentIds: string[] = []): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -52,10 +53,9 @@ export class WebSocketManager {
           this.reconnectAttempts = 0;
           this.reconnectInterval = 1000;
 
-          // Subscribe to instruments if provided
-          if (instrumentIds.length > 0) {
-            this.subscribeToInstruments(instrumentIds);
-          }
+          // Subscribe to instruments with current token
+          this.lastInstruments = instrumentIds;
+          this.subscribeToInstruments(this.lastInstruments);
 
           resolve();
         };
@@ -113,12 +113,12 @@ export class WebSocketManager {
     this.reconnectInterval = Math.min(this.reconnectInterval * 2, 30000);
   }
 
-  private subscribeToInstruments(instrumentIds: string[]): void {
+  private subscribeToInstruments(instrumentIds?: string[]): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const token = useAuthStore.getState().token;
       const subscription = {
         type: 'subscribe',
-        instruments: instrumentIds,
+        instruments: (instrumentIds && instrumentIds.length ? instrumentIds : this.lastInstruments),
         api_key: token || 'dev-key'
       };
 
@@ -170,6 +170,13 @@ export class WebSocketManager {
 
   isWebSocketConnected(): boolean {
     return this.isConnected;
+  }
+
+  // Allow token refresh-triggered re-subscription without reconnecting
+  resubscribe(): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.subscribeToInstruments();
+    }
   }
 }
 
