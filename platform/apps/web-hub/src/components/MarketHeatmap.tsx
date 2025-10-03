@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import * as d3 from 'd3';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
@@ -16,30 +16,44 @@ interface MarketHeatmapProps {
   height?: number;
   width?: number;
   showTooltips?: boolean;
+  onDrillDown?: (region: string, market: string) => void;
 }
 
-export default function MarketHeatmap({
+const MarketHeatmapComponent = ({
   marketData = [],
   height = 400,
   width = 600,
-  showTooltips = true
-}: MarketHeatmapProps) {
+  showTooltips = true,
+  onDrillDown
+}: MarketHeatmapProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const [selectedCell, setSelectedCell] = useState<{region: string, market: string} | null>(null);
+  const [viewMode, setViewMode] = useState<'price' | 'change'>('price');
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleDrillDown = useCallback((region: string, market: string) => {
+    setSelectedCell({region, market});
+    onDrillDown?.(region, market);
+  }, [onDrillDown]);
+
+  // Memoize data processing for performance
+  const processedData = useMemo(() => {
+    return marketData.length > 0 ? marketData : generateSampleMarketData();
+  }, [marketData]);
 
   useEffect(() => {
     if (!svgRef.current) return;
 
-    // Generate sample market data if none provided
-    const data = marketData.length > 0 ? marketData : generateSampleMarketData();
-
-    drawHeatmap(svgRef.current, data, width, height);
-  }, [marketData, width, height]);
+    drawHeatmap(svgRef.current, processedData, width, height, viewMode, handleDrillDown);
+  }, [processedData, width, height, viewMode, handleDrillDown]);
 
   const drawHeatmap = (
     svg: SVGSVGElement,
     data: MarketData[],
     width: number,
-    height: number
+    height: number,
+    viewMode: 'price' | 'change',
+    onDrillDown: (region: string, market: string) => void
   ) => {
     // Clear previous content
     d3.select(svg).selectAll("*").remove();
@@ -59,7 +73,7 @@ export default function MarketHeatmap({
     const regions = ["Northeast", "Midwest", "South", "West", "Northwest"];
     const markets = ["Power", "Gas", "Environmental"];
 
-    // Create color scale based on price levels
+    // Create color scales
     const priceScale = d3.scaleSequential(d3.interpolateRdYlBu)
       .domain([30, 60]); // Price range
 
@@ -86,44 +100,49 @@ export default function MarketHeatmap({
           market
         };
 
-        // Draw cell with click to drill-down placeholder
-        g.append("rect")
+        // Choose color scale based on view mode
+        const colorScale = viewMode === 'price' ? priceScale : changeScale;
+        const value = viewMode === 'price' ? cellData.price : cellData.change;
+
+        // Draw cell with enhanced styling and drill-down
+        const cell = g.append("rect")
           .attr("x", x)
           .attr("y", y)
           .attr("width", cellWidth - 2)
           .attr("height", cellHeight - 2)
-          .attr("fill", priceScale(cellData.price))
-          .attr("stroke", "#fff")
-          .attr("stroke-width", 1)
+          .attr("fill", colorScale(value))
+          .attr("stroke", selectedCell?.region === region && selectedCell?.market === market ? "#333" : "#fff")
+          .attr("stroke-width", selectedCell?.region === region && selectedCell?.market === market ? 3 : 1)
           .attr("rx", 4)
           .attr("cursor", "pointer")
-          .on("click", () => {
-            console.log('Drill-down:', cellData.region, cellData.market);
-          })
+          .style("filter", "drop-shadow(0 2px 4px rgba(0,0,0,0.1))")
+          .on("click", () => onDrillDown(region, market))
           .on("mouseover", function() {
             d3.select(this)
               .transition()
               .duration(200)
               .attr("stroke-width", 3)
-              .attr("stroke", "#333");
+              .attr("stroke", "#333")
+              .style("filter", "drop-shadow(0 4px 8px rgba(0,0,0,0.2))");
 
             if (showTooltips) {
-              showTooltip(d3.event, cellData);
+              showTooltip(d3.event, cellData, viewMode);
             }
           })
           .on("mouseout", function() {
             d3.select(this)
               .transition()
               .duration(200)
-              .attr("stroke-width", 1)
-              .attr("stroke", "#fff");
+              .attr("stroke-width", selectedCell?.region === region && selectedCell?.market === market ? 3 : 1)
+              .attr("stroke", selectedCell?.region === region && selectedCell?.market === market ? "#333" : "#fff")
+              .style("filter", "drop-shadow(0 2px 4px rgba(0,0,0,0.1))");
 
             if (showTooltips) {
               hideTooltip();
             }
           });
 
-        // Add text labels
+        // Add text labels with better contrast based on view mode
         g.append("text")
           .attr("x", x + cellWidth / 2)
           .attr("y", y + cellHeight / 2)
@@ -131,11 +150,11 @@ export default function MarketHeatmap({
           .attr("dominant-baseline", "middle")
           .attr("font-size", "11px")
           .attr("font-weight", "bold")
-          .attr("fill", cellData.price > 45 ? "#fff" : "#333")
-          .text(`$${cellData.price.toFixed(1)}`);
+          .attr("fill", value > (viewMode === 'price' ? 45 : 0) ? "#fff" : "#333")
+          .text(viewMode === 'price' ? `$${cellData.price.toFixed(1)}` : `${cellData.change.toFixed(1)}%`);
 
-        // Add change indicator
-        if (cellData.change !== 0) {
+        // Add change indicator for price view
+        if (viewMode === 'price' && cellData.change !== 0) {
           g.append("text")
             .attr("x", x + cellWidth - 5)
             .attr("y", y + 12)
@@ -261,26 +280,38 @@ export default function MarketHeatmap({
       .text("$60");
   };
 
-  const showTooltip = (event: MouseEvent, data: MarketData) => {
-    // Create tooltip (simplified - in real app would use a proper tooltip library)
+  const showTooltip = (event: MouseEvent, data: MarketData, viewMode: 'price' | 'change') => {
+    // Create enhanced tooltip with better styling
     const tooltip = d3.select("body")
       .append("div")
       .attr("class", "tooltip")
       .style("position", "absolute")
-      .style("background", "rgba(0, 0, 0, 0.8)")
+      .style("background", "rgba(0, 0, 0, 0.9)")
       .style("color", "white")
-      .style("padding", "8px")
-      .style("border-radius", "4px")
+      .style("padding", "12px")
+      .style("border-radius", "8px")
       .style("font-size", "12px")
       .style("pointer-events", "none")
-      .style("z-index", "1000");
+      .style("z-index", "1000")
+      .style("box-shadow", "0 4px 12px rgba(0,0,0,0.15)")
+      .style("border", "1px solid rgba(255,255,255,0.1)");
+
+    const primaryValue = viewMode === 'price' ? `$${data.price.toFixed(2)}` : `${data.change.toFixed(2)}%`;
+    const secondaryValue = viewMode === 'price' ? `${data.change > 0 ? '+' : ''}${data.change.toFixed(2)}%` : `$${data.price.toFixed(2)}`;
 
     tooltip.html(`
-      <strong>${data.instrument_id}</strong><br/>
-      Price: $${data.price.toFixed(2)}<br/>
-      Change: ${data.change > 0 ? '+' : ''}${data.change.toFixed(2)}%<br/>
-      Region: ${data.region}<br/>
-      Market: ${data.market}
+      <div style="font-weight: bold; margin-bottom: 4px;">${data.instrument_id}</div>
+      <div style="margin-bottom: 2px;">
+        <span style="opacity: 0.8;">${viewMode === 'price' ? 'Price:' : 'Change:'}</span>
+        <span style="color: ${viewMode === 'price' ? (data.price > 45 ? '#22c55e' : '#ef4444') : (data.change > 0 ? '#22c55e' : '#ef4444')};">${primaryValue}</span>
+      </div>
+      <div style="margin-bottom: 2px;">
+        <span style="opacity: 0.8;">${viewMode === 'price' ? 'Change:' : 'Price:'}</span>
+        ${secondaryValue}
+      </div>
+      <div style="opacity: 0.8; font-size: 11px;">
+        ${data.region} • ${data.market}
+      </div>
     `);
 
     tooltip
@@ -314,6 +345,24 @@ export default function MarketHeatmap({
     return data;
   };
 
+  const exportToCSV = () => {
+    setIsExporting(true);
+    const data = marketData.length > 0 ? marketData : generateSampleMarketData();
+    const csvContent = [
+      'Region,Market,Price,Change',
+      ...data.map(d => `${d.region},${d.market},${d.price},${d.change}`)
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'market-heatmap-data.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    setIsExporting(false);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -327,25 +376,58 @@ export default function MarketHeatmap({
             style={{ height: `${height}px` }}
           />
 
-          {/* Controls */}
-          <div className="flex gap-2 mt-4">
-            <button className="px-3 py-1 text-sm border rounded hover:bg-gray-50">
-              Price View
-            </button>
-            <button className="px-3 py-1 text-sm border rounded hover:bg-gray-50">
-              Change View
-            </button>
+          {/* Enhanced Controls */}
+          <div className="flex gap-2 mt-4 flex-wrap">
+            <div className="flex gap-1">
+              <button
+                className={`px-3 py-1 text-sm border rounded hover:bg-gray-50 ${viewMode === 'price' ? 'bg-blue-50 border-blue-200' : ''}`}
+                onClick={() => setViewMode('price')}
+              >
+                Price View
+              </button>
+              <button
+                className={`px-3 py-1 text-sm border rounded hover:bg-gray-50 ${viewMode === 'change' ? 'bg-green-50 border-green-200' : ''}`}
+                onClick={() => setViewMode('change')}
+              >
+                Change View
+              </button>
+            </div>
             <button className="px-3 py-1 text-sm border rounded bg-blue-50 border-blue-200">
               Heat Map
             </button>
+            <button
+              className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
+              onClick={exportToCSV}
+              disabled={isExporting}
+            >
+              {isExporting ? 'Exporting...' : 'Export CSV'}
+            </button>
           </div>
+
+          {/* Drill-down breadcrumbs */}
+          {selectedCell && (
+            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+              <span className="text-sm text-blue-800">
+                Selected: {selectedCell.region} • {selectedCell.market}
+              </span>
+              <button
+                className="ml-2 text-xs text-blue-600 hover:text-blue-800"
+                onClick={() => setSelectedCell(null)}
+              >
+                Clear
+              </button>
+            </div>
+          )}
 
           {/* Info */}
           <div className="mt-4 text-xs text-muted-foreground">
-            <p>Click on any cell to view detailed information. Color intensity represents price levels.</p>
+            <p>Click on any cell to drill down. Color intensity represents {viewMode === 'price' ? 'price levels' : 'percentage changes'}.</p>
           </div>
         </div>
       </CardContent>
     </Card>
   );
-}
+};
+
+// Memoize component for performance
+export default React.memo(MarketHeatmapComponent);

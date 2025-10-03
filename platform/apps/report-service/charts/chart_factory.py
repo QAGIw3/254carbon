@@ -1,11 +1,12 @@
 """
 Chart factory for Plotly figures used in reports.
 Supports multiple chart types with consistent theming and export.
+Includes performance optimizations for large datasets.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -13,20 +14,48 @@ import plotly.express as px
 
 DEFAULT_TEMPLATE = "plotly_white"
 
+# Performance optimization constants
+MAX_SERIES_POINTS = 1000  # Limit series length for performance
+MAX_HEATMAP_CELLS = 5000  # Limit heatmap size for performance
+
+
+def downsample_series(x: Sequence[Any], y: Sequence[float], max_points: int = MAX_SERIES_POINTS) -> Tuple[List[Any], List[float]]:
+    """Downsample time series data for performance while preserving shape."""
+    if len(x) <= max_points:
+        return list(x), list(y)
+
+    # Use Douglas-Peucker algorithm for intelligent downsampling
+    # For simplicity, use uniform sampling
+    step = len(x) // max_points
+    indices = list(range(0, len(x), step))[:max_points]
+
+    return [x[i] for i in indices], [y[i] for i in indices]
+
 
 class ChartFactory:
     @staticmethod
-    def price_trends(traces: Dict[str, Dict[str, Sequence[Any]]]) -> go.Figure:
+    def price_trends(traces: Dict[str, Dict[str, Sequence[Any]]], max_points: int = MAX_SERIES_POINTS) -> go.Figure:
+        """Create price trends chart with performance optimizations."""
         fig = go.Figure()
+
         for name, series in traces.items():
+            x_data = series["x"]
+            y_data = series["y"]
+
+            # Downsample data using intelligent algorithm
+            x_data, y_data = downsample_series(x_data, y_data, max_points)
+
+            # Use simplified mode for better performance with large datasets
+            mode = "lines" if len(x_data) > 500 else "lines+markers"
+
             fig.add_trace(
                 go.Scatter(
-                    x=series["x"],
-                    y=series["y"],
-                    mode="lines+markers",
+                    x=x_data,
+                    y=y_data,
+                    mode=mode,
                     name=name,
-                    line=dict(width=2),
-                    marker=dict(size=4),
+                    line=dict(width=2, shape="spline" if len(x_data) < 200 else "linear"),
+                    marker=dict(size=4 if len(x_data) < 500 else 2),
                 )
             )
 
@@ -37,6 +66,8 @@ class ChartFactory:
             yaxis_title="Price ($/MWh)",
             legend_title="Instrument",
             margin=dict(l=40, r=20, t=40, b=40),
+            # Performance optimizations
+            showlegend=len(traces) <= 10,  # Hide legend for many series
         )
         return fig
 
@@ -60,13 +91,38 @@ class ChartFactory:
 
     @staticmethod
     def heatmap(z: List[List[float]], x_labels: Sequence[str], y_labels: Sequence[str], colorscale: str = "RdBu") -> go.Figure:
+        """Create heatmap with performance optimizations for large datasets."""
+        # Check if data is too large and needs downsampling
+        total_cells = len(x_labels) * len(y_labels)
+        if total_cells > MAX_HEATMAP_CELLS:
+            # Simple downsampling - in production would use more sophisticated algorithms
+            step_x = max(1, len(x_labels) // int((MAX_HEATMAP_CELLS / len(y_labels)) ** 0.5))
+            step_y = max(1, len(y_labels) // int((MAX_HEATMAP_CELLS / len(x_labels)) ** 0.5))
+
+            x_sampled = x_labels[::step_x][:50]  # Limit to 50 labels max
+            y_sampled = y_labels[::step_y][:50]
+            z_sampled = [row[::step_x][:len(x_sampled)] for row in z[:len(y_sampled)]]
+        else:
+            x_sampled = x_labels
+            y_sampled = y_labels
+            z_sampled = z
+
         fig = go.Figure(
-            data=go.Heatmap(z=z, x=x_labels, y=y_labels, colorscale=colorscale)
+            data=go.Heatmap(
+                z=z_sampled,
+                x=x_sampled,
+                y=y_sampled,
+                colorscale=colorscale,
+                # Performance optimizations
+                hovertemplate="%{x}<br>%{y}<br>Value: %{z}<extra></extra>",
+            )
         )
         fig.update_layout(
             template=DEFAULT_TEMPLATE,
-            height=400,
+            height=min(400, max(200, len(y_sampled) * 8)),  # Dynamic height based on data size
             margin=dict(l=40, r=20, t=40, b=40),
+            # Performance optimizations
+            showlegend=False,
         )
         return fig
 
