@@ -14,6 +14,9 @@ import yaml
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+from fundamentals import FundamentalsEngine
+from ml_calibrator import EnsembleCalibrator
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,9 @@ app = FastAPI(
     description="Scenario modeling and forecast execution",
     version="1.0.0",
 )
+
+fundamentals_engine = FundamentalsEngine()
+ml_calibrator = EnsembleCalibrator()
 
 
 class ScenarioSpec(BaseModel):
@@ -90,7 +96,7 @@ async def execute_scenario_pipeline(scenario_id: str, run_id: str, spec: Scenari
 
         # Step 2: Run fundamentals layer
         logger.info(f"Step 2: Running fundamentals layer for scenario {scenario_id}")
-        fundamentals_results = await run_fundamentals_layer(assumptions)
+        fundamentals_results = await fundamentals_engine.run(assumptions)
         results["steps"].append({
             "step": "fundamentals_layer",
             "status": "completed",
@@ -99,7 +105,7 @@ async def execute_scenario_pipeline(scenario_id: str, run_id: str, spec: Scenari
 
         # Step 3: ML calibrator
         logger.info(f"Step 3: Running ML calibrator for scenario {scenario_id}")
-        calibrated_results = await run_ml_calibrator(fundamentals_results, spec)
+        calibrated_results = await ml_calibrator.run(fundamentals_results, spec.dict())
         results["steps"].append({
             "step": "ml_calibrator",
             "status": "completed",

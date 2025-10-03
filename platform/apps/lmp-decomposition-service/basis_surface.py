@@ -4,7 +4,7 @@ Hub-to-node basis surface modeling with advanced algorithms.
 import logging
 import json
 from datetime import date, timedelta
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 import asyncio
 
 import pandas as pd
@@ -13,6 +13,8 @@ from clickhouse_driver import Client
 import redis
 from scipy import stats
 from sklearn.linear_model import LinearRegression
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, WhiteKernel
 from sklearn.preprocessing import PolynomialFeatures
 
 logger = logging.getLogger(__name__)
@@ -223,6 +225,8 @@ class BasisSurfaceModeler:
             hedge_ratio = 1.0
             hedging_effectiveness = 0.0
 
+        kriging_summary = self._fit_basis_kriging(basis)
+
         return {
             "mean": float(mean_basis),
             "std": float(std_basis),
@@ -238,5 +242,34 @@ class BasisSurfaceModeler:
             "hedge_ratio": float(hedge_ratio),
             "hedging_effectiveness": float(hedging_effectiveness),
             "sample_size": len(basis),
+            "kriging_model": kriging_summary,
         }
+
+    def _fit_basis_kriging(self, basis: pd.Series) -> Dict[str, Any]:
+        """Fit Gaussian process to basis series for spatial-temporal smoothing."""
+        if len(basis) < 30:
+            return {"status": "insufficient_data"}
+
+        try:
+            # Use time index as proxy for spatial coordinate for now; in future integrate geospatial coordinates
+            x = np.arange(len(basis)).reshape(-1, 1)
+            y = basis.values.reshape(-1, 1)
+
+            kernel = C(1.0, (1e-3, 1e3)) * RBF(length_scale=15.0, length_scale_bounds=(1.0, 1e3)) + WhiteKernel(noise_level=0.5)
+            gp = GaussianProcessRegressor(kernel=kernel, alpha=0.1, normalize_y=True, n_restarts_optimizer=3)
+            gp.fit(x, y)
+
+            x_pred = np.linspace(0, len(basis) - 1, 100).reshape(-1, 1)
+            y_mean, y_std = gp.predict(x_pred, return_std=True)
+
+            return {
+                "status": "fitted",
+                "kernel": str(gp.kernel_),
+                "rmse": float(np.sqrt(np.mean((gp.predict(x) - y) ** 2))),
+                "mean_curve": y_mean.flatten().tolist(),
+                "std_curve": y_std.tolist(),
+            }
+        except Exception as exc:
+            logger.warning(f"Failed to fit kriging model: {exc}")
+            return {"status": "fit_failed", "error": str(exc)}
 

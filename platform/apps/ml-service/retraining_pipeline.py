@@ -2,13 +2,15 @@
 Automated ML model retraining pipeline with performance monitoring.
 """
 import asyncio
+import json
 import logging
+import os
 from datetime import datetime, timedelta, date
 from typing import Dict, List, Any, Optional
-import json
 
 import numpy as np
 import pandas as pd
+import requests
 from clickhouse_driver import Client
 
 from .models import ModelRegistry
@@ -31,6 +33,9 @@ class RetrainingPipeline:
         self.model_registry = ModelRegistry()
         self.trainer = ModelTrainer()
         self.feature_engineer = FeatureEngineer()
+
+        self.prometheus_gateway = os.environ.get("PROMETHEUS_PUSHGATEWAY", "http://prometheus:9091")
+        self.alert_webhook = os.environ.get("ALERT_WEBHOOK_URL")
 
         # Performance thresholds
         self.performance_thresholds = {
@@ -66,7 +71,14 @@ class RetrainingPipeline:
                 evaluation_data["actual"]
             )
 
-            metrics["status"] = self._determine_performance_status(metrics["mape"])
+            drift_metrics = self._calculate_drift_metrics(evaluation_data)
+            metrics.update(drift_metrics)
+            metrics["status"] = self._determine_performance_status(metrics["mape"], drift_metrics)
+
+            await self._emit_prometheus_metrics(instrument_id, metrics)
+
+            if metrics["status"] == "failed":
+                await self._send_alert(instrument_id, metrics)
 
             return metrics
 
@@ -189,9 +201,12 @@ class RetrainingPipeline:
                 evaluation_data["actual"]
             )
 
+            drift_metrics = self._calculate_drift_metrics(evaluation_data)
+
             return {
                 "overall": overall_metrics,
                 "daily": daily_metrics,
+                "drift": drift_metrics,
                 "evaluation_period_days": days,
             }
 
@@ -255,7 +270,6 @@ class RetrainingPipeline:
     ) -> Dict[str, float]:
         """Calculate standard forecasting performance metrics."""
         try:
-            # Ensure no NaN values
             valid_mask = ~(predicted.isna() | actual.isna())
             predicted = predicted[valid_mask]
             actual = actual[valid_mask]
@@ -263,16 +277,10 @@ class RetrainingPipeline:
             if len(predicted) == 0:
                 return {"mape": 1.0, "rmse": 100.0, "r2": 0.0, "mae": 0.0}
 
-            # Mean Absolute Percentage Error
             mape = np.mean(np.abs((actual - predicted) / actual)) * 100
-
-            # Root Mean Square Error
             rmse = np.sqrt(np.mean((predicted - actual) ** 2))
-
-            # Mean Absolute Error
             mae = np.mean(np.abs(predicted - actual))
 
-            # R-squared (coefficient of determination)
             ss_res = np.sum((actual - predicted) ** 2)
             ss_tot = np.sum((actual - np.mean(actual)) ** 2)
             r2 = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
@@ -289,14 +297,24 @@ class RetrainingPipeline:
             logger.error(f"Error calculating performance metrics: {e}")
             return {"mape": 1.0, "rmse": 100.0, "r2": 0.0, "mae": 0.0}
 
-    def _determine_performance_status(self, mape: float) -> str:
-        """Determine model performance status based on MAPE."""
+    def _determine_performance_status(self, mape: float, drift_metrics: Optional[Dict[str, float]] = None) -> str:
+        """Determine performance status with drift-awareness."""
         if mape < self.performance_thresholds["mape_warning"]:
-            return "healthy"
+            status = "healthy"
         elif mape < self.performance_thresholds["mape_critical"]:
-            return "degraded"
+            status = "degraded"
         else:
-            return "failed"
+            status = "failed"
+
+        if drift_metrics:
+            ks_stat = drift_metrics.get("ks_statistic", 0.0)
+            psi = drift_metrics.get("population_stability_index", 0.0)
+            if ks_stat > 0.15 or psi > 0.25:
+                status = "failed"
+            elif ks_stat > 0.1 or psi > 0.15:
+                status = "degraded"
+
+        return status
 
     async def _evaluate_model_performance(
         self,
