@@ -4,8 +4,8 @@ MISO Nodal LMP Connector
 Pulls real-time and day-ahead LMP data from MISO OASIS API.
 """
 import logging
-from datetime import datetime, timedelta
-from typing import Iterator, Dict, Any
+from datetime import datetime, timedelta, timezone
+from typing import Iterator, Dict, Any, Optional
 import time
 
 import requests
@@ -51,11 +51,7 @@ class MISOConnector(Ingestor):
         For DA: polls hourly for next day
         """
         last_checkpoint = self.load_checkpoint()
-        last_time = (
-            last_checkpoint.get("last_event_time")
-            if last_checkpoint
-            else datetime.utcnow() - timedelta(hours=1)
-        )
+        last_time = self._resolve_last_time(last_checkpoint)
         
         # In production, this would use actual MISO OASIS API
         # For now, simulate with mock data
@@ -69,8 +65,9 @@ class MISOConnector(Ingestor):
         nodes = [f"MISO.NODE.{i:04d}" for i in range(1, 51)]  # Sample 50 nodes
         
         for node in nodes:
+            event_time = datetime.now(timezone.utc)
             yield {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": event_time.isoformat(),
                 "node_id": node,
                 "lmp": 35.50 + (hash(node) % 100) / 10,  # Mock price
                 "mcc": 2.30,  # Congestion
@@ -96,6 +93,32 @@ class MISOConnector(Ingestor):
             "source": self.source_id,
             "seq": int(time.time() * 1000000),
         }
+
+    def _resolve_last_time(self, checkpoint: Optional[Dict[str, Any]]) -> datetime:
+        """Resolve the reference timestamp for incremental pulling."""
+        if not checkpoint:
+            return datetime.now(timezone.utc) - timedelta(hours=1)
+
+        last_event_time = checkpoint.get("last_event_time")
+
+        if last_event_time is None:
+            return datetime.now(timezone.utc) - timedelta(hours=1)
+
+        if isinstance(last_event_time, (int, float)):
+            return datetime.fromtimestamp(last_event_time / 1000, tz=timezone.utc)
+
+        if isinstance(last_event_time, str):
+            try:
+                return datetime.fromisoformat(last_event_time)
+            except ValueError:
+                logger.warning("Invalid last_event_time in checkpoint, defaulting to 1 hour lookback")
+                return datetime.now(timezone.utc) - timedelta(hours=1)
+
+        if isinstance(last_event_time, datetime):
+            return last_event_time.astimezone(timezone.utc)
+
+        logger.warning("Unsupported last_event_time type in checkpoint, defaulting to 1 hour lookback")
+        return datetime.now(timezone.utc) - timedelta(hours=1)
     
     def emit(self, events: Iterator[Dict[str, Any]]) -> int:
         """Emit events to Kafka."""

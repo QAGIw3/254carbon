@@ -4,14 +4,15 @@ Enhanced with sparse matrix operations and advanced algorithms.
 """
 import logging
 import json
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List
 import asyncio
 from datetime import datetime, timedelta
 
 import numpy as np
 import networkx as nx
-from scipy.sparse import csr_matrix, linalg
-from scipy.sparse.linalg import spsolve
+from scipy.sparse import csr_matrix, csc_matrix
+from scipy.sparse.linalg import splu
+import asyncpg
 import redis
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,15 @@ class PTDFCalculator:
     def __init__(self):
         self.redis_client = redis.Redis(host='redis', port=6379, decode_responses=True)
         self.cache_ttl = 3600  # 1 hour cache
+        self.db_pool: Optional[asyncpg.pool.Pool] = None
+        self.db_settings = {
+            "host": "postgresql",
+            "port": 5432,
+            "database": "market_intelligence",
+            "user": "postgres",
+            "password": "postgres",
+            "application_name": "ptdf_calculator",
+        }
 
     async def get_network_topology(self, iso: str) -> Dict[str, Any]:
         """
@@ -38,14 +48,10 @@ class PTDFCalculator:
             logger.debug(f"Using cached network topology for {iso}")
             return json.loads(cached)
 
-        # Mock network for demonstration
-        # Real implementation would query actual network topology
-        if iso == "PJM":
-            topology = self._get_pjm_mock_network()
-        elif iso == "MISO":
-            topology = self._get_miso_mock_network()
-        else:
-            topology = self._get_generic_network()
+        topology = await self._load_topology_from_db(iso)
+
+        if topology is None:
+            topology = self._get_mock_network(iso)
 
         # Cache the topology
         self.redis_client.setex(cache_key, self.cache_ttl, json.dumps(topology))
@@ -53,31 +59,29 @@ class PTDFCalculator:
 
         return topology
     
-    def _get_pjm_mock_network(self) -> Dict[str, Any]:
-        """Mock PJM network topology."""
-        return {
-            "nodes": ["PJM.BUS1", "PJM.BUS2", "PJM.BUS3", "PJM.HUB.WEST"],
-            "lines": [
-                {"from": "PJM.BUS1", "to": "PJM.BUS2", "reactance": 0.1, "limit": 500},
-                {"from": "PJM.BUS2", "to": "PJM.BUS3", "reactance": 0.15, "limit": 400},
-                {"from": "PJM.BUS1", "to": "PJM.HUB.WEST", "reactance": 0.08, "limit": 600},
-            ],
-            "reference_bus": "PJM.HUB.WEST",
-        }
-    
-    def _get_miso_mock_network(self) -> Dict[str, Any]:
-        """Mock MISO network topology."""
-        return {
-            "nodes": ["MISO.BUS1", "MISO.BUS2", "MISO.HUB.INDIANA"],
-            "lines": [
-                {"from": "MISO.BUS1", "to": "MISO.BUS2", "reactance": 0.12, "limit": 450},
-                {"from": "MISO.BUS2", "to": "MISO.HUB.INDIANA", "reactance": 0.10, "limit": 500},
-            ],
-            "reference_bus": "MISO.HUB.INDIANA",
-        }
-    
-    def _get_generic_network(self) -> Dict[str, Any]:
-        """Generic network topology."""
+    def _get_mock_network(self, iso: str) -> Dict[str, Any]:
+        """Fallback mock network topology."""
+        if iso == "PJM":
+            return {
+                "nodes": ["PJM.BUS1", "PJM.BUS2", "PJM.BUS3", "PJM.HUB.WEST"],
+                "lines": [
+                    {"from": "PJM.BUS1", "to": "PJM.BUS2", "reactance": 0.1, "limit": 500},
+                    {"from": "PJM.BUS2", "to": "PJM.BUS3", "reactance": 0.15, "limit": 400},
+                    {"from": "PJM.BUS1", "to": "PJM.HUB.WEST", "reactance": 0.08, "limit": 600},
+                ],
+                "reference_bus": "PJM.HUB.WEST",
+            }
+
+        if iso == "MISO":
+            return {
+                "nodes": ["MISO.BUS1", "MISO.BUS2", "MISO.HUB.INDIANA"],
+                "lines": [
+                    {"from": "MISO.BUS1", "to": "MISO.BUS2", "reactance": 0.12, "limit": 450},
+                    {"from": "MISO.BUS2", "to": "MISO.HUB.INDIANA", "reactance": 0.10, "limit": 500},
+                ],
+                "reference_bus": "MISO.HUB.INDIANA",
+            }
+
         return {
             "nodes": ["BUS1", "BUS2", "BUS3"],
             "lines": [
@@ -128,85 +132,80 @@ class PTDFCalculator:
                 constraint_id=constraint_id_line,
             )
 
-        # Build admittance matrix (B matrix) using sparse operations
         nodes = list(G.nodes())
         node_index = {node: i for i, node in enumerate(nodes)}
         n_nodes = len(nodes)
 
-        # Create sparse B matrix (admittance matrix)
-        B_data = []
-        B_rows = []
-        B_cols = []
+        branch_count = len(network["lines"])
+        incidence_rows: List[int] = []
+        incidence_cols: List[int] = []
+        incidence_data: List[float] = []
+        branch_reactances = np.zeros(branch_count)
 
-        for i, node1 in enumerate(nodes):
-            for j, node2 in enumerate(nodes):
-                if i != j:
-                    # Find edge between nodes
-                    if G.has_edge(node1, node2):
-                        reactance = G[node1][node2]['reactance']
-                        susceptance = 1.0 / reactance  # B_ij = -1/X_ij
-
-                        # Off-diagonal elements
-                        B_data.append(-susceptance)
-                        B_rows.append(i)
-                        B_cols.append(j)
-
-                        B_data.append(-susceptance)
-                        B_rows.append(j)
-                        B_cols.append(i)
-                    else:
-                        # No direct connection
-                        B_data.append(0.0)
-                        B_rows.append(i)
-                        B_cols.append(j)
-
-            # Diagonal elements (sum of off-diagonals)
-            row_sum = sum(B_data[k] for k in range(len(B_rows)) if B_rows[k] == i)
-            B_data.append(-row_sum)
-            B_rows.append(i)
-            B_cols.append(i)
-
-        # Create sparse matrix
-        B_sparse = csr_matrix((B_data, (B_rows, B_cols)), shape=(n_nodes, n_nodes))
-
-        # Set reference bus (remove last row/column)
-        ref_bus_idx = node_index[network["reference_bus"]]
-        B_reduced = B_sparse[:-1, :-1]  # Remove reference bus
-
-        # Create injection vector (1 MW at source, -1 MW at sink)
-        injection = np.zeros(n_nodes - 1)  # Exclude reference bus
-        source_idx = node_index[source_node]
-        sink_idx = node_index[sink_node]
-
-        if source_idx != ref_bus_idx and source_idx < n_nodes - 1:
-            injection[source_idx] = 1.0
-        if sink_idx != ref_bus_idx and sink_idx < n_nodes - 1:
-            injection[sink_idx] = -1.0
-
-        # Solve for voltage angles: B_reduced * theta = injection
-        try:
-            theta = spsolve(B_reduced, injection)
-        except Exception as e:
-            logger.error(f"Error solving PTDF system: {e}")
-            # Fallback to simple calculation
-            return self._calculate_simple_ptdf(source_node, sink_node, constraint_id, network)
-
-        # Calculate line flows
-        line_flows = {}
-        for line in network["lines"]:
+        for idx, line in enumerate(network["lines"]):
             from_node = line["from"]
             to_node = line["to"]
             reactance = line["reactance"]
 
+            branch_reactances[idx] = reactance
+            incidence_rows.extend([idx, idx])
+            incidence_cols.extend([node_index[from_node], node_index[to_node]])
+            incidence_data.extend([1.0, -1.0])
+
+        incidence_matrix = csr_matrix((incidence_data, (incidence_rows, incidence_cols)), shape=(branch_count, n_nodes))
+        b_diag = csr_matrix(np.diag(1.0 / branch_reactances))
+        b_bus = incidence_matrix.transpose() @ b_diag @ incidence_matrix
+
+        reference_bus = network.get("reference_bus")
+        if reference_bus not in node_index:
+            raise ValueError(f"Reference bus {reference_bus} not present in network nodes")
+
+        ref_idx = node_index[reference_bus]
+        keep_indices = [i for i in range(n_nodes) if i != ref_idx]
+        b_bus_reduced = b_bus[keep_indices, :][:, keep_indices]
+        b_f = b_diag @ incidence_matrix[:, keep_indices]
+
+        try:
+            lu_solver = splu(csc_matrix(b_bus_reduced))
+        except Exception as exc:
+            logger.exception("Sparse LU factorization failed", exc_info=exc)
+            return self._calculate_simple_ptdf(source_node, sink_node, constraint_id, network)
+
+        injection = np.zeros(len(keep_indices))
+        source_idx = node_index[source_node]
+        sink_idx = node_index[sink_node]
+
+        if source_idx != ref_idx:
+            try:
+                injection[keep_indices.index(source_idx)] = 1.0
+            except ValueError:
+                pass
+
+        if sink_idx != ref_idx:
+            try:
+                injection[keep_indices.index(sink_idx)] -= 1.0
+            except ValueError:
+                pass
+
+        try:
+            theta = lu_solver.solve(injection)
+        except Exception as exc:
+            logger.exception("Failed to solve voltage angles", exc_info=exc)
+            return self._calculate_simple_ptdf(source_node, sink_node, constraint_id, network)
+
+        line_flows = {}
+        for idx, line in enumerate(network["lines"]):
+            from_node = line["from"]
+            to_node = line["to"]
+
             from_idx = node_index[from_node]
             to_idx = node_index[to_node]
 
-            if from_idx < n_nodes - 1 and to_idx < n_nodes - 1:
-                # Line flow = (theta_from - theta_to) / reactance
-                theta_from = theta[from_idx] if from_idx < len(theta) else 0
-                theta_to = theta[to_idx] if to_idx < len(theta) else 0
-                flow = (theta_from - theta_to) / reactance
-                line_flows[f"{from_node}_{to_node}"] = flow
+            theta_from = 0.0 if from_idx == ref_idx else theta[keep_indices.index(from_idx)]
+            theta_to = 0.0 if to_idx == ref_idx else theta[keep_indices.index(to_idx)]
+
+            flow = (theta_from - theta_to) / branch_reactances[idx]
+            line_flows[f"{from_node}_{to_node}"] = flow
 
         # Get PTDF for the constraint
         ptdf = line_flows.get(constraint_id, 0.0)
@@ -278,4 +277,57 @@ class PTDFCalculator:
         )
 
         return sorted_sensitivities
+
+    async def _load_topology_from_db(self, iso: str) -> Optional[Dict[str, Any]]:
+        try:
+            pool = await self._get_pool()
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    """
+                    SELECT nodes, lines, reference_bus
+                    FROM network_topology
+                    WHERE iso = $1
+                    ORDER BY version DESC
+                    LIMIT 1
+                    """,
+                    iso,
+                )
+
+                if row is None:
+                    logger.warning(f"No network topology found in database for ISO {iso}")
+                    return None
+
+                return {
+                    "nodes": row["nodes"],
+                    "lines": row["lines"],
+                    "reference_bus": row["reference_bus"],
+                }
+
+        except asyncpg.UndefinedTableError:
+            logger.warning("network_topology table missing; using mock topology")
+            return None
+        except Exception as exc:
+            logger.error(f"Error loading topology for {iso}: {exc}")
+            return None
+
+    async def _get_pool(self) -> asyncpg.pool.Pool:
+        if self.db_pool is None:
+            self.db_pool = await asyncpg.create_pool(
+                host=self.db_settings["host"],
+                port=self.db_settings["port"],
+                database=self.db_settings["database"],
+                user=self.db_settings["user"],
+                password=self.db_settings["password"],
+                max_size=10,
+                min_size=1,
+                command_timeout=60,
+                server_settings={"application_name": self.db_settings["application_name"]},
+            )
+
+        return self.db_pool
+
+    async def close(self) -> None:
+        if self.db_pool is not None:
+            await self.db_pool.close()
+            self.db_pool = None
 

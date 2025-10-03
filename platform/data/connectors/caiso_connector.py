@@ -5,8 +5,8 @@ Pulls real-time and day-ahead LMP data from CAISO OASIS API.
 Implements entitlement restrictions per pilot requirements.
 """
 import logging
-from datetime import datetime, timedelta
-from typing import Iterator, Dict, Any
+from datetime import datetime, timedelta, timezone
+from typing import Iterator, Dict, Any, Optional
 import time
 
 import requests
@@ -68,11 +68,7 @@ class CAISOConnector(Ingestor):
         Implements hub-only restriction for pilot customers.
         """
         last_checkpoint = self.load_checkpoint()
-        last_time = (
-            last_checkpoint.get("last_event_time")
-            if last_checkpoint
-            else datetime.utcnow() - timedelta(hours=1)
-        )
+        last_time = self._resolve_last_time(last_checkpoint)
         
         logger.info(f"Fetching CAISO {self.market_type} LMP since {last_time}")
         
@@ -131,7 +127,7 @@ class CAISOConnector(Ingestor):
                 logger.warning(f"Using mock data for {node} - implement XML parsing")
 
                 # Mock data for development until XML parsing is implemented
-                current_time = datetime.utcnow()
+                current_time = datetime.now(timezone.utc)
 
                 # Generate realistic CAISO hub prices
                 base_price = {
@@ -192,7 +188,7 @@ class CAISOConnector(Ingestor):
                 # Fallback to minimal mock data for testing
                 logger.warning("Falling back to minimal mock data")
 
-                current_time = datetime.utcnow()
+                current_time = datetime.now(timezone.utc)
                 base_price = 40.00
 
                 yield {
@@ -232,6 +228,33 @@ class CAISOConnector(Ingestor):
                 "entitlement_restricted": self.entitlements_enabled,
             }
         }
+
+    def _resolve_last_time(self, checkpoint: Optional[Dict[str, Any]]) -> datetime:
+        """Resolve the most recent processed timestamp for incremental pulls."""
+        if not checkpoint:
+            return datetime.now(timezone.utc) - timedelta(hours=1)
+
+        last_event_time = checkpoint.get("last_event_time")
+
+        if last_event_time is None:
+            return datetime.now(timezone.utc) - timedelta(hours=1)
+
+        if isinstance(last_event_time, (int, float)):
+            return datetime.fromtimestamp(last_event_time / 1000, tz=timezone.utc)
+
+        if isinstance(last_event_time, str):
+            try:
+                dt = datetime.fromisoformat(last_event_time)
+                return dt.astimezone(timezone.utc)
+            except ValueError:
+                logger.warning("Invalid checkpoint last_event_time; defaulting to 1 hour lookback")
+                return datetime.now(timezone.utc) - timedelta(hours=1)
+
+        if isinstance(last_event_time, datetime):
+            return last_event_time.astimezone(timezone.utc)
+
+        logger.warning("Unsupported last_event_time type in checkpoint; defaulting to 1 hour lookback")
+        return datetime.now(timezone.utc) - timedelta(hours=1)
     
     def emit(self, events: Iterator[Dict[str, Any]]) -> int:
         """Emit events to Kafka."""

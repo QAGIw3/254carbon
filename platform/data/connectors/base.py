@@ -5,11 +5,13 @@ All data source connectors implement the Ingestor interface.
 """
 from abc import ABC, abstractmethod
 from typing import Iterator, Dict, Any, Optional
+import asyncio
+from datetime import datetime, timezone
 import logging
 import json
 import time
-import psycopg2
-from psycopg2.extras import RealDictCursor
+
+import asyncpg
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +42,17 @@ class Ingestor(ABC):
         self.db_name = self.db_config.get("database", "market_intelligence")
         self.db_user = self.db_config.get("user", "postgres")
         self.db_password = self.db_config.get("password", "postgres")
+        self.db_app_name = self.db_config.get("application_name", f"connector_{self.source_id}")
         # Throttle checkpoint writes to avoid excessive DB load
         self.checkpoint_min_interval_seconds = self.db_config.get("checkpoint_min_interval_seconds", 30)
         self._last_checkpoint_write_ms: Optional[int] = None
 
+        # Async event loop dedicated to checkpoint IO
+        self._loop = asyncio.new_event_loop()
+        self._db_pool: Optional[asyncpg.pool.Pool] = None
+
         # Initialize database connection
-        self._init_db()
+        self._loop.run_until_complete(self._init_db())
     
     @abstractmethod
     def discover(self) -> Dict[str, Any]:
@@ -116,54 +123,9 @@ class Ingestor(ABC):
             if (now_ms - self._last_checkpoint_write_ms) < (self.checkpoint_min_interval_seconds * 1000):
                 return
 
-        attempts = 0
-        backoff = 0.5
-        state_json = json.dumps(state)
-
-        while attempts < 3:
-            attempts += 1
-            try:
-                conn = psycopg2.connect(
-                    host=self.db_host,
-                    port=self.db_port,
-                    database=self.db_name,
-                    user=self.db_user,
-                    password=self.db_password
-                )
-                conn.autocommit = True
-
-                with conn.cursor() as cursor:
-                    # Upsert latest checkpoint in main table under pg schema
-                    cursor.execute(
-                        """
-                        INSERT INTO pg.connector_checkpoints (source_id, checkpoint_data, last_updated)
-                        VALUES (%s, %s, CURRENT_TIMESTAMP)
-                        ON CONFLICT (source_id)
-                        DO UPDATE SET checkpoint_data = EXCLUDED.checkpoint_data,
-                                      last_updated = CURRENT_TIMESTAMP
-                        """,
-                        (self.source_id, state_json),
-                    )
-
-                    # Append to history table for audit/debug
-                    cursor.execute(
-                        """
-                        INSERT INTO pg.connector_checkpoint_history (source_id, checkpoint_data)
-                        VALUES (%s, %s)
-                        """,
-                        (self.source_id, state_json),
-                    )
-
-                conn.close()
-                self._last_checkpoint_write_ms = now_ms
-                logger.debug(f"Checkpoint saved for {self.source_id}: {state}")
-                return
-
-            except Exception as e:
-                logger.error(f"Error saving checkpoint (attempt {attempts}/3): {e}")
-                time.sleep(backoff)
-                backoff *= 2
-                # Continue retrying; do not raise
+        self._loop.run_until_complete(self._checkpoint_async(state))
+        self._last_checkpoint_write_ms = now_ms
+        logger.debug(f"Checkpoint saved for {self.source_id}: {state}")
     
     def validate_event(self, event: Dict[str, Any]) -> bool:
         """
@@ -197,42 +159,36 @@ class Ingestor(ABC):
 
         return True
 
-    def _init_db(self) -> None:
+    async def _init_db(self) -> None:
         """Initialize database connection and create checkpoint table if needed."""
         try:
-            # Connect to database
-            conn = psycopg2.connect(
-                host=self.db_host,
-                port=self.db_port,
-                database=self.db_name,
-                user=self.db_user,
-                password=self.db_password
-            )
-            conn.autocommit = True
-
-            # Create tables in pg schema if they don't exist
-            with conn.cursor() as cursor:
-                cursor.execute(
+            pool = await self._get_pool()
+            async with pool.acquire() as conn:
+                await conn.execute(
                     """
-                    CREATE SCHEMA IF NOT EXISTS pg;
-                    CREATE TABLE IF NOT EXISTS pg.connector_checkpoints (
-                        source_id VARCHAR(100) PRIMARY KEY,
-                        checkpoint_data JSONB NOT NULL,
-                        last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    CREATE TABLE IF NOT EXISTS connector_checkpoints (
+                        connector_id VARCHAR(255) PRIMARY KEY,
+                        last_event_time TIMESTAMP WITH TIME ZONE,
+                        last_successful_run TIMESTAMP WITH TIME ZONE,
+                        state JSONB,
+                        error_count INTEGER DEFAULT 0,
+                        metadata JSONB,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                     );
-                    CREATE TABLE IF NOT EXISTS pg.connector_checkpoint_history (
+                    CREATE TABLE IF NOT EXISTS connector_checkpoint_history (
                         history_id BIGSERIAL PRIMARY KEY,
-                        source_id VARCHAR(100) NOT NULL,
-                        checkpoint_data JSONB NOT NULL,
-                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                        connector_id VARCHAR(255) NOT NULL,
+                        state JSONB,
+                        metadata JSONB,
+                        status VARCHAR(20),
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                     );
-                    CREATE INDEX IF NOT EXISTS idx_checkpoint_hist_source_time
-                      ON pg.connector_checkpoint_history (source_id, created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_connector_checkpoint_history__connector_time
+                        ON connector_checkpoint_history (connector_id, created_at DESC);
                     """
                 )
 
-            conn.close()
             logger.info(f"Database initialized for connector {self.source_id}")
 
         except Exception as e:
@@ -247,30 +203,13 @@ class Ingestor(ABC):
             Last checkpoint state dict or None
         """
         try:
-            conn = psycopg2.connect(
-                host=self.db_host,
-                port=self.db_port,
-                database=self.db_name,
-                user=self.db_user,
-                password=self.db_password
-            )
-
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute(
-                    "SELECT checkpoint_data FROM pg.connector_checkpoints WHERE source_id = %s",
-                    (self.source_id,)
-                )
-                row = cursor.fetchone()
-
-            conn.close()
-
-            if row:
-                self.checkpoint_state = row['checkpoint_data']
+            result = self._loop.run_until_complete(self._load_checkpoint_async())
+            if result:
+                self.checkpoint_state = result
                 logger.info(f"Loaded checkpoint for {self.source_id}: {self.checkpoint_state}")
                 return self.checkpoint_state
-            else:
-                logger.info(f"No checkpoint found for {self.source_id}")
-                return None
+            logger.info(f"No checkpoint found for {self.source_id}")
+            return None
 
         except Exception as e:
             logger.error(f"Error loading checkpoint: {e}")
@@ -294,6 +233,7 @@ class Ingestor(ABC):
         batch = []
         batch_size = self.config.get("batch_size", 1000)
         
+        last_event_time_ms: Optional[int] = None
         try:
             for raw_event in self.pull_or_subscribe():
                 # Map to canonical schema
@@ -307,6 +247,7 @@ class Ingestor(ABC):
                 if not self.validate_event(canonical):
                     continue
                 
+                last_event_time_ms = canonical.get("event_time_utc")
                 batch.append(canonical)
                 
                 # Emit batch
@@ -315,7 +256,15 @@ class Ingestor(ABC):
                     processed += count
                     
                     # Checkpoint
-                    self.checkpoint({"last_event_time": canonical["event_time_utc"]})
+                    checkpoint_payload = {
+                        "last_event_time": canonical["event_time_utc"],
+                        "status": "success",
+                        "metadata": {
+                            "batch_size": len(batch),
+                            "processed_total": processed
+                        }
+                    }
+                    self.checkpoint(checkpoint_payload)
                     
                     batch = []
             
@@ -323,11 +272,180 @@ class Ingestor(ABC):
             if batch:
                 count = self.emit(iter(batch))
                 processed += count
+
+                if last_event_time_ms is not None:
+                    checkpoint_payload = {
+                        "last_event_time": last_event_time_ms,
+                        "status": "success",
+                        "metadata": {
+                            "batch_size": len(batch),
+                            "processed_total": processed
+                        }
+                    }
+                    self.checkpoint(checkpoint_payload)
         
         except Exception as e:
             logger.error(f"Connector error: {e}")
+            error_state = {
+                "status": "error",
+                "last_event_time": last_event_time_ms or self.checkpoint_state.get("last_event_time"),
+                "metadata": {
+                    "error_message": str(e)
+                }
+            }
+            try:
+                self.checkpoint(error_state)
+            except Exception:
+                logger.exception("Failed to persist error checkpoint state")
             raise
+        finally:
+            self._loop.run_until_complete(self._close_db())
         
         logger.info(f"Connector finished: {processed} events processed")
         return processed
+
+    async def _get_pool(self) -> asyncpg.pool.Pool:
+        if self._db_pool is None:
+            self._db_pool = await asyncpg.create_pool(
+                host=self.db_host,
+                port=self.db_port,
+                database=self.db_name,
+                user=self.db_user,
+                password=self.db_password,
+                command_timeout=60,
+                max_size=self.db_config.get("pool_max_size", 10),
+                min_size=self.db_config.get("pool_min_size", 1),
+                statement_cache_size=self.db_config.get("statement_cache_size", 0),
+                server_settings={
+                    "application_name": self.db_app_name
+                }
+            )
+        return self._db_pool
+
+    async def _checkpoint_async(self, state: Dict[str, Any]) -> None:
+        pool = await self._get_pool()
+        status = state.get("status", "success")
+        metadata = state.get("metadata", {})
+        error_count = state.get("error_count")
+
+        last_event_time_value = state.get("last_event_time")
+        last_event_time_dt: Optional[datetime] = None
+
+        if last_event_time_value is not None:
+            if isinstance(last_event_time_value, (int, float)):
+                last_event_time_dt = datetime.fromtimestamp(last_event_time_value / 1000, tz=timezone.utc)
+            elif isinstance(last_event_time_value, str):
+                try:
+                    last_event_time_dt = datetime.fromisoformat(last_event_time_value)
+                except ValueError:
+                    last_event_time_dt = None
+            elif isinstance(last_event_time_value, datetime):
+                last_event_time_dt = last_event_time_value.astimezone(timezone.utc)
+
+        state_payload = state.copy()
+
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                prev = await conn.fetchrow(
+                    "SELECT error_count FROM connector_checkpoints WHERE connector_id = $1",
+                    self.source_id,
+                )
+
+                if error_count is None:
+                    previous_errors = prev["error_count"] if prev else 0
+                    if status == "error":
+                        error_count = previous_errors + 1
+                    else:
+                        error_count = 0
+
+                await conn.execute(
+                    """
+                    INSERT INTO connector_checkpoints (
+                        connector_id,
+                        last_event_time,
+                        last_successful_run,
+                        state,
+                        error_count,
+                        metadata,
+                        updated_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                    ON CONFLICT (connector_id)
+                    DO UPDATE SET
+                        last_event_time = EXCLUDED.last_event_time,
+                        last_successful_run = EXCLUDED.last_successful_run,
+                        state = EXCLUDED.state,
+                        error_count = EXCLUDED.error_count,
+                        metadata = EXCLUDED.metadata,
+                        updated_at = NOW()
+                    """,
+                    self.source_id,
+                    last_event_time_dt,
+                    datetime.now(timezone.utc) if status == "success" else None,
+                    json.dumps(state_payload),
+                    error_count,
+                    json.dumps(metadata),
+                )
+
+                await conn.execute(
+                    """
+                    INSERT INTO connector_checkpoint_history (
+                        connector_id,
+                        state,
+                        metadata,
+                        status
+                    ) VALUES ($1, $2, $3, $4)
+                    """,
+                    self.source_id,
+                    json.dumps(state_payload),
+                    json.dumps(metadata),
+                    status,
+                )
+
+    async def _load_checkpoint_async(self) -> Optional[Dict[str, Any]]:
+        pool = await self._get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT
+                    last_event_time,
+                    last_successful_run,
+                    state,
+                    error_count,
+                    metadata
+                FROM connector_checkpoints
+                WHERE connector_id = $1
+                """,
+                self.source_id,
+            )
+
+            if row is None:
+                return None
+
+            state_payload = row["state"] or {}
+            metadata = row["metadata"] or {}
+
+            if isinstance(metadata, str):
+                metadata = json.loads(metadata)
+
+            if isinstance(state_payload, str):
+                state_payload = json.loads(state_payload)
+
+            last_event_dt = row["last_event_time"]
+            if last_event_dt and state_payload.get("last_event_time") is None:
+                state_payload["last_event_time"] = int(last_event_dt.timestamp() * 1000)
+
+            state_payload["last_successful_run"] = (
+                row["last_successful_run"].isoformat()
+                if row["last_successful_run"]
+                else None
+            )
+            state_payload["error_count"] = row["error_count"]
+            state_payload["metadata"] = metadata
+
+            return state_payload
+
+    async def _close_db(self) -> None:
+        if self._db_pool is not None:
+            await self._db_pool.close()
+            self._db_pool = None
 
