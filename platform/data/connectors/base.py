@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Iterator, Dict, Any, Optional
 import logging
 import json
+import time
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -39,6 +40,9 @@ class Ingestor(ABC):
         self.db_name = self.db_config.get("database", "market_intelligence")
         self.db_user = self.db_config.get("user", "postgres")
         self.db_password = self.db_config.get("password", "postgres")
+        # Throttle checkpoint writes to avoid excessive DB load
+        self.checkpoint_min_interval_seconds = self.db_config.get("checkpoint_min_interval_seconds", 30)
+        self._last_checkpoint_write_ms: Optional[int] = None
 
         # Initialize database connection
         self._init_db()
@@ -101,38 +105,65 @@ class Ingestor(ABC):
     @abstractmethod
     def checkpoint(self, state: Dict[str, Any]) -> None:
         """
-        Save checkpoint state for resume/recovery.
+        Save checkpoint state for resume/recovery with retry/backoff and history logging.
 
         Args:
             state: State dict to persist (e.g., last_timestamp, last_offset)
         """
-        try:
-            conn = psycopg2.connect(
-                host=self.db_host,
-                port=self.db_port,
-                database=self.db_name,
-                user=self.db_user,
-                password=self.db_password
-            )
-            conn.autocommit = True
+        # Respect min interval between writes to reduce DB churn
+        now_ms = int(time.time() * 1000)
+        if self._last_checkpoint_write_ms is not None:
+            if (now_ms - self._last_checkpoint_write_ms) < (self.checkpoint_min_interval_seconds * 1000):
+                return
 
-            # Convert state to JSON for storage
-            state_json = json.dumps(state)
+        attempts = 0
+        backoff = 0.5
+        state_json = json.dumps(state)
 
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    INSERT INTO connector_checkpoints (source_id, checkpoint_data, last_updated)
-                    VALUES (%s, %s, CURRENT_TIMESTAMP)
-                    ON CONFLICT (source_id)
-                    DO UPDATE SET checkpoint_data = %s, last_updated = CURRENT_TIMESTAMP
-                """, (self.source_id, state_json, state_json))
+        while attempts < 3:
+            attempts += 1
+            try:
+                conn = psycopg2.connect(
+                    host=self.db_host,
+                    port=self.db_port,
+                    database=self.db_name,
+                    user=self.db_user,
+                    password=self.db_password
+                )
+                conn.autocommit = True
 
-            conn.close()
-            logger.debug(f"Checkpoint saved for {self.source_id}: {state}")
+                with conn.cursor() as cursor:
+                    # Upsert latest checkpoint in main table under pg schema
+                    cursor.execute(
+                        """
+                        INSERT INTO pg.connector_checkpoints (source_id, checkpoint_data, last_updated)
+                        VALUES (%s, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT (source_id)
+                        DO UPDATE SET checkpoint_data = EXCLUDED.checkpoint_data,
+                                      last_updated = CURRENT_TIMESTAMP
+                        """,
+                        (self.source_id, state_json),
+                    )
 
-        except Exception as e:
-            logger.error(f"Error saving checkpoint: {e}")
-            # Don't raise exception - checkpoint failures shouldn't stop ingestion
+                    # Append to history table for audit/debug
+                    cursor.execute(
+                        """
+                        INSERT INTO pg.connector_checkpoint_history (source_id, checkpoint_data)
+                        VALUES (%s, %s)
+                        """,
+                        (self.source_id, state_json),
+                    )
+
+                conn.close()
+                self._last_checkpoint_write_ms = now_ms
+                logger.debug(f"Checkpoint saved for {self.source_id}: {state}")
+                return
+
+            except Exception as e:
+                logger.error(f"Error saving checkpoint (attempt {attempts}/3): {e}")
+                time.sleep(backoff)
+                backoff *= 2
+                # Continue retrying; do not raise
     
     def validate_event(self, event: Dict[str, Any]) -> bool:
         """
@@ -179,16 +210,27 @@ class Ingestor(ABC):
             )
             conn.autocommit = True
 
-            # Create checkpoint table if it doesn't exist
+            # Create tables in pg schema if they don't exist
             with conn.cursor() as cursor:
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS connector_checkpoints (
+                cursor.execute(
+                    """
+                    CREATE SCHEMA IF NOT EXISTS pg;
+                    CREATE TABLE IF NOT EXISTS pg.connector_checkpoints (
                         source_id VARCHAR(100) PRIMARY KEY,
                         checkpoint_data JSONB NOT NULL,
                         last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
+                    );
+                    CREATE TABLE IF NOT EXISTS pg.connector_checkpoint_history (
+                        history_id BIGSERIAL PRIMARY KEY,
+                        source_id VARCHAR(100) NOT NULL,
+                        checkpoint_data JSONB NOT NULL,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_checkpoint_hist_source_time
+                      ON pg.connector_checkpoint_history (source_id, created_at DESC);
+                    """
+                )
 
             conn.close()
             logger.info(f"Database initialized for connector {self.source_id}")
@@ -215,7 +257,7 @@ class Ingestor(ABC):
 
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute(
-                    "SELECT checkpoint_data FROM connector_checkpoints WHERE source_id = %s",
+                    "SELECT checkpoint_data FROM pg.connector_checkpoints WHERE source_id = %s",
                     (self.source_id,)
                 )
                 row = cursor.fetchone()
