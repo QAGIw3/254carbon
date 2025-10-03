@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: market-intelligence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+      - name: gateway
+        image: 254carbon/gateway:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          value: postgresql://postgres:postgres@postgresql:5432/market_intelligence
+        - name: CLICKHOUSE_HOST
+          value: clickhouse
+        - name: KAFKA_BOOTSTRAP
+          value: kafka:9092
+        - name: PYTHONPATH
+          value: /app
+        - name: ENVIRONMENT
+          value: development
+        volumeMounts:
+        - name: gateway-code
+          mountPath: /app
+      volumes:
+      - name: gateway-code
+        hostPath:
+          path: /home/m/254carbon/platform/apps/gateway
+          type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: market-intelligence
+spec:
+  selector:
+    app: gateway
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: ClusterIP

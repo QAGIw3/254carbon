@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickhouse
+  namespace: market-intelligence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clickhouse
+  template:
+    metadata:
+      labels:
+        app: clickhouse
+    spec:
+      containers:
+      - name: clickhouse
+        image: clickhouse/clickhouse-server:latest
+        ports:
+        - containerPort: 8123
+        - containerPort: 9000
+        volumeMounts:
+        - name: clickhouse-storage
+          mountPath: /var/lib/clickhouse
+        - name: clickhouse-config
+          mountPath: /etc/clickhouse-server/config.d/
+        - name: init-script
+          mountPath: /docker-entrypoint-initdb.d/
+        env:
+        - name: CLICKHOUSE_DB
+          value: market_intelligence
+        - name: CLICKHOUSE_USER
+          value: default
+        - name: CLICKHOUSE_PASSWORD
+          value: password
+      volumes:
+      - name: clickhouse-storage
+        persistentVolumeClaim:
+          claimName: clickhouse-pvc
+      - name: clickhouse-config
+        configMap:
+          name: clickhouse-config
+      - name: init-script
+        configMap:
+          name: clickhouse-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse
+  namespace: market-intelligence
+spec:
+  selector:
+    app: clickhouse
+  ports:
+  - name: http
+    port: 8123
+    targetPort: 8123
+  - name: native
+    port: 9000
+    targetPort: 9000
+  type: ClusterIP

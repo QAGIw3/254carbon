@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-init
+  namespace: market-intelligence
+data:
+  init.sql: |
+    -- Create database
+    CREATE DATABASE IF NOT EXISTS market_intelligence;
+
+    -- Market price ticks table (optimized for time-series data)
+    CREATE TABLE IF NOT EXISTS market_intelligence.market_price_ticks (
+        event_time DateTime64(3) CODEC(DoubleDelta, LZ4),
+        instrument_id String CODEC(ZSTD(1)),
+        location_code String CODEC(ZSTD(1)),
+        price_type String CODEC(ZSTD(1)),
+        value Decimal(10,4) CODEC(T64, LZ4),
+        volume Decimal(12,4) CODEC(T64, LZ4),
+        currency String CODEC(ZSTD(1)),
+        unit String CODEC(ZSTD(1)),
+        source String CODEC(ZSTD(1)),
+        created_at DateTime DEFAULT now() CODEC(DoubleDelta, LZ4)
+    )
+    ENGINE = MergeTree()
+    PARTITION BY toYYYYMM(event_time)
+    ORDER BY (event_time, instrument_id, location_code)
+    SETTINGS index_granularity = 8192;
+
+    -- Forward curve points table
+    CREATE TABLE IF NOT EXISTS market_intelligence.forward_curve_points (
+        run_id UUID CODEC(ZSTD(1)),
+        instrument_id String CODEC(ZSTD(1)),
+        delivery_start Date CODEC(DoubleDelta, LZ4),
+        delivery_end Date CODEC(DoubleDelta, LZ4),
+        tenor_type String CODEC(ZSTD(1)),
+        price Decimal(10,4) CODEC(T64, LZ4),
+        currency String CODEC(ZSTD(1)),
+        unit String CODEC(ZSTD(1)),
+        created_at DateTime DEFAULT now() CODEC(DoubleDelta, LZ4)
+    )
+    ENGINE = MergeTree()
+    PARTITION BY toYYYYMM(created_at)
+    ORDER BY (run_id, instrument_id, delivery_start)
+    SETTINGS index_granularity = 8192;
+
+    -- Fundamentals series table
+    CREATE TABLE IF NOT EXISTS market_intelligence.fundamentals_series (
+        instrument_id String CODEC(ZSTD(1)),
+        data_date Date CODEC(DoubleDelta, LZ4),
+        fundamental_type String CODEC(ZSTD(1)),
+        value Decimal(15,6) CODEC(T64, LZ4),
+        unit String CODEC(ZSTD(1)),
+        source String CODEC(ZSTD(1)),
+        created_at DateTime DEFAULT now() CODEC(DoubleDelta, LZ4)
+    )
+    ENGINE = MergeTree()
+    PARTITION BY toYYYYMM(data_date)
+    ORDER BY (instrument_id, data_date, fundamental_type)
+    SETTINGS index_granularity = 8192;
+
+    -- Create materialized views for common aggregations
+    CREATE MATERIALIZED VIEW IF NOT EXISTS market_intelligence.market_price_ticks_daily_mv
+    ENGINE = SummingMergeTree()
+    PARTITION BY toYYYYMM(event_time)
+    ORDER BY (toDate(event_time), instrument_id, location_code)
+    AS
+    SELECT
+        toDate(event_time) as date,
+        instrument_id,
+        location_code,
+        argMax(value, event_time) as last_price,
+        min(value) as min_price,
+        max(value) as max_price,
+        avg(value) as avg_price,
+        count() as tick_count
+    FROM market_intelligence.market_price_ticks
+    GROUP BY date, instrument_id, location_code;

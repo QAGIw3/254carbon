@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: curve-service
+  namespace: market-intelligence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: curve-service
+  template:
+    metadata:
+      labels:
+        app: curve-service
+    spec:
+      containers:
+      - name: curve-service
+        image: 254carbon/curve-service:latest
+        ports:
+        - containerPort: 8001
+        env:
+        - name: DATABASE_URL
+          value: postgresql://postgres:postgres@postgresql:5432/market_intelligence
+        - name: CLICKHOUSE_HOST
+          value: clickhouse
+        - name: PYTHONPATH
+          value: /app
+        - name: ENVIRONMENT
+          value: development
+        volumeMounts:
+        - name: curve-service-code
+          mountPath: /app
+      volumes:
+      - name: curve-service-code
+        hostPath:
+          path: /home/m/254carbon/platform/apps/curve-service
+          type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: curve-service
+  namespace: market-intelligence
+spec:
+  selector:
+    app: curve-service
+  ports:
+  - port: 8001
+    targetPort: 8001
+  type: ClusterIP

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-hub
+  namespace: market-intelligence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-hub
+  template:
+    metadata:
+      labels:
+        app: web-hub
+    spec:
+      containers:
+      - name: web-hub
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: web-hub-static
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: web-hub-static
+        hostPath:
+          path: /home/m/254carbon/platform/apps/web-hub/dist
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-hub
+  namespace: market-intelligence
+spec:
+  selector:
+    app: web-hub
+  ports:
+  - port: 3000
+    targetPort: 80
+  type: ClusterIP
