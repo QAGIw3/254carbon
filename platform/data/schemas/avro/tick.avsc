@@ -1,0 +1,74 @@
+{
+  "type": "record",
+  "name": "Tick",
+  "namespace": "ai.energy.market",
+  "doc": "Market price tick event",
+  "fields": [
+    {
+      "name": "event_time_utc",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Event timestamp in UTC (milliseconds since epoch)"
+    },
+    {
+      "name": "market",
+      "type": "string",
+      "doc": "Market type: power, gas, env, lng"
+    },
+    {
+      "name": "product",
+      "type": "string",
+      "doc": "Product type: lmp, congestion, rec, lcfs, basis, curve"
+    },
+    {
+      "name": "instrument_id",
+      "type": "string",
+      "doc": "Unique instrument identifier"
+    },
+    {
+      "name": "location_code",
+      "type": "string",
+      "doc": "Geographic location or node code"
+    },
+    {
+      "name": "price_type",
+      "type": "string",
+      "doc": "Price type: trade, bid, ask, mid, settle, model_forward, scenario_forecast"
+    },
+    {
+      "name": "value",
+      "type": "double",
+      "doc": "Price value"
+    },
+    {
+      "name": "volume",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Trading volume if available"
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "default": "USD",
+      "doc": "Currency code (ISO 4217)"
+    },
+    {
+      "name": "unit",
+      "type": "string",
+      "doc": "Unit of measure: MWh, MMBtu, short_ton, t"
+    },
+    {
+      "name": "source",
+      "type": "string",
+      "doc": "Data source identifier"
+    },
+    {
+      "name": "seq",
+      "type": "long",
+      "doc": "Sequence number for ordering"
+    }
+  ]
+}
+

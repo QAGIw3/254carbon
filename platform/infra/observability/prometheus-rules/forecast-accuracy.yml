@@ -1,0 +1,44 @@
+groups:
+  - name: forecast_accuracy
+    interval: 1h
+    rules:
+      - alert: HighMAPE
+        expr: avg(backtest_mape) > 12
+        for: 6h
+        labels:
+          severity: warning
+          component: forecasting
+        annotations:
+          summary: "Forecast MAPE exceeds 12% threshold"
+          description: "Average MAPE is {{ $value }}% (threshold: 12%)"
+      
+      - alert: HighRMSE
+        expr: avg(backtest_rmse{product="lmp"}) > 10
+        for: 6h
+        labels:
+          severity: warning
+          component: forecasting
+        annotations:
+          summary: "LMP forecast RMSE exceeds $10/MWh"
+          description: "Average RMSE is ${{ $value }}/MWh for LMP forecasts"
+      
+      - alert: ForecastBiasDrift
+        expr: abs(avg_over_time(backtest_mean_error[7d])) > 5
+        for: 24h
+        labels:
+          severity: info
+          component: forecasting
+        annotations:
+          summary: "Sustained forecast bias detected"
+          description: "7-day average bias is ${{ $value }}/MWh"
+      
+      - alert: BacktestDataStaleness
+        expr: time() - backtest_last_run_timestamp > 86400
+        for: 1h
+        labels:
+          severity: critical
+          component: backtesting
+        annotations:
+          summary: "Backtesting service not running"
+          description: "No backtest runs in last 24 hours"
+

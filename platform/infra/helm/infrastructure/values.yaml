@@ -1,0 +1,157 @@
+# Infrastructure Helm Values
+# Local Kubernetes deployment
+
+# Kafka
+kafka:
+  enabled: true
+  replicaCount: 1
+  zookeeper:
+    enabled: true
+    replicaCount: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1"
+    limits:
+      memory: "4Gi"
+      cpu: "2"
+
+# ClickHouse
+clickhouse:
+  enabled: true
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 50Gi
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "2"
+    limits:
+      memory: "8Gi"
+      cpu: "4"
+  config:
+    maxMemoryUsage: 10000000000
+    maxThreads: 8
+
+# PostgreSQL
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "postgres"
+    database: "market_intelligence"
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1"
+
+# MinIO (S3-compatible object storage)
+minio:
+  enabled: true
+  mode: standalone
+  rootUser: minioadmin
+  rootPassword: minioadmin
+  persistence:
+    enabled: true
+    size: 100Gi
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+  buckets:
+    - name: raw
+      policy: none
+    - name: curves
+      policy: none
+    - name: runs
+      policy: none
+    - name: downloads
+      policy: download
+
+# Keycloak (OIDC)
+keycloak:
+  enabled: true
+  auth:
+    adminUser: admin
+    adminPassword: admin
+  postgresql:
+    enabled: true
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+  ingress:
+    enabled: true
+    hostname: keycloak.local
+
+# Prometheus
+prometheus:
+  enabled: true
+  server:
+    retention: "15d"
+    persistentVolume:
+      enabled: true
+      size: 20Gi
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "1"
+  alertmanager:
+    enabled: true
+
+# Grafana
+grafana:
+  enabled: true
+  adminPassword: admin
+  persistence:
+    enabled: true
+    size: 5Gi
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://prometheus-server
+          isDefault: true
+        - name: ClickHouse
+          type: vertamedia-clickhouse-datasource
+          url: http://clickhouse:8123
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          folder: 'Market Intelligence'
+          type: file
+          options:
+            path: /var/lib/grafana/dashboards
+
+# Apache Airflow
+airflow:
+  enabled: true
+  executor: KubernetesExecutor
+  postgresql:
+    enabled: true
+  redis:
+    enabled: false
+  webserver:
+    defaultUser:
+      enabled: true
+      username: admin
+      password: admin
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+

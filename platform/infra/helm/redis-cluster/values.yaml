@@ -1,0 +1,57 @@
+# Redis Cluster Configuration for 254Carbon
+
+replicaCount: 3
+
+redis:
+  # Redis server configuration
+  port: 6379
+  
+  # Persistence
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: standard
+  
+  # Resources
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  
+  # Configuration
+  config:
+    maxmemory: "800mb"
+    maxmemory-policy: "allkeys-lru"
+    save: "900 1 300 10 60 10000"  # RDB snapshots
+    appendonly: "yes"  # AOF persistence
+    appendfsync: "everysec"
+
+# Redis Sentinel for high availability
+sentinel:
+  enabled: true
+  quorum: 2
+  downAfterMilliseconds: 5000
+  failoverTimeout: 10000
+  parallelSyncs: 1
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 6379
+
+# Security
+auth:
+  enabled: true
+  existingSecret: redis-password
+  existingSecretPasswordKey: password
+
+# Monitoring
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: market-intelligence-infra
+

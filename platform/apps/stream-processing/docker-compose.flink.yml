@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  flink-jobmanager:
+    image: flink:1.18.0-scala_2.12
+    container_name: flink-jobmanager
+    ports:
+      - "8081:8081"  # Flink Web UI
+    command: jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      - FLINK_PROPERTIES=jobmanager.memory.process.size=1600m
+    volumes:
+      - ./flink_job.py:/opt/flink/jobs/flink_job.py
+    networks:
+      - market-intelligence
+
+  flink-taskmanager:
+    image: flink:1.18.0-scala_2.12
+    depends_on:
+      - flink-jobmanager
+    command: taskmanager
+    scale: 2
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      - FLINK_PROPERTIES=taskmanager.memory.process.size=1728m|taskmanager.numberOfTaskSlots=4
+    networks:
+      - market-intelligence
+
+networks:
+  market-intelligence:
+    external: true
+

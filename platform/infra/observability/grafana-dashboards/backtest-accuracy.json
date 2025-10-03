@@ -1,0 +1,113 @@
+{
+  "dashboard": {
+    "title": "Forecast Accuracy - Backtesting",
+    "tags": ["backtesting", "accuracy", "forecasting"],
+    "timezone": "UTC",
+    "panels": [
+      {
+        "title": "MAPE by Market & Product",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "SELECT market, product, avg(mape) as avg_mape FROM pg.backtest_results br JOIN pg.instrument i ON br.instrument_id = i.instrument_id WHERE created_at >= now() - interval '30 days' GROUP BY market, product",
+            "format": "time_series"
+          }
+        ],
+        "yaxes": [
+          {"label": "MAPE (%)", "format": "percent"},
+          {"show": false}
+        ],
+        "thresholds": [
+          {"value": 12, "colorMode": "critical", "op": "gt", "fill": true, "line": true}
+        ]
+      },
+      {
+        "title": "RMSE by Instrument",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "SELECT instrument_id, avg(rmse) as avg_rmse FROM pg.backtest_results WHERE created_at >= now() - interval '30 days' GROUP BY instrument_id ORDER BY avg_rmse DESC LIMIT 20",
+            "format": "time_series"
+          }
+        ],
+        "yaxes": [
+          {"label": "RMSE ($/MWh)", "format": "currencyUSD"},
+          {"show": false}
+        ]
+      },
+      {
+        "title": "Forecast Bias (Mean Error)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "SELECT forecast_date, avg(mean_error) as avg_bias FROM pg.backtest_results WHERE created_at >= now() - interval '90 days' GROUP BY forecast_date ORDER BY forecast_date",
+            "format": "time_series"
+          }
+        ],
+        "yaxes": [
+          {"label": "Bias ($/MWh)", "format": "currencyUSD"},
+          {"show": false}
+        ],
+        "seriesOverrides": [
+          {"alias": "Bias", "color": "#1F77B4"}
+        ]
+      },
+      {
+        "title": "MAPE Trend (30-day rolling)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "SELECT forecast_date, avg(mape) OVER (ORDER BY forecast_date ROWS BETWEEN 29 PRECEDING AND CURRENT ROW) as mape_30d FROM pg.backtest_results ORDER BY forecast_date",
+            "format": "time_series"
+          }
+        ],
+        "yaxes": [
+          {"label": "30-day MAPE (%)", "format": "percent"},
+          {"show": false}
+        ],
+        "alert": {
+          "name": "High MAPE Alert",
+          "conditions": [
+            {
+              "evaluator": {"params": [12], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1h",
+          "handler": 1,
+          "message": "MAPE exceeds 12% threshold",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "title": "Accuracy by Forecast Horizon",
+        "type": "table",
+        "gridPos": {"x": 0, "y": 16, "w": 24, "h": 8},
+        "targets": [
+          {
+            "expr": "SELECT CASE WHEN evaluation_end - forecast_date <= 180 THEN '1-6 months' WHEN evaluation_end - forecast_date <= 730 THEN '7-24 months' ELSE '24+ months' END as horizon, count(*) as n_forecasts, avg(mape) as avg_mape, avg(wape) as avg_wape, avg(rmse) as avg_rmse FROM pg.backtest_results WHERE created_at >= now() - interval '90 days' GROUP BY horizon ORDER BY horizon",
+            "format": "table"
+          }
+        ],
+        "styles": [
+          {"pattern": "avg_mape", "type": "number", "unit": "percent", "decimals": 2, "colorMode": "cell", "colors": ["green", "yellow", "red"], "thresholds": [8, 12]},
+          {"pattern": "avg_wape", "type": "number", "unit": "percent", "decimals": 2},
+          {"pattern": "avg_rmse", "type": "number", "unit": "currencyUSD", "decimals": 2}
+        ]
+      }
+    ],
+    "refresh": "5m",
+    "time": {"from": "now-30d", "to": "now"},
+    "timepicker": {"refresh_intervals": ["5m", "15m", "30m", "1h", "6h", "12h", "1d"]}
+  }
+}
+
