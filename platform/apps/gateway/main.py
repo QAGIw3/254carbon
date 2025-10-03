@@ -2,7 +2,9 @@
 API Gateway Service
 FastAPI application with OIDC integration, core endpoints, and WebSocket streaming.
 """
+import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Optional
@@ -362,30 +364,116 @@ async def get_fundamentals(
 async def websocket_stream(websocket: WebSocket):
     """Real-time price streaming via WebSocket."""
     await websocket.accept()
-    
+
+    instrument_ids = []
+
     try:
         # Authenticate
         auth_msg = await websocket.receive_json()
-        token = auth_msg.get("token")
-        # TODO: Verify token
-        
-        # Subscribe to instruments
-        subscribe_msg = await websocket.receive_json()
-        instrument_ids = subscribe_msg.get("instrument_ids", [])
-        
-        # Register connection
-        await stream_manager.register(websocket, instrument_ids)
-        
-        # Keep connection alive and send updates
-        while True:
-            message = await websocket.receive_text()
-            if message == "ping":
-                await websocket.send_text("pong")
+
+        if auth_msg.get("type") == "subscribe":
+            instrument_ids = auth_msg.get("instruments", [])
+            api_key = auth_msg.get("api_key")
+
+            # For local development, allow dev-key
+            if api_key != "dev-key" and not await verify_token(api_key):
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Invalid API key"
+                })
+                await websocket.close()
+                return
+
+            # Register connection
+            await stream_manager.register(websocket, instrument_ids)
+
+            # Send confirmation
+            await websocket.send_json({
+                "type": "subscribed",
+                "instruments": instrument_ids,
+                "message": f"Subscribed to {len(instrument_ids)} instruments"
+            })
+
+            # Start streaming mock data for local development
+            if os.getenv("LOCAL_DEV", "true") == "true":
+                await stream_mock_data(websocket, instrument_ids)
+            else:
+                # In production, would stream from Kafka
+                await stream_kafka_data(websocket, instrument_ids)
+
+        else:
+            await websocket.send_json({
+                "type": "error",
+                "message": "Invalid subscription message"
+            })
+
     except WebSocketDisconnect:
         await stream_manager.unregister(websocket)
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         await stream_manager.unregister(websocket)
+
+
+async def stream_mock_data(websocket: WebSocket, instrument_ids: list[str]):
+    """Stream mock price data for local development."""
+    import random
+    import json
+
+    while True:
+        try:
+            # Generate mock price updates
+            for instrument_id in instrument_ids:
+                # Generate realistic price based on instrument
+                if "MISO" in instrument_id:
+                    base_price = 35.0
+                elif "PJM" in instrument_id:
+                    base_price = 40.0
+                elif "CAISO" in instrument_id:
+                    base_price = 45.0
+                else:
+                    base_price = 40.0
+
+                # Add some random variation
+                price = base_price + random.uniform(-2, 2)
+                price = max(0, price)  # Ensure non-negative
+
+                price_update = {
+                    "type": "price_update",
+                    "data": {
+                        "instrument_id": instrument_id,
+                        "value": round(price, 2),
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "source": "mock",
+                        "market": "power",
+                        "product": "lmp"
+                    }
+                }
+
+                await websocket.send_json(price_update)
+
+            # Send updates every 5 seconds
+            await asyncio.sleep(5)
+
+        except WebSocketDisconnect:
+            break
+        except Exception as e:
+            logger.error(f"Error streaming mock data: {e}")
+            break
+
+
+async def stream_kafka_data(websocket: WebSocket, instrument_ids: list[str]):
+    """Stream real price data from Kafka (placeholder)."""
+    # In production, this would consume from Kafka and filter for subscribed instruments
+    # For now, just send periodic heartbeat
+    while True:
+        try:
+            await websocket.send_json({
+                "type": "heartbeat",
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            await asyncio.sleep(30)
+        except WebSocketDisconnect:
+            break
 
 
 # Error handlers

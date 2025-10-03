@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '../stores/authStore';
 
 export const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -30,4 +30,149 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// WebSocket streaming functionality
+export class WebSocketManager {
+  private ws: WebSocket | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectInterval = 1000; // Start with 1 second
+  private listeners: Map<string, Set<(data: any) => void>> = new Map();
+  private isConnected = false;
+
+  connect(instrumentIds: string[] = []): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api/v1/stream';
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+          console.log('WebSocket connected');
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+          this.reconnectInterval = 1000;
+
+          // Subscribe to instruments if provided
+          if (instrumentIds.length > 0) {
+            this.subscribeToInstruments(instrumentIds);
+          }
+
+          resolve();
+        };
+
+        this.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            this.handleMessage(data);
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+          }
+        };
+
+        this.ws.onclose = () => {
+          console.log('WebSocket disconnected');
+          this.isConnected = false;
+          this.attemptReconnect(instrumentIds);
+        };
+
+        this.ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          reject(error);
+        };
+
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  disconnect(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.isConnected = false;
+  }
+
+  private attemptReconnect(instrumentIds: string[]): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('Max reconnection attempts reached');
+      return;
+    }
+
+    this.reconnectAttempts++;
+    console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+
+    setTimeout(() => {
+      this.connect(instrumentIds).catch(error => {
+        console.error('Reconnection failed:', error);
+      });
+    }, this.reconnectInterval);
+
+    // Exponential backoff
+    this.reconnectInterval = Math.min(this.reconnectInterval * 2, 30000);
+  }
+
+  private subscribeToInstruments(instrumentIds: string[]): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const token = useAuthStore.getState().token;
+      const subscription = {
+        type: 'subscribe',
+        instruments: instrumentIds,
+        api_key: token || 'dev-key'
+      };
+
+      this.ws.send(JSON.stringify(subscription));
+    }
+  }
+
+  private handleMessage(data: any): void {
+    if (data.type === 'price_update' && data.data) {
+      // Notify all price update listeners
+      this.notifyListeners('price_update', data.data);
+    } else if (data.type === 'instrument_update' && data.data) {
+      // Notify all instrument update listeners
+      this.notifyListeners('instrument_update', data.data);
+    }
+  }
+
+  private notifyListeners(eventType: string, data: any): void {
+    const listeners = this.listeners.get(eventType);
+    if (listeners) {
+      listeners.forEach(listener => {
+        try {
+          listener(data);
+        } catch (error) {
+          console.error('Error in WebSocket listener:', error);
+        }
+      });
+    }
+  }
+
+  addListener(eventType: string, callback: (data: any) => void): () => void {
+    if (!this.listeners.has(eventType)) {
+      this.listeners.set(eventType, new Set());
+    }
+
+    this.listeners.get(eventType)!.add(callback);
+
+    // Return cleanup function
+    return () => {
+      const listeners = this.listeners.get(eventType);
+      if (listeners) {
+        listeners.delete(callback);
+        if (listeners.size === 0) {
+          this.listeners.delete(eventType);
+        }
+      }
+    };
+  }
+
+  isWebSocketConnected(): boolean {
+    return this.isConnected;
+  }
+}
+
+// Global WebSocket manager instance
+export const webSocketManager = new WebSocketManager();
 

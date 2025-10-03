@@ -225,6 +225,28 @@ class ModelRegistry:
         
         return list(self.models[instrument_id].values())
     
+    def get_all_instruments(self) -> List[str]:
+        """Get list of all instruments that have models."""
+        return list(self.models.keys())
+
+    def get_active_model(self, instrument_id: str) -> Optional[PriceForecastModel]:
+        """Get the currently active model for an instrument."""
+        if instrument_id not in self.models:
+            return None
+
+        for model in self.models[instrument_id].values():
+            if model.is_active:
+                return model
+
+        # If no model is explicitly active, return the most recent
+        if self.models[instrument_id]:
+            return max(
+                self.models[instrument_id].values(),
+                key=lambda m: m.trained_date
+            )
+
+        return None
+
     def count(self) -> int:
         """Total number of models loaded."""
         return sum(len(models) for models in self.models.values())

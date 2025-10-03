@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from .feature_engineering import FeatureEngineer
 from .models import PriceForecastModel, ModelRegistry
 from .training import ModelTrainer
+from .retraining_pipeline import RetrainingPipeline
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ app = FastAPI(
 feature_engineer = FeatureEngineer()
 model_registry = ModelRegistry()
 trainer = ModelTrainer()
+retraining_pipeline = RetrainingPipeline()
 
 
 class ForecastRequest(BaseModel):
@@ -216,6 +218,145 @@ async def activate_model(instrument_id: str, version: str):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/models/retrain")
+async def trigger_retraining(
+    instrument_ids: List[str],
+    retrain_threshold: float = 0.15,  # Retrain if MAPE > 15%
+    force_retrain: bool = False,
+):
+    """
+    Trigger automated model retraining pipeline.
+
+    Monitors model performance and retrains when performance degrades.
+    """
+    logger.info(f"Triggering retraining for {len(instrument_ids)} instruments")
+
+    results = []
+
+    for instrument_id in instrument_ids:
+        # Check current model performance
+        current_performance = await retraining_pipeline.check_model_performance(
+            instrument_id
+        )
+
+        should_retrain = (
+            force_retrain or
+            current_performance.get("mape", 0) > retrain_threshold
+        )
+
+        if should_retrain:
+            logger.info(f"Retraining {instrument_id} (MAPE: {current_performance.get('mape', 0):.3f})")
+
+            # Run retraining pipeline
+            retrain_result = await retraining_pipeline.retrain_model(
+                instrument_id,
+                model_type="xgboost"  # Default model type
+            )
+
+            results.append({
+                "instrument_id": instrument_id,
+                "retrained": True,
+                "old_performance": current_performance,
+                "new_performance": retrain_result.get("performance"),
+                "model_version": retrain_result.get("model_version"),
+            })
+        else:
+            logger.info(f"Skipping {instrument_id} (MAPE: {current_performance.get('mape', 0):.3f})")
+
+            results.append({
+                "instrument_id": instrument_id,
+                "retrained": False,
+                "current_performance": current_performance,
+            })
+
+    return {
+        "total_instruments": len(instrument_ids),
+        "retrained_count": sum(1 for r in results if r["retrained"]),
+        "results": results,
+    }
+
+
+@app.get("/api/v1/models/performance")
+async def get_model_performance(
+    instrument_id: str,
+    days: int = 30,
+):
+    """
+    Get model performance metrics for monitoring.
+
+    Returns MAPE, RMSE, and other metrics over recent period.
+    """
+    try:
+        performance = await retraining_pipeline.get_performance_metrics(
+            instrument_id, days=days
+        )
+
+        return {
+            "instrument_id": instrument_id,
+            "evaluation_period_days": days,
+            "metrics": performance,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting performance metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/models/health")
+async def get_models_health():
+    """
+    Get overall health status of all deployed models.
+
+    Returns summary of model performance across all instruments.
+    """
+    try:
+        # Get list of all instruments from registry
+        all_instruments = await model_registry.get_all_instruments()
+
+        health_summary = {
+            "total_models": len(all_instruments),
+            "healthy_models": 0,
+            "degraded_models": 0,
+            "failed_models": 0,
+            "instrument_details": [],
+        }
+
+        for instrument_id in all_instruments:
+            try:
+                performance = await retraining_pipeline.check_model_performance(instrument_id)
+
+                mape = performance.get("mape", 0)
+                instrument_health = {
+                    "instrument_id": instrument_id,
+                    "mape": mape,
+                    "rmse": performance.get("rmse", 0),
+                    "status": "healthy" if mape < 0.12 else "degraded" if mape < 0.20 else "failed",
+                }
+
+                health_summary["instrument_details"].append(instrument_health)
+
+                if mape < 0.12:
+                    health_summary["healthy_models"] += 1
+                elif mape < 0.20:
+                    health_summary["degraded_models"] += 1
+                else:
+                    health_summary["failed_models"] += 1
+
+            except Exception as e:
+                logger.warning(f"Could not check health for {instrument_id}: {e}")
+                health_summary["instrument_details"].append({
+                    "instrument_id": instrument_id,
+                    "status": "unknown",
+                    "error": str(e),
+                })
+
+        return health_summary
+
+    except Exception as e:
+        logger.error(f"Error getting models health: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
