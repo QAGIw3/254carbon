@@ -50,9 +50,11 @@ print(curve_df.head())
 - **Type-safe API client** with Pydantic models
 - **Pandas integration** for easy data analysis
 - **Async support** for high-performance applications
+- **WebSocket streaming** for real-time price updates
+- **Advanced analytics** (VaR, correlation, forecasting)
+- **Local development mode** with mock data fallbacks
 - **Automatic retry** and error handling
 - **Rate limiting** compliance
-- **Streaming support** via WebSocket (coming soon)
 
 ## Usage Examples
 
@@ -156,6 +158,64 @@ curve = client.get_curve_dataframe(
 )
 ```
 
+### Real-time Streaming
+
+```python
+import asyncio
+from carbon254 import CarbonClient
+
+def handle_price_update(price_tick):
+    print(f"📈 {price_tick.instrument_id}: ${price_tick.value:.2f}")
+
+async def stream_example():
+    client = CarbonClient(local_dev=True)
+
+    # Stream real-time prices
+    instruments = ["MISO.HUB.INDIANA", "PJM.HUB.WEST"]
+    await client.stream_prices(instruments, handle_price_update)
+
+    client.close()
+
+# Run streaming
+asyncio.run(stream_example())
+```
+
+### Advanced Analytics
+
+```python
+# Portfolio Value at Risk
+portfolio = [
+    {"instrument_id": "MISO.HUB.INDIANA", "quantity": 1000},
+    {"instrument_id": "PJM.HUB.WEST", "quantity": -500}
+]
+
+var_result = client.get_portfolio_var(portfolio, confidence_level=0.95)
+print(f"Portfolio VaR: ${var_result['total_var']:.2f}")
+
+# Correlation Analysis
+instruments = ["MISO.HUB.INDIANA", "PJM.HUB.WEST", "CAISO.SP15"]
+corr_matrix = client.get_correlation_matrix(
+    instruments,
+    start_date=datetime.now() - timedelta(days=30),
+    end_date=datetime.now()
+)
+print(corr_matrix)
+
+# Price Forecasting
+forecast = client.get_price_forecast("MISO.HUB.INDIANA", horizon_days=30)
+print(f"30-day forecast average: ${forecast['forecast_price'].mean():.2f}/MWh")
+```
+
+### Local Development Mode
+
+```python
+# Enable local development with mock data fallbacks
+client = CarbonClient(local_dev=True)  # Uses localhost:8000 and mock data
+
+# No API key required for basic functionality
+# Automatic fallback to realistic mock data when API unavailable
+```
+
 ### Async Usage
 
 ```python
@@ -213,7 +273,7 @@ except Exception as e:
 
 Main client class for interacting with the 254Carbon API.
 
-**Methods:**
+**Core Methods:**
 
 - `get_instruments(market=None, product=None)` - Get available instruments
 - `get_prices(instrument_id, start_time, end_time, price_type="mid")` - Get price ticks
@@ -224,21 +284,66 @@ Main client class for interacting with the 254Carbon API.
 - `run_scenario(scenario_id)` - Execute scenario
 - `get_run_status(scenario_id, run_id)` - Get run status
 
+**Streaming Methods:**
+
+- `stream_prices(instrument_ids, callback, reconnect=True)` - Stream real-time price updates
+- `stream_prices_sync(instrument_ids, callback)` - Synchronous price streaming
+
+**Advanced Analytics:**
+
+- `get_portfolio_var(positions, confidence_level=0.95, method="historical")` - Portfolio VaR
+- `get_correlation_matrix(instruments, start_date, end_date, window=30)` - Correlation matrix
+- `get_price_forecast(instrument_id, horizon_days=30, model_type="ensemble")` - Price forecasts
+
 ## Configuration
 
 ### Environment Variables
 
 ```bash
+# Production
 export CARBON254_API_KEY="your_api_key"
 export CARBON254_BASE_URL="https://api.254carbon.ai"  # Optional
+
+# Local Development (default when no API key provided)
+export CARBON254_LOCAL_DEV="true"  # Enable local dev mode
+export CARBON254_API_URL="http://localhost:8000"  # Local API URL
+export CARBON254_API_KEY="dev-key"  # Development key
 ```
+
+### Client Configuration
 
 ```python
 import os
 from carbon254 import CarbonClient
 
-# Client will read from environment
+# Production client
+client = CarbonClient(api_key="your_api_key")
+
+# Local development client (auto-detects localhost)
+client = CarbonClient(local_dev=True)  # Uses localhost:8000
+
+# Manual configuration
+client = CarbonClient(
+    api_key="your_key",
+    base_url="https://api.254carbon.ai",
+    local_dev=False
+)
+
+# Environment variable configuration
 client = CarbonClient(api_key=os.getenv("CARBON254_API_KEY"))
+```
+
+## Examples
+
+### Basic Examples
+- `examples/streaming_example.py` - Real-time price streaming demo
+- `examples/analytics_example.py` - Advanced analytics (VaR, correlation, forecasting)
+
+Run examples:
+```bash
+cd examples/
+python streaming_example.py
+python analytics_example.py
 ```
 
 ## Development
@@ -246,7 +351,7 @@ client = CarbonClient(api_key=os.getenv("CARBON254_API_KEY"))
 ### Running Tests
 
 ```bash
-pip install carbon254[dev]
+pip install -r requirements.txt
 pytest tests/
 ```
 
@@ -261,6 +366,25 @@ black carbon254/
 ```bash
 mypy carbon254/
 ```
+
+### Local Development Setup
+
+1. **Start the 254Carbon platform:**
+   ```bash
+   cd ../platform
+   ./scripts/dev-setup.sh
+   ```
+
+2. **Install SDK in development mode:**
+   ```bash
+   pip install -e .
+   ```
+
+3. **Run examples:**
+   ```bash
+   python examples/streaming_example.py
+   python examples/analytics_example.py
+   ```
 
 ## Support
 

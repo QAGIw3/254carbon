@@ -12,9 +12,9 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from .decomposer import LMPDecomposer
-from .ptdf_calculator import PTDFCalculator
-from .basis_surface import BasisSurfaceModeler
+from decomposer import LMPDecomposer
+from ptdf_calculator import PTDFCalculator
+from basis_surface import BasisSurfaceModeler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

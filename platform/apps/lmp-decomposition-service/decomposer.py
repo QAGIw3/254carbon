@@ -2,8 +2,9 @@
 LMP decomposition logic.
 """
 import logging
+import os
 from datetime import datetime, timedelta, date
-from typing import Dict, List
+from typing import Dict, List, Any
 import numpy as np
 import pandas as pd
 from clickhouse_driver import Client
@@ -41,6 +42,25 @@ class LMPDecomposer:
         iso: str,
     ) -> pd.DataFrame:
         """Get raw LMP data from ClickHouse."""
+        # Mock mode for local development
+        if os.getenv("MOCK_MODE", "0") == "1":
+            timestamps = pd.date_range(start=start_time, end=end_time, freq="H", inclusive="both")
+            rows = []
+            for node in node_ids:
+                base = 40.0 + (hash(node) % 10)
+                for ts in timestamps:
+                    hour = ts.hour
+                    if 6 <= hour < 10 or 17 <= hour < 21:
+                        mult = 1.2
+                    elif hour >= 22 or hour < 6:
+                        mult = 0.85
+                    else:
+                        mult = 1.0
+                    price = base * mult + ((hash(str(ts)) % 5))
+                    rows.append((ts.to_pydatetime(), node, float(price)))
+            df = pd.DataFrame(rows, columns=["timestamp", "node_id", "lmp"])
+            return df
+
         query = """
         SELECT 
             event_time as timestamp,
@@ -76,6 +96,22 @@ class LMPDecomposer:
         if not hub_id:
             logger.warning(f"No reference hub for {iso}, using fallback")
             return {}
+        
+        # Mock mode for local development
+        if os.getenv("MOCK_MODE", "0") == "1":
+            timestamps = pd.date_range(start=start_time, end=end_time, freq="H", inclusive="both")
+            base = 40.0
+            series = {}
+            for ts in timestamps:
+                hour = ts.hour
+                if 6 <= hour < 10 or 17 <= hour < 21:
+                    mult = 1.15
+                elif hour >= 22 or hour < 6:
+                    mult = 0.9
+                else:
+                    mult = 1.0
+                series[ts.to_pydatetime()] = float(base * mult)
+            return series
         
         query = """
         SELECT 

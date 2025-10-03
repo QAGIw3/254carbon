@@ -13,10 +13,37 @@ Real-time market data feeds and analytics functions for Microsoft Excel.
 
 ### Requirements
 - Microsoft Excel 2016 or later (Windows)
-- .NET Framework 4.7.2 or later
+- .NET 6.0 Runtime or later
 - 254Carbon API key
 
-### Install Steps
+### Development Setup (Local)
+
+1. **Start the 254Carbon platform:**
+   ```bash
+   cd platform
+   ./scripts/dev-setup.sh
+   ```
+
+2. **Build the Excel Add-in:**
+   ```bash
+   cd apps/excel-addin
+   dotnet build
+   ```
+
+3. **Register the Add-in:**
+   ```bash
+   # Build and register (Windows)
+   dotnet run -- register
+   ```
+
+4. **Load in Excel:**
+   - Open Excel
+   - Go to File → Options → Add-ins
+   - Click "Go" next to "Manage: Excel Add-ins"
+   - Click "Browse" and select `254Carbon\bin\Debug\net6.0-windows\254Carbon-AddIn.xll`
+   - Check the box next to "254Carbon" and click OK
+
+### Production Installation
 
 1. Download `254Carbon-ExcelAddin.xll` from releases
 2. In Excel, go to File → Options → Add-ins
@@ -28,13 +55,26 @@ Real-time market data feeds and analytics functions for Microsoft Excel.
 
 ### Connect to API
 
+#### Local Development
+```excel
+=C254_CONNECT("dev-key")
+```
+
+Or set environment variables:
+```bash
+export CARBON254_LOCAL_DEV=true
+export CARBON254_API_URL=http://localhost:8000
+export CARBON254_API_KEY=dev-key
+```
+
+#### Production
 ```excel
 =C254_CONNECT("your_api_key_here")
 ```
 
 Or set environment variable:
-```
-CARBON254_API_KEY=your_api_key
+```bash
+export CARBON254_API_KEY=your_api_key
 ```
 
 ### Get Live Price (RTD)
@@ -112,12 +152,28 @@ Returns array of instruments. Use Ctrl+Shift+Enter for array formula.
 | MISO Hub | 500 | =C254_VAR("MISO.HUB.INDIANA",500,0.95) | =C254_VAR("MISO.HUB.INDIANA",500,0.99) |
 | PJM West | -300 | =C254_VAR("PJM.HUB.WEST",-300,0.95) | =C254_VAR("PJM.HUB.WEST",-300,0.99) |
 
+## Local Development Features
+
+### Mock Data Mode
+When running in local development mode, the add-in will automatically fall back to generating realistic mock data if the API is unavailable:
+
+- **Real-time prices** update every 5 seconds with realistic market patterns
+- **Forward curves** show contango patterns (increasing prices over time)
+- **Historical averages** calculated from mock price history
+- **VaR calculations** use realistic volatility assumptions
+
+### Development Benefits
+- ✅ **No API key required** for basic testing
+- ✅ **Offline development** possible without internet
+- ✅ **Realistic test data** for spreadsheet development
+- ✅ **Hot-reloading** when code changes (restart Excel to pick up changes)
+
 ## Troubleshooting
 
 ### #N/A Error
 - Check API key is set correctly
 - Verify instrument ID exists
-- Check network connection
+- Check network connection to localhost:8000
 
 ### #VALUE! Error
 - Verify parameter types (dates as text, numbers as numbers)
@@ -125,12 +181,18 @@ Returns array of instruments. Use Ctrl+Shift+Enter for array formula.
 
 ### RTD Not Updating
 - Ensure Excel calculation is set to Automatic
-- Check RTD server is registered: `regsvr32 Carbon254.RTDServer.dll`
+- Check RTD server is registered (rebuild and reload add-in)
 
 ### Authentication Errors
-- Verify API key is valid
+- For local development: Use `=C254_CONNECT("dev-key")`
+- For production: Verify API key is valid
 - Check entitlements for instrument/market
 - Try reconnecting: `=C254_CONNECT("your_key")`
+
+### Development Issues
+- **Add-in not loading**: Rebuild with `dotnet build` and reload in Excel
+- **Mock data not working**: Ensure `CARBON254_LOCAL_DEV=true` environment variable is set
+- **API connection issues**: Check that the 254Carbon platform is running on localhost:8000
 
 ## Performance Tips
 

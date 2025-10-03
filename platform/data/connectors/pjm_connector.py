@@ -250,11 +250,6 @@ class PJMConnector(Ingestor):
         logger.info(f"Emitted {count} PJM events to {self.kafka_topic}")
         return count
     
-    def checkpoint(self, state: Dict[str, Any]) -> None:
-        """Save checkpoint to state store."""
-        self.checkpoint_state = state
-        # TODO: Persist to PostgreSQL
-        logger.debug(f"PJM checkpoint saved: {state}")
 
 
 if __name__ == "__main__":

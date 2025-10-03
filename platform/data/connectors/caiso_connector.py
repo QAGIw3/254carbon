@@ -276,11 +276,6 @@ class CAISOConnector(Ingestor):
         
         return event["instrument_id"] in allowed_hubs
     
-    def checkpoint(self, state: Dict[str, Any]) -> None:
-        """Save checkpoint to state store."""
-        self.checkpoint_state = state
-        # TODO: Persist to PostgreSQL checkpoint table
-        logger.debug(f"Checkpoint saved: {state}")
 
 
 if __name__ == "__main__":

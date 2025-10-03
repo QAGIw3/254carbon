@@ -117,11 +117,6 @@ class MISOConnector(Ingestor):
         logger.info(f"Emitted {count} events to {self.kafka_topic}")
         return count
     
-    def checkpoint(self, state: Dict[str, Any]) -> None:
-        """Save checkpoint to state store."""
-        self.checkpoint_state = state
-        # TODO: Persist to PostgreSQL
-        logger.debug(f"Checkpoint saved: {state}")
 
 
 if __name__ == "__main__":

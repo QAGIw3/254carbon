@@ -1,0 +1,7 @@
+<DnaLibrary Name="254Carbon Excel Add-in" RuntimeVersion="v4.0">
+  <ExternalLibrary Path="254Carbon.dll" LoadFromBytes="true" />
+
+  <Project Name="254Carbon" Path=".">
+    <Reference AssemblyPath="254Carbon.dll" />
+  </Project>
+</DnaLibrary>

@@ -12,8 +12,10 @@ import cvxpy as cp
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from .db import get_clickhouse_client, get_postgres_pool
-from .qp_solver import smooth_curve, reconcile_tenors
+from db import get_clickhouse_client, get_postgres_pool
+from qp_solver import smooth_curve, reconcile_tenors
+import os
+import httpx
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,6 +44,7 @@ class CurveResponse(BaseModel):
     points: list[dict]
     status: str
     message: Optional[str] = None
+    decomposition_sample: Optional[dict] = None
 
 
 @app.get("/health")
@@ -158,6 +161,40 @@ async def generate_curve(request: CurveRequest):
             )
         
         logger.info(f"Curve generated successfully: {run_id}")
+
+        # Optionally enrich with LMP decomposition sample (first node if available)
+        decomposition_sample = None
+        try:
+            if os.getenv("ENABLE_DECOMPOSITION", "0") == "1":
+                # Derive a plausible node_id from instrument (if already node-like)
+                node_id = request.instrument_id
+                start_time = datetime.combine(request.as_of_date, datetime.min.time())
+                end_time = datetime.combine(request.as_of_date, datetime.max.time())
+                payload = {
+                    "node_ids": [node_id],
+                    "start_time": start_time.isoformat(),
+                    "end_time": end_time.isoformat(),
+                    "iso": instrument["market"].upper(),
+                }
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(
+                        "http://lmp-decomposition-service:8009/api/v1/lmp/decompose",
+                        json=payload,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if isinstance(data, list) and data:
+                            sample = data[0]
+                            decomposition_sample = {
+                                "timestamp": sample.get("timestamp"),
+                                "node_id": sample.get("node_id"),
+                                "lmp_total": sample.get("lmp_total"),
+                                "energy_component": sample.get("energy_component"),
+                                "congestion_component": sample.get("congestion_component"),
+                                "loss_component": sample.get("loss_component"),
+                            }
+        except Exception as e:
+            logger.warning(f"Decomposition enrichment skipped: {e}")
         
         return CurveResponse(
             run_id=run_id,
@@ -165,6 +202,7 @@ async def generate_curve(request: CurveRequest):
             scenario_id=request.scenario_id,
             points=points,
             status="success",
+            decomposition_sample=decomposition_sample,
         )
         
     except HTTPException:

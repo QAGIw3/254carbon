@@ -6,4 +6,5 @@ cvxpy==1.4.2
 osqp==0.6.4
 asyncpg==0.29.0
 clickhouse-driver==0.2.6
+httpx==0.26.0
 

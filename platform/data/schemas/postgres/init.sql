@@ -135,6 +135,14 @@ CREATE TABLE IF NOT EXISTS pg.backtest_results (
     created_at        TIMESTAMPTZ DEFAULT now()
 );
 
+-- Connector checkpoint persistence for resume/recovery
+CREATE TABLE IF NOT EXISTS pg.connector_checkpoints (
+    source_id       VARCHAR(100) PRIMARY KEY,
+    checkpoint_data JSONB NOT NULL,
+    last_updated    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_instrument_market ON pg.instrument(market, product);
 CREATE INDEX IF NOT EXISTS idx_scenario_created ON pg.scenario(created_at DESC);
@@ -143,6 +151,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON pg.audit_log(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON pg.audit_log(user_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_backtest_instrument ON pg.backtest_results(instrument_id, forecast_date DESC);
 CREATE INDEX IF NOT EXISTS idx_backtest_created ON pg.backtest_results(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_checkpoint_updated ON pg.connector_checkpoints(last_updated DESC);
 
 -- Insert reference data
 INSERT INTO pg.unit_ref (unit, description) VALUES

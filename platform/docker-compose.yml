@@ -12,6 +12,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./data/schemas/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d market_intelligence"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   clickhouse:
     image: clickhouse/clickhouse-server:latest
@@ -21,6 +26,11 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./data/schemas/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kafka:
     image: bitnami/kafka:latest
@@ -64,51 +74,152 @@ services:
       - postgres
 
   gateway:
-    build: ./apps/gateway
+    build:
+      context: ./apps/gateway
+      dockerfile: Dockerfile.dev
     ports:
       - "8000:8000"
+    volumes:
+      - ./apps/gateway:/app
+      - /app/__pycache__  # Exclude cache for hot reload
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/market_intelligence
       CLICKHOUSE_HOST: clickhouse
       KAFKA_BOOTSTRAP: kafka:9092
+      PYTHONPATH: /app
     depends_on:
-      - postgres
-      - clickhouse
-      - kafka
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
 
   curve-service:
-    build: ./apps/curve-service
+    build:
+      context: ./apps/curve-service
+      dockerfile: Dockerfile.dev
     ports:
       - "8001:8001"
+    volumes:
+      - ./apps/curve-service:/app
+      - /app/__pycache__
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/market_intelligence
       CLICKHOUSE_HOST: clickhouse
+      PYTHONPATH: /app
     depends_on:
-      - postgres
-      - clickhouse
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
 
   scenario-engine:
-    build: ./apps/scenario-engine
+    build:
+      context: ./apps/scenario-engine
+      dockerfile: Dockerfile.dev
     ports:
       - "8002:8002"
+    volumes:
+      - ./apps/scenario-engine:/app
+      - /app/__pycache__
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/market_intelligence
       CLICKHOUSE_HOST: clickhouse
       S3_ENDPOINT: http://minio:9000
+      PYTHONPATH: /app
     depends_on:
-      - postgres
-      - clickhouse
-      - minio
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  report-service:
+    build:
+      context: ./apps/report-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./apps/report-service:/app
+      - /app/__pycache__
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/market_intelligence
+      CLICKHOUSE_HOST: clickhouse
+      S3_ENDPOINT: http://minio:9000
+      PYTHONPATH: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backtesting-service:
+    build:
+      context: ./apps/backtesting-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./apps/backtesting-service:/app
+      - /app/__pycache__
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/market_intelligence
+      CLICKHOUSE_HOST: clickhouse
+      PYTHONPATH: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+
+  download-center:
+    build:
+      context: ./apps/download-center
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8006:8006"
+    volumes:
+      - ./apps/download-center:/app
+      - /app/__pycache__
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/market_intelligence
+      S3_ENDPOINT: http://minio:9000
+      PYTHONPATH: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
 
   web-hub:
-    build: ./apps/web-hub
+    build:
+      context: ./apps/web-hub
+      dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
+    volumes:
+      - ./apps/web-hub/src:/app/src
+      - ./apps/web-hub/public:/app/public
+      - /app/node_modules
     environment:
       VITE_API_URL: http://localhost:8000
       VITE_KEYCLOAK_URL: http://localhost:8080/auth
+      VITE_WS_URL: ws://localhost:8000
     depends_on:
-      - gateway
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:
