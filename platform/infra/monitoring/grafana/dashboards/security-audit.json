@@ -1,0 +1,173 @@
+{
+  "dashboard": {
+    "title": "Security & Audit Monitoring",
+    "tags": ["security", "audit", "compliance"],
+    "timezone": "UTC",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Failed Authentication Attempts",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  date_trunc('minute', timestamp) as time,\n  count(*) as failed_attempts\nFROM pg.audit_log\nWHERE action = 'authenticate'\n  AND success = false\n  AND timestamp > NOW() - INTERVAL '1 hour'\nGROUP BY time\nORDER BY time",
+            "format": "time_series"
+          }
+        ],
+        "alert": {
+          "name": "Brute Force Attack",
+          "conditions": [
+            {
+              "evaluator": {"type": "gt", "params": [10]},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"type": "sum"}
+            }
+          ],
+          "message": "Multiple failed authentication attempts detected - possible brute force attack"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Authorization Failures",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 0, "w": 6, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT count(*) as failures\nFROM pg.audit_log\nWHERE action = 'authorize_denied'\n  AND timestamp > NOW() - INTERVAL '1 hour'",
+            "format": "time_series"
+          }
+        ],
+        "thresholds": [
+          {"value": 0, "color": "green"},
+          {"value": 10, "color": "yellow"},
+          {"value": 50, "color": "red"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Active Users (Last Hour)",
+        "type": "stat",
+        "gridPos": {"x": 18, "y": 0, "w": 6, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT count(DISTINCT user_id) as active_users\nFROM pg.audit_log\nWHERE timestamp > NOW() - INTERVAL '1 hour'",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Top 10 Users by Activity",
+        "type": "table",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  user_id,\n  tenant_id,\n  count(*) as total_actions,\n  sum(CASE WHEN success THEN 1 ELSE 0 END) as successful,\n  sum(CASE WHEN success THEN 0 ELSE 1 END) as failed,\n  max(timestamp) as last_activity\nFROM pg.audit_log\nWHERE timestamp > NOW() - INTERVAL '24 hours'\nGROUP BY user_id, tenant_id\nORDER BY total_actions DESC\nLIMIT 10",
+            "format": "table"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Data Exports by User",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  date_trunc('hour', timestamp) as time,\n  user_id,\n  count(*) as exports\nFROM pg.audit_log\nWHERE action = 'export'\n  AND timestamp > NOW() - INTERVAL '24 hours'\nGROUP BY time, user_id\nORDER BY time",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Sensitive Data Access",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  date_trunc('hour', timestamp) as time,\n  resource_type,\n  count(*) as accesses\nFROM pg.audit_log\nWHERE action = 'read_sensitive'\n  AND timestamp > NOW() - INTERVAL '24 hours'\nGROUP BY time, resource_type\nORDER BY time",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Configuration Changes",
+        "type": "table",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  timestamp,\n  user_id,\n  resource_id as config_key,\n  details->>'old_value' as old_value,\n  details->>'new_value' as new_value\nFROM pg.audit_log\nWHERE action = 'config_change'\n  AND timestamp > NOW() - INTERVAL '7 days'\nORDER BY timestamp DESC\nLIMIT 50",
+            "format": "table"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Unusual Activity Alerts",
+        "type": "table",
+        "gridPos": {"x": 0, "y": 24, "w": 24, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "WITH user_stats AS (\n  SELECT\n    user_id,\n    count(*) as action_count,\n    avg(count(*)) OVER () as avg_actions\n  FROM pg.audit_log\n  WHERE timestamp > NOW() - INTERVAL '1 hour'\n  GROUP BY user_id\n)\nSELECT\n  a.timestamp,\n  a.user_id,\n  a.action,\n  a.resource_type,\n  a.ip_address,\n  us.action_count,\n  ROUND(us.avg_actions, 0) as platform_avg\nFROM pg.audit_log a\nJOIN user_stats us ON a.user_id = us.user_id\nWHERE us.action_count > (us.avg_actions * 3)\n  AND a.timestamp > NOW() - INTERVAL '1 hour'\nORDER BY a.timestamp DESC\nLIMIT 100",
+            "format": "table"
+          }
+        ],
+        "description": "Users with >3x average activity (possible automated scraping)"
+      },
+      {
+        "id": 9,
+        "title": "Access by IP Address",
+        "type": "worldmap",
+        "gridPos": {"x": 0, "y": 32, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  ip_address,\n  count(*) as access_count\nFROM pg.audit_log\nWHERE timestamp > NOW() - INTERVAL '24 hours'\n  AND ip_address IS NOT NULL\nGROUP BY ip_address\nORDER BY access_count DESC",
+            "format": "table"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "API Calls by Tenant",
+        "type": "piechart",
+        "gridPos": {"x": 12, "y": 32, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  tenant_id,\n  count(*) as api_calls\nFROM pg.audit_log\nWHERE action = 'api_call'\n  AND timestamp > NOW() - INTERVAL '24 hours'\nGROUP BY tenant_id\nORDER BY api_calls DESC",
+            "format": "table"
+          }
+        ]
+      }
+    ],
+    "refresh": "1m",
+    "time": {"from": "now-24h", "to": "now"},
+    "timepicker": {
+      "refresh_intervals": ["30s", "1m", "5m", "15m", "30m", "1h"]
+    }
+  }
+}
+
+

@@ -1,0 +1,117 @@
+{
+  "dashboard": {
+    "title": "Forecast Accuracy Monitoring",
+    "tags": ["backtesting", "accuracy", "forecasts"],
+    "timezone": "UTC",
+    "panels": [
+      {
+        "id": 1,
+        "title": "MAPE by Market (Last 30 Days)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  date_trunc('day', created_at) as time,\n  i.market,\n  AVG(br.mape) as avg_mape\nFROM pg.backtest_results br\nJOIN pg.instrument i ON br.instrument_id = i.instrument_id\nWHERE br.created_at > NOW() - INTERVAL '30 days'\nGROUP BY time, i.market\nORDER BY time",
+            "format": "time_series"
+          }
+        ],
+        "yaxes": [
+          {"label": "MAPE (%)", "format": "percent"},
+          {"show": false}
+        ],
+        "alert": {
+          "name": "High MAPE Alert",
+          "conditions": [
+            {
+              "evaluator": {"type": "gt", "params": [12]},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"type": "avg"}
+            }
+          ],
+          "message": "Power hub MAPE exceeds 12% threshold"
+        }
+      },
+      {
+        "id": 2,
+        "title": "WAPE by Product",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  date_trunc('day', created_at) as time,\n  i.product,\n  AVG(br.wape) as avg_wape\nFROM pg.backtest_results br\nJOIN pg.instrument i ON br.instrument_id = i.instrument_id\nWHERE br.created_at > NOW() - INTERVAL '30 days'\nGROUP BY time, i.product\nORDER BY time",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "RMSE Distribution",
+        "type": "heatmap",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  date_trunc('hour', created_at) as time,\n  i.market,\n  br.rmse\nFROM pg.backtest_results br\nJOIN pg.instrument i ON br.instrument_id = i.instrument_id\nWHERE br.created_at > NOW() - INTERVAL '7 days'\nORDER BY time",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Forecast Bias (Mean Error)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  date_trunc('day', created_at) as time,\n  i.market,\n  AVG(br.mean_error) as avg_bias\nFROM pg.backtest_results br\nJOIN pg.instrument i ON br.instrument_id = i.instrument_id\nWHERE br.created_at > NOW() - INTERVAL '30 days'\nGROUP BY time, i.market\nORDER BY time",
+            "format": "time_series"
+          }
+        ],
+        "description": "Positive = over-forecasting, Negative = under-forecasting"
+      },
+      {
+        "id": 5,
+        "title": "Accuracy by Forecast Horizon",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 24, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  (evaluation_end - forecast_date) as horizon_days,\n  AVG(mape) as avg_mape,\n  AVG(rmse) as avg_rmse\nFROM pg.backtest_results\nWHERE created_at > NOW() - INTERVAL '30 days'\nGROUP BY horizon_days\nORDER BY horizon_days",
+            "format": "time_series"
+          }
+        ],
+        "description": "Accuracy degradation over forecast horizon"
+      },
+      {
+        "id": 6,
+        "title": "Top 10 Worst Performing Instruments",
+        "type": "table",
+        "gridPos": {"x": 0, "y": 24, "w": 24, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "PostgreSQL",
+            "rawSql": "SELECT\n  br.instrument_id,\n  i.market,\n  i.product,\n  AVG(br.mape) as avg_mape,\n  AVG(br.wape) as avg_wape,\n  AVG(br.rmse) as avg_rmse,\n  COUNT(*) as backtest_count\nFROM pg.backtest_results br\nJOIN pg.instrument i ON br.instrument_id = i.instrument_id\nWHERE br.created_at > NOW() - INTERVAL '30 days'\nGROUP BY br.instrument_id, i.market, i.product\nORDER BY avg_mape DESC\nLIMIT 10",
+            "format": "table"
+          }
+        ]
+      }
+    ],
+    "refresh": "5m",
+    "time": {"from": "now-30d", "to": "now"},
+    "timepicker": {
+      "refresh_intervals": ["5m", "15m", "30m", "1h", "2h", "1d"]
+    }
+  }
+}
+
+

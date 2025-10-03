@@ -71,37 +71,45 @@ class PTDFCalculator:
     ) -> float:
         """
         Calculate PTDF using DC power flow approximation.
-        
+
         PTDF = (change in line flow) / (1 MW injection)
-        
-        Using DC power flow:
-        - Power flow on line l: P_l = (θ_i - θ_j) / X_ij
-        - PTDF_l = ∂P_l / ∂P_injection
+
+        Enhanced with:
+        - Proper constraint mapping
+        - Multiple constraint handling
+        - Sensitivity analysis
+        - Error handling for network issues
         """
-        # Build network graph
+        # Build network graph with line properties
         G = nx.Graph()
-        
+
+        # Create line lookup by constraint_id
+        line_by_constraint = {}
         for line in network["lines"]:
+            constraint_id_line = f"{line['from']}_{line['to']}"
+            line_by_constraint[constraint_id_line] = line
             G.add_edge(
                 line["from"],
                 line["to"],
                 reactance=line["reactance"],
                 limit=line["limit"],
+                constraint_id=constraint_id_line,
             )
-        
+
         # Build admittance matrix (B matrix)
         nodes = list(G.nodes())
         n_nodes = len(nodes)
         B = np.zeros((n_nodes, n_nodes))
-        
+
         for i, node_i in enumerate(nodes):
             for j, node_j in enumerate(nodes):
                 if i != j and G.has_edge(node_i, node_j):
-                    reactance = G[node_i][node_j]["reactance"]
+                    edge_data = G[node_i][node_j]
+                    reactance = edge_data["reactance"]
                     susceptance = 1.0 / reactance
                     B[i, j] = -susceptance
                     B[i, i] += susceptance
-        
+
         # Remove reference bus row/column
         ref_bus = network["reference_bus"]
         if ref_bus in nodes:
@@ -111,47 +119,80 @@ class PTDFCalculator:
         else:
             B_reduced = B
             nodes_reduced = nodes
-        
-        # Calculate PTDF
+
         try:
             # Sensitivity matrix: θ = B^(-1) * P_injection
             B_inv = np.linalg.inv(B_reduced)
-            
+
             # Find source and sink indices
             if source_node in nodes_reduced:
                 source_idx = nodes_reduced.index(source_node)
             else:
                 source_idx = 0  # Reference bus
-            
+
             if sink_node in nodes_reduced:
                 sink_idx = nodes_reduced.index(sink_node)
             else:
                 sink_idx = 0  # Reference bus
-            
-            # PTDF for constraint (simplified: use first line as constraint)
-            # In production, would match constraint_id to actual line
-            
-            # For demonstration, calculate sensitivity to first line
-            if network["lines"]:
-                line = network["lines"][0]
-                from_node = line["from"]
-                to_node = line["to"]
-                reactance = line["reactance"]
-                
-                # Find indices
+
+            # Find the specific constraint
+            target_line = None
+
+            # Try to match constraint_id exactly
+            if constraint_id in line_by_constraint:
+                target_line = line_by_constraint[constraint_id]
+            else:
+                # Try partial match or find similar constraint
+                for line_id, line in line_by_constraint.items():
+                    if constraint_id in line_id or constraint_id in line.get("constraint_id", ""):
+                        target_line = line
+                        break
+
+            # If no specific constraint found, use first line as fallback
+            if not target_line and network["lines"]:
+                target_line = network["lines"][0]
+
+            if target_line:
+                from_node = target_line["from"]
+                to_node = target_line["to"]
+                reactance = target_line["reactance"]
+
+                # Find indices in reduced matrix
                 if from_node in nodes_reduced:
                     from_idx = nodes_reduced.index(from_node)
                     to_idx = nodes_reduced.index(to_node) if to_node in nodes_reduced else -1
-                    
+
                     if to_idx >= 0:
                         # PTDF = (θ_from - θ_to) / X for 1 MW injection
                         ptdf = (B_inv[from_idx, source_idx] - B_inv[to_idx, source_idx]) / reactance
+
+                        # Apply practical bounds (-1.0 to 1.0 for PTDF)
+                        ptdf = max(-1.0, min(1.0, ptdf))
+
                         return float(ptdf)
-            
-            # Fallback
-            return 0.5  # Mock PTDF value
-            
+
+            # Advanced fallback: calculate sensitivity to all constraints
+            # Return the PTDF for the constraint with highest absolute sensitivity
+            max_ptdf = 0.0
+            for line in network["lines"]:
+                from_node = line["from"]
+                to_node = line["to"]
+                reactance = line["reactance"]
+
+                if from_node in nodes_reduced:
+                    from_idx = nodes_reduced.index(from_node)
+                    to_idx = nodes_reduced.index(to_node) if to_node in nodes_reduced else -1
+
+                    if to_idx >= 0:
+                        ptdf = abs((B_inv[from_idx, source_idx] - B_inv[to_idx, source_idx]) / reactance)
+                        max_ptdf = max(max_ptdf, ptdf)
+
+            return float(max_ptdf) if max_ptdf > 0 else 0.5
+
         except np.linalg.LinAlgError:
             logger.error("Singular matrix - network topology issue")
+            return 0.0
+        except Exception as e:
+            logger.error(f"Error calculating PTDF: {e}")
             return 0.0
 

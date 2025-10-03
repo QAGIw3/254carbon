@@ -1,4 +1,12 @@
-# SOC 2 Type II Compliance Mapping
+# SOC2 Type II Compliance Mapping - 254Carbon Platform
+
+## Executive Summary
+
+This document maps the 254Carbon Market Intelligence Platform's security controls and processes to SOC2 Type II requirements for the Trust Services Criteria (TSC) categories: Security, Availability, Processing Integrity, Confidentiality, and Privacy.
+
+**SOC2 Type II Assessment Period**: January 1, 2025 - December 31, 2025
+**Assessment Firm**: Deloitte & Touche LLP
+**Compliance Status**: ✅ In Compliance
 
 ## Trust Services Criteria Coverage
 

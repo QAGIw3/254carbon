@@ -1,0 +1,163 @@
+---
+# IP Allowlist Configuration for API Gateway
+# This restricts access to specific IP ranges for production deployment
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-gateway-ip-allowlist
+  namespace: market-intelligence
+spec:
+  podSelector:
+    matchLabels:
+      app: api-gateway
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    # Allow traffic from ingress controller
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    # Allow traffic from internal services
+    - namespaceSelector:
+        matchLabels:
+          name: market-intelligence
+    # Allow traffic from monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8000
+
+---
+# Ingress with IP whitelist
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway-ingress
+  namespace: market-intelligence
+  annotations:
+    # IP Allowlist - Update with actual customer IP ranges
+    nginx.ingress.kubernetes.io/whitelist-source-range: |
+      10.0.0.0/8,
+      172.16.0.0/12,
+      192.168.0.0/16,
+      203.0.113.0/24
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    
+    # Connection limits per IP
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    
+    # Enable ModSecurity WAF
+    nginx.ingress.kubernetes.io/enable-modsecurity: "true"
+    nginx.ingress.kubernetes.io/enable-owasp-core-rules: "true"
+    
+    # SSL/TLS configuration
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Content-Security-Policy: default-src 'self'";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+spec:
+  tls:
+  - hosts:
+    - api.254carbon.ai
+    secretName: api-tls-cert
+  rules:
+  - host: api.254carbon.ai
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 8000
+
+---
+# Rate limiting ConfigMap for custom rules
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rate-limit-config
+  namespace: market-intelligence
+data:
+  rate-limits.conf: |
+    # Different rate limits by endpoint
+    
+    # Public endpoints (higher limits)
+    location /api/v1/instruments {
+      limit_req zone=general burst=200 nodelay;
+    }
+    
+    # Data endpoints (moderate limits)
+    location /api/v1/prices {
+      limit_req zone=data burst=100 nodelay;
+    }
+    
+    location /api/v1/curves {
+      limit_req zone=data burst=100 nodelay;
+    }
+    
+    # Export endpoints (strict limits to prevent data exfiltration)
+    location /api/v1/export {
+      limit_req zone=export burst=5 nodelay;
+    }
+    
+    # WebSocket streaming (connection-based limits)
+    location /ws/ {
+      limit_conn addr 10;
+    }
+  
+  nginx.conf: |
+    # Rate limiting zones
+    limit_req_zone $binary_remote_addr zone=general:10m rate=100r/s;
+    limit_req_zone $binary_remote_addr zone=data:10m rate=50r/s;
+    limit_req_zone $binary_remote_addr zone=export:10m rate=1r/s;
+    limit_conn_zone $binary_remote_addr zone=addr:10m;
+    
+    # Rate limit status codes
+    limit_req_status 429;
+    limit_conn_status 429;
+
+---
+# PodSecurityPolicy for API Gateway
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: api-gateway-psp
+  namespace: market-intelligence
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+  - ALL
+  volumes:
+  - 'configMap'
+  - 'emptyDir'
+  - 'projected'
+  - 'secret'
+  - 'downwardAPI'
+  - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+
+

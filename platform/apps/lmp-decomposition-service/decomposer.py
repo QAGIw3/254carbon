@@ -104,19 +104,28 @@ class LMPDecomposer:
         node_id: str,
         energy_price: float,
         iso: str,
+        distance_from_hub: float = None,
     ) -> float:
         """
-        Calculate marginal loss component.
-        
-        Loss = Energy * Loss_Factor
-        
-        In practice, would use actual loss sensitivity factors.
+        Calculate marginal loss component using distance-based estimation.
+
+        Loss = Energy * Loss_Factor * Distance_Factor
+
+        In production, would use actual loss sensitivity factors from ISO.
         """
         loss_factor = self.loss_factors.get(iso, 0.015)
-        
-        # Simplified: loss component is a percentage of energy
-        loss = energy_price * loss_factor
-        
+
+        # Distance factor: farther nodes have higher losses
+        if distance_from_hub is None:
+            # Estimate based on node ID (simplified heuristic)
+            distance_factor = 1.0 + (hash(node_id) % 100) / 1000.0  # 0-10% variation
+        else:
+            # Use actual electrical distance
+            distance_factor = 1.0 + distance_from_hub / 100.0  # Scale by distance
+
+        # Loss component is percentage of energy price
+        loss = energy_price * loss_factor * distance_factor
+
         return loss
     
     async def get_historical_congestion(
@@ -218,4 +227,82 @@ class LMPDecomposer:
         forecast = mean_congestion * seasonal_factor
         
         return float(forecast)
+
+    async def calculate_electrical_distance(
+        self,
+        node_id: str,
+        iso: str,
+        network: Dict[str, Any],
+    ) -> float:
+        """
+        Calculate electrical distance from reference hub to node.
+
+        Uses shortest path in network graph weighted by reactance.
+        """
+        try:
+            import networkx as nx
+
+            # Build network graph
+            G = nx.Graph()
+            for line in network["lines"]:
+                G.add_edge(
+                    line["from"],
+                    line["to"],
+                    weight=line["reactance"]  # Use reactance as edge weight
+                )
+
+            ref_bus = network["reference_bus"]
+
+            if node_id not in G.nodes() or ref_bus not in G.nodes():
+                return 10.0  # Default distance
+
+            # Calculate shortest path distance
+            try:
+                distance = nx.shortest_path_length(G, ref_bus, node_id, weight="weight")
+                return float(distance)
+            except nx.NetworkXNoPath:
+                return 20.0  # Large distance if no path
+
+        except Exception as e:
+            logger.error(f"Error calculating electrical distance: {e}")
+            return 10.0  # Default fallback
+
+    async def calculate_congestion_component(
+        self,
+        node_id: str,
+        energy: float,
+        loss: float,
+        lmp_total: float,
+        timestamp: datetime,
+        iso: str,
+    ) -> float:
+        """
+        Calculate congestion component with constraint awareness.
+
+        In production, would use shadow prices from OPF solution.
+        For now, estimate based on historical patterns and binding constraints.
+        """
+        # Get historical congestion for this node
+        historical_congestion = await self.get_historical_congestion(
+            node_id, lookback_days=30, iso=iso
+        )
+
+        if not historical_congestion.empty:
+            # Use recent average as baseline
+            baseline_congestion = historical_congestion.mean()
+
+            # Identify binding constraints for this timestamp
+            binding_constraints = await self.identify_binding_constraints(node_id, iso)
+
+            # Adjust for constraint impact (simplified)
+            constraint_multiplier = 1.0
+            for constraint in binding_constraints[:3]:  # Top 3 constraints
+                constraint_multiplier *= (1.0 + constraint["binding_frequency"] * 0.5)
+
+            congestion = baseline_congestion * constraint_multiplier
+        else:
+            # Fallback: estimate as residual after energy and loss
+            congestion = max(0, lmp_total - energy - loss)
+
+        return congestion
 

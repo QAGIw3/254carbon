@@ -106,13 +106,19 @@ class BasisSurfaceModeler:
         node_prices: pd.Series,
     ) -> Dict[str, float]:
         """
-        Calculate basis statistics.
-        
+        Calculate comprehensive basis statistics.
+
         Basis = Node Price - Hub Price
+
+        Enhanced with:
+        - Seasonal analysis
+        - Volatility measures
+        - Trend detection
+        - Correlation analysis
         """
         # Align series
         aligned_hub, aligned_node = hub_prices.align(node_prices, join="inner")
-        
+
         if aligned_hub.empty or aligned_node.empty:
             return {
                 "mean": 0.0,
@@ -120,16 +126,44 @@ class BasisSurfaceModeler:
                 "p95": 0.0,
                 "p5": 0.0,
                 "correlation": 0.0,
+                "seasonal_mean": 0.0,
+                "volatility_ratio": 0.0,
+                "trend_slope": 0.0,
             }
-        
+
         # Calculate basis
         basis = aligned_node - aligned_hub
-        
+
+        # Basic statistics
+        mean_basis = basis.mean()
+        std_basis = basis.std()
+
+        # Seasonal analysis (by month)
+        basis_df = pd.DataFrame({"basis": basis, "month": basis.index.month})
+        seasonal_means = basis_df.groupby("month")["basis"].mean()
+        seasonal_mean = seasonal_means.mean()  # Overall seasonal average
+
+        # Volatility ratio (node vol / hub vol)
+        hub_vol = aligned_hub.std()
+        node_vol = aligned_node.std()
+        volatility_ratio = node_vol / hub_vol if hub_vol > 0 else 1.0
+
+        # Trend analysis (linear regression)
+        if len(basis) > 30:  # Need sufficient data
+            x = np.arange(len(basis))
+            slope, _ = np.polyfit(x, basis.values, 1)
+            trend_slope = float(slope)
+        else:
+            trend_slope = 0.0
+
         return {
-            "mean": float(basis.mean()),
-            "std": float(basis.std()),
+            "mean": float(mean_basis),
+            "std": float(std_basis),
             "p95": float(basis.quantile(0.95)),
             "p5": float(basis.quantile(0.05)),
             "correlation": float(aligned_node.corr(aligned_hub)),
+            "seasonal_mean": float(seasonal_mean),
+            "volatility_ratio": float(volatility_ratio),
+            "trend_slope": trend_slope,
         }
 

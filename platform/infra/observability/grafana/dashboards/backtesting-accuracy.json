@@ -1,0 +1,204 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Forecast Accuracy - Backtesting Results",
+    "tags": ["forecasting", "accuracy", "backtesting"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "MAPE Trend by Market",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "avg(backtest_mape) by (market)",
+            "legendFormat": "{{market}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "max": 20,
+            "min": 0,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 12},
+                {"color": "red", "value": 15}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "WAPE Trend by Market",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "avg(backtest_wape) by (market)",
+            "legendFormat": "{{market}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "max": 25,
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "RMSE Trend by Market",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "avg(backtest_rmse) by (market)",
+            "legendFormat": "{{market}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Quality Gates Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "avg(backtest_mape)",
+            "legendFormat": "Avg MAPE"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 12},
+                {"color": "red", "value": 15}
+              ]
+            },
+            "mappings": [
+              {
+                "type": "value",
+                "options": {
+                  "match": "null",
+                  "result": {"text": "No Data", "color": "blue"}
+                }
+              }
+            ]
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Backtest Success Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(backtest_success[24h])) / sum(rate(backtest_total[24h])) * 100",
+            "legendFormat": "Success Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 90},
+                {"color": "green", "value": 95}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Daily Backtests Completed",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(backtest_total)",
+            "legendFormat": "Total"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 50},
+                {"color": "green", "value": 100}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "Recent Backtest Results",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "backtest_results",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "MAPE"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "percent"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "steps": [
+                      {"color": "green", "value": 0},
+                      {"color": "yellow", "value": 12},
+                      {"color": "red", "value": 15}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16}
+      }
+    ],
+    "time": {
+      "from": "now-30d",
+      "to": "now"
+    },
+    "refresh": "1h",
+    "schemaVersion": 37,
+    "version": 1,
+    "links": []
+  },
+  "folderId": 0,
+  "overwrite": true
+}

@@ -1,0 +1,158 @@
+{
+  "dashboard": {
+    "title": "Data Quality Monitoring",
+    "tags": ["data-quality", "ingestion", "connectors"],
+    "timezone": "UTC",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Data Freshness by Source",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "ClickHouse",
+            "rawSql": "SELECT\n  toStartOfMinute(event_time) as time,\n  source,\n  max(event_time) as latest_event\nFROM ch.market_price_ticks\nWHERE event_time > now() - INTERVAL 1 HOUR\nGROUP BY time, source\nORDER BY time",
+            "format": "time_series"
+          }
+        ],
+        "alert": {
+          "name": "Stale Data Alert",
+          "conditions": [
+            {
+              "evaluator": {"type": "no_value", "params": []},
+              "query": {"params": ["A", "10m", "now"]},
+              "reducer": {"type": "last"}
+            }
+          ],
+          "message": "No data received from source in last 10 minutes"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Data Completeness (%)",
+        "type": "gauge",
+        "gridPos": {"x": 12, "y": 0, "w": 6, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "ClickHouse",
+            "rawSql": "SELECT\n  (COUNT(*) * 100.0 / (SELECT COUNT(DISTINCT instrument_id) FROM pg.instrument)) as completeness\nFROM (\n  SELECT DISTINCT instrument_id\n  FROM ch.market_price_ticks\n  WHERE event_time > now() - INTERVAL 5 MINUTE\n)",
+            "format": "time_series"
+          }
+        ],
+        "thresholds": [
+          {"value": 0, "color": "red"},
+          {"value": 95, "color": "yellow"},
+          {"value": 99.5, "color": "green"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Records Ingested per Minute",
+        "type": "graph",
+        "gridPos": {"x": 18, "y": 0, "w": 6, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "ClickHouse",
+            "rawSql": "SELECT\n  toStartOfMinute(event_time) as time,\n  source,\n  count() as records\nFROM ch.market_price_ticks\nWHERE event_time > now() - INTERVAL 1 HOUR\nGROUP BY time, source\nORDER BY time",
+            "format": "time_series"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Price Anomalies Detected",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 8, "w": 6, "h": 4},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "ClickHouse",
+            "rawSql": "SELECT count() as anomalies\nFROM ch.market_price_ticks\nWHERE event_time > now() - INTERVAL 1 HOUR\n  AND (value < 0 OR value > 10000)\n",
+            "format": "time_series"
+          }
+        ],
+        "thresholds": [
+          {"value": 0, "color": "green"},
+          {"value": 1, "color": "yellow"},
+          {"value": 10, "color": "red"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Missing Data Gaps",
+        "type": "table",
+        "gridPos": {"x": 6, "y": 8, "w": 18, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "ClickHouse",
+            "rawSql": "WITH expected_instruments AS (\n  SELECT instrument_id FROM pg.instrument WHERE market = 'power'\n),\nrecent_data AS (\n  SELECT DISTINCT instrument_id\n  FROM ch.market_price_ticks\n  WHERE event_time > now() - INTERVAL 10 MINUTE\n)\nSELECT\n  e.instrument_id,\n  i.market,\n  i.product,\n  i.location_code\nFROM expected_instruments e\nLEFT JOIN recent_data r ON e.instrument_id = r.instrument_id\nJOIN pg.instrument i ON e.instrument_id = i.instrument_id\nWHERE r.instrument_id IS NULL\nLIMIT 50",
+            "format": "table"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Connector Health Status",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 16, "w": 24, "h": 4},
+        "targets": [
+          {
+            "refId": "MISO",
+            "datasource": "ClickHouse",
+            "rawSql": "SELECT\n  CASE\n    WHEN max(event_time) > now() - INTERVAL 10 MINUTE THEN 1\n    ELSE 0\n  END as status\nFROM ch.market_price_ticks\nWHERE source = 'miso_rt_lmp'"
+          },
+          {
+            "refId": "CAISO",
+            "datasource": "ClickHouse",
+            "rawSql": "SELECT\n  CASE\n    WHEN max(event_time) > now() - INTERVAL 10 MINUTE THEN 1\n    ELSE 0\n  END as status\nFROM ch.market_price_ticks\nWHERE source = 'caiso_rtm_lmp'"
+          }
+        ],
+        "mappings": [
+          {"value": 1, "text": "Healthy", "color": "green"},
+          {"value": 0, "text": "Unhealthy", "color": "red"}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Data Latency (seconds)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 20, "w": 24, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "ClickHouse",
+            "rawSql": "SELECT\n  toStartOfMinute(ingested_at) as time,\n  source,\n  avg(dateDiff('second', event_time, ingested_at)) as latency_seconds\nFROM ch.market_price_ticks\nWHERE event_time > now() - INTERVAL 1 HOUR\nGROUP BY time, source\nORDER BY time",
+            "format": "time_series"
+          }
+        ],
+        "yaxes": [
+          {"label": "Latency (seconds)", "format": "s"},
+          {"show": false}
+        ],
+        "alert": {
+          "name": "High Latency Alert",
+          "conditions": [
+            {
+              "evaluator": {"type": "gt", "params": [2]},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"type": "avg"}
+            }
+          ],
+          "message": "Data latency exceeds 2 second SLA"
+        }
+      }
+    ],
+    "refresh": "30s",
+    "time": {"from": "now-1h", "to": "now"},
+    "timepicker": {
+      "refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m"]
+    }
+  }
+}
+
+

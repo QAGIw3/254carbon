@@ -5,4 +5,5 @@ numpy==1.26.3
 pandas==2.1.4
 asyncpg==0.29.0
 clickhouse-driver==0.2.6
+httpx==0.26.0
 

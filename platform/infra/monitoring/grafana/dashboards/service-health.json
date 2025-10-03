@@ -1,0 +1,206 @@
+{
+  "dashboard": {
+    "title": "Service Health & Performance",
+    "tags": ["infrastructure", "performance", "sla"],
+    "timezone": "UTC",
+    "panels": [
+      {
+        "id": 1,
+        "title": "API Response Time (p50, p95, p99)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Prometheus",
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "refId": "B",
+            "datasource": "Prometheus",
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "refId": "C",
+            "datasource": "Prometheus",
+            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99"
+          }
+        ],
+        "yaxes": [
+          {"label": "Response Time", "format": "ms"},
+          {"show": false}
+        ],
+        "alert": {
+          "name": "High API Latency",
+          "conditions": [
+            {
+              "evaluator": {"type": "gt", "params": [250]},
+              "query": {"params": ["B", "5m", "now"]},
+              "reducer": {"type": "avg"}
+            }
+          ],
+          "message": "API p95 latency exceeds 250ms SLA"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Request Rate (requests/sec)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Prometheus",
+            "expr": "sum(rate(http_requests_total[5m])) by (service)",
+            "legendFormat": "{{service}}"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Error Rate (%)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Prometheus",
+            "expr": "(sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))) * 100",
+            "legendFormat": "Error Rate"
+          }
+        ],
+        "yaxes": [
+          {"label": "Error Rate (%)", "format": "percent"},
+          {"show": false}
+        ],
+        "alert": {
+          "name": "High Error Rate",
+          "conditions": [
+            {
+              "evaluator": {"type": "gt", "params": [1]},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"type": "avg"}
+            }
+          ],
+          "message": "Service error rate exceeds 1%"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Service Uptime (24h)",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 8, "w": 6, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Prometheus",
+            "expr": "avg(up{job=~\".*gateway.*\"}) * 100",
+            "legendFormat": "Gateway"
+          },
+          {
+            "refId": "B",
+            "datasource": "Prometheus",
+            "expr": "avg(up{job=~\".*curve-service.*\"}) * 100",
+            "legendFormat": "Curve Service"
+          }
+        ],
+        "thresholds": [
+          {"value": 0, "color": "red"},
+          {"value": 99, "color": "yellow"},
+          {"value": 99.9, "color": "green"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "CPU Usage by Service",
+        "type": "graph",
+        "gridPos": {"x": 18, "y": 8, "w": 6, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Prometheus",
+            "expr": "rate(container_cpu_usage_seconds_total{namespace=\"market-intelligence\"}[5m]) * 100",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "yaxes": [
+          {"label": "CPU %", "format": "percent"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Memory Usage by Service",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Prometheus",
+            "expr": "container_memory_usage_bytes{namespace=\"market-intelligence\"} / 1024 / 1024",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "yaxes": [
+          {"label": "Memory (MB)", "format": "mbytes"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Database Connection Pool",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Prometheus",
+            "expr": "pg_connection_pool_active",
+            "legendFormat": "Active Connections"
+          },
+          {
+            "refId": "B",
+            "datasource": "Prometheus",
+            "expr": "pg_connection_pool_idle",
+            "legendFormat": "Idle Connections"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Kafka Consumer Lag",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 24, "w": 24, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Prometheus",
+            "expr": "kafka_consumer_lag{topic=\"power.ticks.v1\"}",
+            "legendFormat": "{{consumer_group}}"
+          }
+        ],
+        "alert": {
+          "name": "High Kafka Lag",
+          "conditions": [
+            {
+              "evaluator": {"type": "gt", "params": [1000]},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"type": "avg"}
+            }
+          ],
+          "message": "Kafka consumer lag exceeds threshold"
+        }
+      }
+    ],
+    "refresh": "30s",
+    "time": {"from": "now-1h", "to": "now"},
+    "timepicker": {
+      "refresh_intervals": ["10s", "30s", "1m", "5m", "15m"]
+    }
+  }
+}
+
+

@@ -75,23 +75,24 @@ async def health():
 @app.post("/api/v1/lmp/decompose", response_model=List[LMPComponents])
 async def decompose_lmp(request: DecompositionRequest):
     """
-    Decompose nodal LMP into Energy + Congestion + Loss.
-    
+    Decompose nodal LMP into Energy + Congestion + Loss components.
+
     LMP_nodal = Energy + Congestion + Loss
-    
-    Where:
-    - Energy: System energy price (typically hub or reference bus)
-    - Congestion: Price impact of transmission constraints
-    - Loss: Marginal loss component
+
+    Enhanced with:
+    - Sophisticated loss factor modeling
+    - Constraint-aware decomposition
+    - Distance-based loss calculations
+    - Historical pattern analysis
     """
     logger.info(
         f"Decomposing LMP for {len(request.node_ids)} nodes "
         f"in {request.iso} from {request.start_time} to {request.end_time}"
     )
-    
+
     try:
         results = []
-        
+
         # Get raw LMP data
         lmp_data = await decomposer.get_lmp_data(
             request.node_ids,
@@ -99,33 +100,57 @@ async def decompose_lmp(request: DecompositionRequest):
             request.end_time,
             request.iso,
         )
-        
+
         # Get energy component (usually from hub or reference bus)
         energy_prices = await decomposer.get_energy_component(
             request.iso,
             request.start_time,
             request.end_time,
         )
-        
-        # Decompose each observation
+
+        # Get network topology for distance calculations
+        network = await ptdf_calc.get_network_topology(request.iso)
+
+        # Decompose each observation with enhanced algorithms
         for _, row in lmp_data.iterrows():
             node_id = row["node_id"]
             timestamp = row["timestamp"]
             lmp_total = row["lmp"]
-            
+
             # Get energy price for this timestamp
             energy = energy_prices.get(timestamp, lmp_total * 0.95)  # Fallback: 95% of LMP
-            
-            # Calculate marginal loss (typically 0.5-3% of energy)
+
+            # Calculate electrical distance from reference hub
+            distance_from_hub = await decomposer.calculate_electrical_distance(
+                node_id, request.iso, network
+            )
+
+            # Enhanced loss calculation with distance factor
             loss = decomposer.calculate_loss_component(
                 node_id,
                 energy,
                 request.iso,
+                distance_from_hub,
             )
-            
-            # Congestion is residual
-            congestion = lmp_total - energy - loss
-            
+
+            # Constraint-aware congestion calculation
+            congestion = await decomposer.calculate_congestion_component(
+                node_id,
+                energy,
+                loss,
+                lmp_total,
+                timestamp,
+                request.iso,
+            )
+
+            # Validate decomposition (should sum to LMP)
+            decomposition_sum = energy + congestion + loss
+            if abs(decomposition_sum - lmp_total) > 0.01:  # Allow 1 cent tolerance
+                logger.warning(
+                    f"Decomposition error for {node_id} at {timestamp}: "
+                    f"{decomposition_sum:.3f} vs {lmp_total:.3f}"
+                )
+
             results.append(LMPComponents(
                 timestamp=timestamp,
                 node_id=node_id,
@@ -134,11 +159,11 @@ async def decompose_lmp(request: DecompositionRequest):
                 congestion_component=congestion,
                 loss_component=loss,
             ))
-        
+
         logger.info(f"Decomposed {len(results)} LMP observations")
-        
+
         return results
-        
+
     except Exception as e:
         logger.error(f"Error decomposing LMP: {e}")
         raise HTTPException(status_code=500, detail=str(e))
