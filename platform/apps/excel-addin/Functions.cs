@@ -4,10 +4,12 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Text.Json;
 using ExcelDna.Integration;
+using Microsoft.Office.Interop.Excel;
 
 namespace Carbon254.ExcelAddin
 {
@@ -17,6 +19,9 @@ namespace Carbon254.ExcelAddin
         private static string _apiKey = "";
         private static string _apiBaseUrl = "http://localhost:8000"; // Local development URL
         private static bool _useLocalDev = true;
+        private static readonly TimeSpan PriceCacheTtl = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan CurveCacheTtl = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan AnalyticsCacheTtl = TimeSpan.FromSeconds(10);
 
         // Initialize connection
         [ExcelFunction(Description = "Set 254Carbon API credentials")]
@@ -65,6 +70,9 @@ namespace Carbon254.ExcelAddin
                 _apiBaseUrl = !string.IsNullOrEmpty(apiUrl) ? apiUrl : "https://api.254carbon.ai";
             }
 
+            Environment.SetEnvironmentVariable("CARBON254_API_KEY", _apiKey);
+            Environment.SetEnvironmentVariable("CARBON254_API_URL", _apiBaseUrl);
+
             return $"Connected to 254Carbon ({(_useLocalDev ? "Local Dev" : "Production")})";
         }
 
@@ -72,6 +80,11 @@ namespace Carbon254.ExcelAddin
         [ExcelFunction(Description = "Get latest price for instrument")]
         public static object C254_PRICE(string instrumentId)
         {
+            if (RealtimeCache.TryGetPrice(instrumentId, PriceCacheTtl, out var cachedValue))
+            {
+                return cachedValue;
+            }
+
             return ExcelAsyncUtil.Run("C254_PRICE", new object[] { instrumentId }, async () =>
             {
                 try
@@ -89,7 +102,9 @@ namespace Carbon254.ExcelAddin
                     
                     if (data != null && data.ContainsKey("value"))
                     {
-                        return Convert.ToDouble(data["value"].ToString());
+                        double price = Convert.ToDouble(data["value"].ToString());
+                        RealtimeCache.StorePrice(instrumentId, price);
+                        return price;
                     }
 
                     return ExcelError.ExcelErrorNA;
@@ -99,7 +114,9 @@ namespace Carbon254.ExcelAddin
                     // Try mock data as fallback for development
                     if (_useLocalDev)
                     {
-                        return GenerateMockPrice(instrumentId);
+                        var mockPrice = GenerateMockPrice(instrumentId);
+                        RealtimeCache.StorePrice(instrumentId, mockPrice);
+                        return mockPrice;
                     }
                     return $"Error: {ex.Message}";
                 }
@@ -109,7 +126,7 @@ namespace Carbon254.ExcelAddin
         // Generate mock data for development/testing
         private static double GenerateMockPrice(string instrumentId)
         {
-            var random = new Random();
+            var random = Random.Shared;
 
             // Generate realistic price based on instrument
             if (instrumentId.Contains("MISO"))
@@ -127,7 +144,7 @@ namespace Carbon254.ExcelAddin
         // Generate mock curve data for development/testing
         private static double GenerateMockCurve(string instrumentId, string deliveryMonth)
         {
-            var random = new Random();
+            var random = Random.Shared;
 
             // Generate curve price based on delivery month
             int monthsOut = 1;
@@ -152,7 +169,7 @@ namespace Carbon254.ExcelAddin
         // Generate mock historical average data for development/testing
         private static double GenerateMockHistoricalAvg(string instrumentId, int days)
         {
-            var random = new Random();
+            var random = Random.Shared;
 
             // Generate average based on instrument and time period
             double basePrice = GenerateMockPrice(instrumentId);
@@ -171,6 +188,11 @@ namespace Carbon254.ExcelAddin
             string scenario = "BASE"
         )
         {
+            if (RealtimeCache.TryGetCurve(instrumentId, deliveryMonth, CurveCacheTtl, out var cachedValue))
+            {
+                return cachedValue;
+            }
+
             return ExcelAsyncUtil.Run("C254_CURVE", new object[] { instrumentId, deliveryMonth }, async () =>
             {
                 try
@@ -188,7 +210,9 @@ namespace Carbon254.ExcelAddin
                     
                     if (data != null && data.ContainsKey("price"))
                     {
-                        return Convert.ToDouble(data["price"].ToString());
+                        double curvePrice = Convert.ToDouble(data["price"].ToString());
+                        RealtimeCache.StoreCurve(instrumentId, deliveryMonth, curvePrice);
+                        return curvePrice;
                     }
 
                     return ExcelError.ExcelErrorNA;
@@ -198,7 +222,9 @@ namespace Carbon254.ExcelAddin
                     // Try mock data as fallback for development
                     if (_useLocalDev)
                     {
-                        return GenerateMockCurve(instrumentId, deliveryMonth);
+                        var mockCurve = GenerateMockCurve(instrumentId, deliveryMonth);
+                        RealtimeCache.StoreCurve(instrumentId, deliveryMonth, mockCurve);
+                        return mockCurve;
                     }
                     return $"Error: {ex.Message}";
                 }
@@ -299,6 +325,11 @@ namespace Carbon254.ExcelAddin
             double confidenceLevel = 0.95
         )
         {
+            if (RealtimeCache.TryGetAnalytics("VAR", instrumentId, string.Empty, AnalyticsCacheTtl, out var cachedValue))
+            {
+                return cachedValue;
+            }
+
             return ExcelAsyncUtil.Run("C254_VAR", new object[] { instrumentId, quantity }, async () =>
             {
                 try
@@ -333,9 +364,11 @@ namespace Carbon254.ExcelAddin
                     
                     if (data != null && data.ContainsKey("var_value"))
                     {
-                        return Convert.ToDouble(data["var_value"].ToString());
+                        double varValue = Convert.ToDouble(data["var_value"].ToString());
+                        RealtimeCache.StoreAnalytics("VAR", instrumentId, string.Empty, varValue);
+                        return varValue;
                     }
-                    
+
                     return ExcelError.ExcelErrorNA;
                 }
                 catch (Exception ex)
@@ -343,8 +376,89 @@ namespace Carbon254.ExcelAddin
                     // Try mock data as fallback for development
                     if (_useLocalDev)
                     {
-                        return GenerateMockVaR(instrumentId, quantity, confidenceLevel);
+                        var mockVar = GenerateMockVaR(instrumentId, quantity, confidenceLevel);
+                        RealtimeCache.StoreAnalytics("VAR", instrumentId, string.Empty, mockVar);
+                        return mockVar;
                     }
+                    return $"Error: {ex.Message}";
+                }
+            });
+        }
+
+        [ExcelFunction(Description = "Get analytics metric value (e.g., VAR, SHARPE)")]
+        public static object C254_ANALYTIC(
+            string metric,
+            string instrumentId,
+            object dimension = null,
+            object parameter = null,
+            double confidenceLevel = 0.95
+        )
+        {
+            string normalizedMetric = metric?.ToUpperInvariant() ?? string.Empty;
+            string instrumentKey = instrumentId ?? string.Empty;
+            string dimensionKey = NormalizeOptionalArgument(dimension);
+
+            if (normalizedMetric == "VAR")
+            {
+                double quantity = ParseOptionalDouble(parameter, 1.0);
+                return C254_VAR(instrumentKey, quantity, confidenceLevel);
+            }
+
+            if (RealtimeCache.TryGetAnalytics(normalizedMetric, instrumentKey, dimensionKey, AnalyticsCacheTtl, out var cachedValue))
+            {
+                return cachedValue;
+            }
+
+            return ExcelAsyncUtil.Run("C254_ANALYTIC", new object[] { normalizedMetric, instrumentKey, dimensionKey, parameter ?? ExcelMissing.Value, confidenceLevel }, async () =>
+            {
+                try
+                {
+                    string url = $"{_apiBaseUrl}/api/v1/analytics/value?metric={Uri.EscapeDataString(normalizedMetric)}&instrument_id={Uri.EscapeDataString(instrumentKey)}";
+
+                    if (!string.IsNullOrEmpty(dimensionKey))
+                    {
+                        url += $"&dimension={Uri.EscapeDataString(dimensionKey)}";
+                    }
+
+                    string parameterValue = NormalizeOptionalArgument(parameter);
+                    if (!string.IsNullOrEmpty(parameterValue))
+                    {
+                        url += $"&parameter={Uri.EscapeDataString(parameterValue)}";
+                    }
+
+                    var request = new HttpRequestMessage(HttpMethod.Get, url);
+                    request.Headers.Add("Authorization", $"Bearer {_apiKey}");
+
+                    var response = await _httpClient.SendAsync(request);
+                    var content = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var data = JsonSerializer.Deserialize<Dictionary<string, object>>(content);
+                        if (data != null && data.TryGetValue("value", out var valueObj))
+                        {
+                            object value = valueObj;
+                            if (double.TryParse(valueObj?.ToString(), out double numericValue))
+                            {
+                                value = numericValue;
+                            }
+
+                            RealtimeCache.StoreAnalytics(normalizedMetric, instrumentKey, dimensionKey, value);
+                            return value;
+                        }
+                    }
+
+                    return ExcelError.ExcelErrorNA;
+                }
+                catch (Exception ex)
+                {
+                    if (_useLocalDev)
+                    {
+                        var mockValue = GenerateMockAnalytics(normalizedMetric, instrumentKey, dimensionKey, parameter);
+                        RealtimeCache.StoreAnalytics(normalizedMetric, instrumentKey, dimensionKey, mockValue);
+                        return mockValue;
+                    }
+
                     return $"Error: {ex.Message}";
                 }
             });
@@ -353,7 +467,7 @@ namespace Carbon254.ExcelAddin
         // Generate mock VaR data for development/testing
         private static double GenerateMockVaR(string instrumentId, double quantity, double confidenceLevel)
         {
-            var random = new Random();
+            var random = Random.Shared;
 
             // Base volatility by instrument
             double baseVolatility;
@@ -381,6 +495,53 @@ namespace Carbon254.ExcelAddin
 
             return positionValue * dailyVolatility * zScore * confidenceMultiplier;
         }
+
+        private static double GenerateMockAnalytics(string metric, string instrumentId, string dimension, object parameter)
+        {
+            var random = Random.Shared;
+
+            return metric switch
+            {
+                "SHARPE" => 1.0 + random.NextDouble() * 0.5,
+                "PNL" => (random.NextDouble() - 0.5) * 10000,
+                "DRAWDOWN" => -(random.NextDouble() * 5),
+                _ => GenerateMockVaR(instrumentId, ParseOptionalDouble(parameter, 10.0), 0.95)
+            };
+        }
+
+        private static string NormalizeOptionalArgument(object value)
+        {
+            if (value == null || value is ExcelMissing)
+            {
+                return string.Empty;
+            }
+
+            if (value is double doubleValue)
+            {
+                return doubleValue.ToString();
+            }
+
+            return value.ToString() ?? string.Empty;
+        }
+
+        private static double ParseOptionalDouble(object value, double defaultValue)
+        {
+            if (value == null || value is ExcelMissing)
+            {
+                return defaultValue;
+            }
+
+            if (value is double d)
+            {
+                return d;
+            }
+
+            if (value is string s && double.TryParse(s, out double parsed))
+            {
+                return parsed;
+            }
+
+            return defaultValue;
+        }
     }
 }
-

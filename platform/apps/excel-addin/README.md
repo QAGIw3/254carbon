@@ -4,7 +4,7 @@ Real-time market data feeds and analytics functions for Microsoft Excel.
 
 ## Features
 
-- **Real-Time Data (RTD)**: Live price updates in Excel cells
+- **Real-Time Data (RTD)**: Live price updates in Excel cells via WebSocket streaming
 - **Custom Functions (UDFs)**: Formula-based data access
 - **SSO Authentication**: Integrated with 254Carbon platform
 - **Market Coverage**: Power, gas, environmental products
@@ -65,6 +65,8 @@ Or set environment variables:
 export CARBON254_LOCAL_DEV=true
 export CARBON254_API_URL=http://localhost:8000
 export CARBON254_API_KEY=dev-key
+# Optional: override WebSocket endpoint
+export CARBON254_WS_URL=ws://localhost:8000/api/v1/stream
 ```
 
 #### Production
@@ -75,6 +77,8 @@ export CARBON254_API_KEY=dev-key
 Or set environment variable:
 ```bash
 export CARBON254_API_KEY=your_api_key
+# Optional: override WebSocket endpoint
+export CARBON254_WS_URL=wss://api.254carbon.ai/api/v1/stream
 ```
 
 ### Get Live Price (RTD)
@@ -83,13 +87,15 @@ export CARBON254_API_KEY=your_api_key
 =RTD("Carbon254.RTDServer",,"PRICE","MISO.HUB.INDIANA")
 ```
 
-Updates automatically every 5 seconds.
+The RTD server maintains a persistent WebSocket connection to `/api/v1/stream` for sub-second updates and falls back to REST polling if the socket is unavailable.
 
 ### Get Current Price (UDF)
 
 ```excel
 =C254_PRICE("PJM.HUB.WEST")
 ```
+
+The price UDF reads from the same in-memory cache that the RTD server maintains. When the WebSocket pushes a new tick, both RTD cells and UDF formulas refresh immediately without an extra API round-trip.
 
 ### Get Forward Curve Point
 
@@ -129,6 +135,21 @@ Parameters:
 
 Returns array of instruments. Use Ctrl+Shift+Enter for array formula.
 
+### Get Analytics Metric
+
+```excel
+=C254_ANALYTIC("SHARPE","PJM.HUB.WEST")
+```
+
+Parameters:
+- Metric name (e.g., `VAR`, `SHARPE`, `PNL`)
+- Instrument ID
+- Optional dimension or scenario code
+- Optional numeric parameter (e.g., VAR quantity)
+- Optional confidence level (used for VAR)
+
+For `VAR`, `C254_ANALYTIC` delegates to `C254_VAR`. All analytics results are cached locally and update instantly when the WebSocket delivers new analytics events.
+
 ## Example Worksheets
 
 ### Price Monitor
@@ -160,7 +181,7 @@ When running in local development mode, the add-in will automatically fall back 
 - **Real-time prices** update every 5 seconds with realistic market patterns
 - **Forward curves** show contango patterns (increasing prices over time)
 - **Historical averages** calculated from mock price history
-- **VaR calculations** use realistic volatility assumptions
+- **Analytics** (VaR, Sharpe, PnL) use realistic volatility assumptions
 
 ### Development Benefits
 - ✅ **No API key required** for basic testing
@@ -182,6 +203,7 @@ When running in local development mode, the add-in will automatically fall back 
 ### RTD Not Updating
 - Ensure Excel calculation is set to Automatic
 - Check RTD server is registered (rebuild and reload add-in)
+- Verify gateway WebSocket (`/api/v1/stream`) is reachable. Set `CARBON254_WS_URL` if running on a non-default host
 
 ### Authentication Errors
 - For local development: Use `=C254_CONNECT("dev-key")`
@@ -230,6 +252,7 @@ When running in local development mode, the add-in will automatically fall back 
 | C254_HISTORICAL_AVG | instrument_id, [days] | Historical average |
 | C254_INSTRUMENTS | [market] | Array of instruments |
 | C254_VAR | instrument_id, quantity, [confidence] | Value at Risk |
+| C254_ANALYTIC | metric, instrument_id, [dimension], [parameter], [confidence] | Analytics metric value |
 
 ## Support
 
@@ -240,4 +263,3 @@ When running in local development mode, the add-in will automatically fall back 
 ## License
 
 Proprietary - 254Carbon, Inc.
-

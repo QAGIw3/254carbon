@@ -1,0 +1,4 @@
+/home/m/254carbon/platform/apps/excel-addin/obj/Debug/net6.0-windows/254Carbon.csproj.AssemblyReference.cache
+/home/m/254carbon/platform/apps/excel-addin/obj/Debug/net6.0-windows/254Carbon.GeneratedMSBuildEditorConfig.editorconfig
+/home/m/254carbon/platform/apps/excel-addin/obj/Debug/net6.0-windows/254Carbon.csproj.CoreCompileInputs.cache
+/home/m/254carbon/platform/apps/excel-addin/obj/Debug/net6.0-windows/254Carbon.sourcelink.json
