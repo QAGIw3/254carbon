@@ -1,3 +1,5 @@
+# Retention CronJob: prune backups older than 14 days (03:30 UTC)
+# Uses minio/mc to delete old objects under clickhouse-backups/daily
 apiVersion: batch/v1
 kind: CronJob
 metadata:

@@ -1,3 +1,8 @@
+# ClickHouse single-node Deployment and Service (prod-sized)
+# - Strategy: Recreate (prevents dual-mount on RWO PVC during rollout)
+# - Probes: HTTP /ping for readiness/liveness on 8123
+# - Resources: requests 32Gi/16 CPU; limits 64Gi/32 CPU (tune per environment)
+# - Volumes: PVC backed by local-path (RWO)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,6 +23,7 @@ spec:
       containers:
       - name: clickhouse
         image: clickhouse/clickhouse-server:25.9.2.1
+        # Expose HTTP (8123) and native (9000) ports
         ports:
         - containerPort: 8123
         - containerPort: 9000
@@ -44,6 +50,7 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 2
           failureThreshold: 6
+        # Persistent data and configuration
         volumeMounts:
         - name: clickhouse-storage
           mountPath: /var/lib/clickhouse

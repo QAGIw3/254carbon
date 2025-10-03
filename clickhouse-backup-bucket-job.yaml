@@ -1,3 +1,5 @@
+# One-off job to create the MinIO bucket for ClickHouse backups
+# Idempotent: will succeed if the bucket already exists
 apiVersion: batch/v1
 kind: Job
 metadata:

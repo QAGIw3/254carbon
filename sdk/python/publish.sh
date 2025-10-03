@@ -1,7 +1,12 @@
 #!/bin/bash
-# Script to build and publish the 254Carbon Python SDK to PyPI
+# Build and (optionally) publish the 254Carbon Python SDK to PyPI
+# Usage:
+#   ./publish.sh               # build and print next steps
+#   TWINE_USERNAME=... \
+#   TWINE_PASSWORD=... \
+#     twine upload dist/*     # publish artifacts
 
-set -e
+set -euo pipefail
 
 echo "🚀 Building 254Carbon Python SDK for PyPI..."
 
@@ -10,14 +15,14 @@ rm -rf build/
 rm -rf dist/
 rm -rf *.egg-info/
 
-# Build the package
+# Build the package (sdist + wheel)
 python setup.py sdist bdist_wheel
 
 # Check the built files
 echo "📦 Built files:"
 ls -la dist/
 
-# Optional: Test the package installation locally
+# Optional: Test the package installation locally (adjust version as needed)
 echo "🧪 Testing local installation..."
 pip install dist/carbon254-1.0.0.tar.gz
 

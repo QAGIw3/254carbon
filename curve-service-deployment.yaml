@@ -1,3 +1,7 @@
+# Curve Service Deployment and Service
+# - Exposes HTTP on 8001
+# - Connects to PostgreSQL and ClickHouse for curve data
+# - ImagePullPolicy set to Never for local dev
 apiVersion: apps/v1
 kind: Deployment
 metadata:

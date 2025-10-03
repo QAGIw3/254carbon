@@ -1,3 +1,6 @@
+# Nightly ClickHouse backup to MinIO (daily at 02:00 UTC)
+# - Uses clickhouse-client BACKUP to S3-compatible endpoint
+# - Credentials from Kubernetes Secrets
 apiVersion: batch/v1
 kind: CronJob
 metadata:

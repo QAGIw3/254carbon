@@ -1,3 +1,6 @@
+# PostgreSQL Deployment and Service
+# - Exposes 5432
+# - Initialized by postgresql-init-configmap.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:

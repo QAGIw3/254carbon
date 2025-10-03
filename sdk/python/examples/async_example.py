@@ -2,11 +2,14 @@
 """
 Example: Enhanced async functionality with 254Carbon Python SDK
 
-This example demonstrates:
-- Async/await API calls with retry logic
+Demonstrates:
+- Async/await API calls with retry/backoff
 - Real-time streaming with async generators
-- Connection health monitoring
-- Error handling and reconnection
+- Connection health monitoring and reconnection
+
+Prerequisites:
+- Install: `pip install carbon254` (or run from repo root)
+- Use local_dev=True for mock fallbacks, or set a valid API key
 """
 import asyncio
 import pandas as pd

@@ -1,3 +1,5 @@
+# PostgreSQL initialization SQL (ConfigMap)
+# - Creates schemas, tables, extensions, and indexes for app services
 apiVersion: v1
 kind: ConfigMap
 metadata:

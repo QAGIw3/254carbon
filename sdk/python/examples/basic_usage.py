@@ -1,5 +1,9 @@
 """
 Basic usage examples for 254Carbon Python SDK.
+
+Prerequisites:
+- Install: `pip install carbon254` (or run from repo root)
+- Set API key: use CarbonClient(api_key=...) or local_dev=True for mocks
 """
 from carbon254 import CarbonClient
 from datetime import datetime, timedelta, date
@@ -94,4 +98,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

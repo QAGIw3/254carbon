@@ -1,3 +1,7 @@
+# NGINX Ingress for Gateway and Web Hub
+# - Host: 254carbon.local (adjust DNS/hosts accordingly)
+# - /api -> gateway:8000, /web and / -> web-hub:3000
+# - SSL redirect disabled for local dev
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

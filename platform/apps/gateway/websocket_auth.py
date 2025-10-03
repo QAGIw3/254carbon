@@ -4,13 +4,21 @@ WebSocket authentication helpers for validating JWTs outside FastAPI dependency 
 
 from __future__ import annotations
 
-import time
 import logging
+import os
+import sys
+import time
 from typing import Any, Dict
 
 import jwt
 
-from .auth import get_jwks, KEYCLOAK_AUDIENCE, KEYCLOAK_URL
+# Add current directory to path for absolute imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# Use absolute import
+from auth import get_jwks, KEYCLOAK_AUDIENCE, KEYCLOAK_URL
 
 logger = logging.getLogger(__name__)
 

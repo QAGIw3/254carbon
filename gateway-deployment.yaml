@@ -1,3 +1,7 @@
+# API Gateway Deployment and Service
+# - Exposes HTTP on 8000
+# - Talks to PostgreSQL, ClickHouse, Kafka
+# - Set appropriate image tag and pull policy for your environment
 apiVersion: apps/v1
 kind: Deployment
 metadata:

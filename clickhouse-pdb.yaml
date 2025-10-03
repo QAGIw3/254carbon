@@ -1,3 +1,5 @@
+# PodDisruptionBudget for ClickHouse single replica
+# Ensures no voluntary disruptions when only one pod exists
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -8,4 +10,3 @@ spec:
   selector:
     matchLabels:
       app: clickhouse
-

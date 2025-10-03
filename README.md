@@ -112,6 +112,39 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for comprehensive deployment guide.
 
 ---
 
+## 🌐 Ingress & Endpoints (Kubernetes)
+
+Ingress host: `254carbon.local`
+
+- Web Hub: `http://254carbon.local/web` (also `http://254carbon.local/`)
+- API Gateway: `http://254carbon.local/api` (OpenAPI docs at `/api/docs`)
+
+Configure local DNS for the Ingress IP:
+
+```
+# Get the Ingress Controller load balancer IP (MetalLB)
+kubectl get svc -n ingress-nginx ingress-nginx-controller \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}{"\n"}'
+
+# Add to /etc/hosts (replace ${IP})
+echo ${IP} 254carbon.local | sudo tee -a /etc/hosts
+```
+
+Notes for internal services (not exposed via Ingress):
+
+- MinIO Console/API (dev): `kubectl -n market-intelligence port-forward svc/minio 9000:9000 9001:9001` → `http://localhost:9001`
+- Keycloak (dev): `kubectl -n market-intelligence port-forward deploy/keycloak 8080:8080` → `http://localhost:8080`
+- ClickHouse HTTP (dev): `kubectl -n market-intelligence port-forward svc/clickhouse 8123:8123` → `http://localhost:8123/ping`
+
+Service summary via Ingress:
+
+- `web-hub` → `/web` and `/`
+- `gateway` → `/api`
+
+To add more services to Ingress, edit `ingress.yaml` and add additional `paths` entries.
+
+---
+
 ## 📊 Core Services
 
 ### API Gateway

@@ -1,3 +1,5 @@
+# MetalLB address pool and L2 advertisement (kind dev)
+# - Provides LoadBalancer IPs in 172.18.255.200-250
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:

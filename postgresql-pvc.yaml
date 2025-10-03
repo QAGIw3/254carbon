@@ -1,3 +1,4 @@
+# PostgreSQL data volume (PVC)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

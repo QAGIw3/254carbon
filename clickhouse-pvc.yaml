@@ -1,3 +1,6 @@
+# ClickHouse data volume (PVC)
+# - StorageClass: standard (rancher.io/local-path), no online expansion
+# - Capacity: 1Ti (recreated via backup/restore during migration)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

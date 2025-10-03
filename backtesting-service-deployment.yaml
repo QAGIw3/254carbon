@@ -1,3 +1,7 @@
+# Backtesting Service Deployment and Service
+# - Exposes HTTP on 8005
+# - Depends on PostgreSQL and ClickHouse
+# - ImagePullPolicy set to Never for local dev; adjust for CI/CD
 apiVersion: apps/v1
 kind: Deployment
 metadata:

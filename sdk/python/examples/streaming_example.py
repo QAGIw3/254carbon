@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
 Example: Real-time price streaming with 254Carbon Python SDK
+
+Tips:
+- Ensure WebSocket endpoint is reachable (local_dev=True or valid base_url)
+- Use callback for legacy sync patterns or consume the async generator
 """
 
 import asyncio

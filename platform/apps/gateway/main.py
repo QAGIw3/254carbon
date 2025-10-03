@@ -5,9 +5,14 @@ FastAPI application with OIDC integration, core endpoints, and WebSocket streami
 import asyncio
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Optional
+
+# Set package context for relative imports
+if __name__ == "__main__" and __package__ is None:
+    __package__ = "gateway"
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
@@ -15,6 +20,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+# Import modules using absolute imports
+import sys
+import os
+
+# Add current directory to path for absolute imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# Use absolute imports
 from auth import verify_token, has_permission
 from db import get_clickhouse_client, get_postgres_pool
 from entitlements import check_entitlement

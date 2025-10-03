@@ -1,3 +1,6 @@
+# Single-broker Kafka Deployment and Service (dev)
+# - Exposes plaintext listener on 9092
+# - For production, use a proper Kafka operator/helm chart
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,6 +17,15 @@ spec:
         app: kafka
     spec:
       containers:
+      - name: zookeeper
+        image: confluentinc/cp-zookeeper:7.4.0
+        ports:
+        - containerPort: 2181
+        env:
+        - name: ZOOKEEPER_CLIENT_PORT
+          value: "2181"
+        - name: ZOOKEEPER_TICK_TIME
+          value: "2000"
       - name: kafka
         image: confluentinc/cp-kafka:7.4.0
         ports:

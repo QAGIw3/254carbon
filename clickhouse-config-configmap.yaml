@@ -1,3 +1,8 @@
+# ClickHouse server configuration (merged into /etc/clickhouse-server/config.d/config.xml)
+# - Enables console logging for kubectl logs
+# - Opens HTTP/native/MySQL/PostgreSQL compatibility ports
+# - Increases connections/concurrency for prod profile
+# - Allows local filesystem backups under /var/lib/clickhouse/backups
 apiVersion: v1
 kind: ConfigMap
 metadata:

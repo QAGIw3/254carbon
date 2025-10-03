@@ -1,3 +1,5 @@
+# Debug/adhoc backup job to validate backup flow to MinIO
+# Prints variables and emits BACKUP_CREATED on success
 apiVersion: batch/v1
 kind: Job
 metadata:

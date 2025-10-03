@@ -2,9 +2,17 @@
 Entitlement checking logic.
 """
 import logging
+import os
+import sys
 from typing import Optional
 
-from .db import get_postgres_pool
+# Add current directory to path for absolute imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# Use absolute import
+from db import get_postgres_pool
 
 logger = logging.getLogger(__name__)
 

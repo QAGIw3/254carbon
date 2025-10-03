@@ -1,3 +1,6 @@
+# Keycloak Deployment and Service (dev profile)
+# - Exposes HTTP on 8080
+# - For production, enable persistent storage and TLS
 apiVersion: apps/v1
 kind: Deployment
 metadata:

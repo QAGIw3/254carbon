@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """
 Example: Advanced analytics with 254Carbon Python SDK
+
+Includes:
+- Portfolio VaR (dev mock fallback)
+- Correlation matrix
+- 30-day price forecast with chart output
+
+Requires matplotlib for plotting: `pip install matplotlib`
 """
 
 import matplotlib.pyplot as plt

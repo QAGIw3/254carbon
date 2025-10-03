@@ -1,3 +1,5 @@
+# MinIO data volume (PVC)
+# - Stores object data for S3-compatible API
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

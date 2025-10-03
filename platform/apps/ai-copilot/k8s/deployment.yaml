@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-copilot
+  namespace: market-intelligence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-copilot
+  template:
+    metadata:
+      labels:
+        app: ai-copilot
+    spec:
+      containers:
+      - name: ai-copilot
+        image: 254carbon/ai-copilot:latest
+        ports:
+        - containerPort: 8017
+        env:
+        - name: POSTGRES_HOST
+          value: "postgresql"
+        - name: POSTGRES_PORT
+          value: "5432"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8017
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8017
+          initialDelaySeconds: 60
+          periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-copilot
+  namespace: market-intelligence
+spec:
+  selector:
+    app: ai-copilot
+  ports:
+  - port: 8017
+    targetPort: 8017
+  type: ClusterIP
