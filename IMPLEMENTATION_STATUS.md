@@ -254,18 +254,18 @@ helm upgrade --install market-intelligence platform/infra/helm/market-intelligen
 - 🔲 Configure External Secrets with production secrets backend
 
 ### Week 2: Service Deployment
-- 🔲 Deploy infrastructure services (PostgreSQL, ClickHouse, Kafka, Keycloak, MinIO)
-- 🔲 Deploy application services (API Gateway, Curve Service, etc.)
-- 🔲 Configure monitoring (Prometheus, Grafana)
-- 🔲 Setup alerting (PagerDuty integration)
-- 🔲 Verify all health checks passing
+- 🚧 Deploy infrastructure services (PostgreSQL, ClickHouse, Kafka, Keycloak, MinIO)
+- 🚧 Deploy application services (API Gateway, Curve Service, etc.)
+- 🚧 Configure monitoring (Prometheus, Grafana)
+- 🚧 Setup alerting (PagerDuty integration)
+- 🚧 Verify all health checks passing
 
 ### Week 3: Data Pipeline Activation
-- 🔲 Activate MISO connector (full access pilot)
-- 🔲 Activate CAISO connector (hub-only pilot)
-- 🔲 Backfill 30 days of historical data
-- 🔲 Verify data quality metrics
-- 🔲 Run backtesting validation
+- 🚧 Activate MISO connector (full access pilot)
+- 🚧 Activate CAISO connector (hub-only pilot)
+- 🚧 Backfill 30 days of historical data
+- 🚧 Verify data quality metrics
+- 🚧 Run backtesting validation
 
 ### Week 4: UAT & Go-Live
 - 🔲 Conduct UAT with MISO pilot customer

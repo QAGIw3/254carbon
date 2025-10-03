@@ -5,6 +5,8 @@ metadata:
   namespace: market-intelligence
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: clickhouse
@@ -15,10 +17,33 @@ spec:
     spec:
       containers:
       - name: clickhouse
-        image: clickhouse/clickhouse-server:latest
+        image: clickhouse/clickhouse-server:25.9.2.1
         ports:
         - containerPort: 8123
         - containerPort: 9000
+        resources:
+          requests:
+            memory: "32Gi"
+            cpu: "16"
+          limits:
+            memory: "64Gi"
+            cpu: "32"
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: 8123
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 6
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 8123
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 6
         volumeMounts:
         - name: clickhouse-storage
           mountPath: /var/lib/clickhouse

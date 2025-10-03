@@ -58,20 +58,5 @@ data:
     ORDER BY (instrument_id, data_date, fundamental_type)
     SETTINGS index_granularity = 8192;
 
-    -- Create materialized views for common aggregations
-    CREATE MATERIALIZED VIEW IF NOT EXISTS market_intelligence.market_price_ticks_daily_mv
-    ENGINE = SummingMergeTree()
-    PARTITION BY toYYYYMM(event_time)
-    ORDER BY (toDate(event_time), instrument_id, location_code)
-    AS
-    SELECT
-        toDate(event_time) as date,
-        instrument_id,
-        location_code,
-        argMax(value, event_time) as last_price,
-        min(value) as min_price,
-        max(value) as max_price,
-        avg(value) as avg_price,
-        count() as tick_count
-    FROM market_intelligence.market_price_ticks
-    GROUP BY date, instrument_id, location_code;
+    -- Note: Skipping materialized view creation for now to avoid memory issues
+    -- This can be added later once ClickHouse is stable

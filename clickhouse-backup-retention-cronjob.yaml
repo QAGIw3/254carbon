@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: clickhouse-backup-retention
+  namespace: market-intelligence
+spec:
+  schedule: "30 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: retention
+            image: minio/mc:latest
+            env:
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: access_key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: secret_key
+            command: ["/bin/sh","-lc"]
+            args:
+            - |
+              set -eu
+              mc alias set local http://minio:9000 "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"
+              # If the prefix doesn't exist yet, exit successfully
+              mc ls local/clickhouse-backups/daily >/dev/null 2>&1 || exit 0
+              # Delete objects older than 14 days under the daily/ prefix
+              mc find local/clickhouse-backups/daily --older-than 14d --exec "mc rm --force {}" || true

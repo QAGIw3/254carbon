@@ -1,29 +1,31 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: curve-service
+  name: scenario-engine
   namespace: market-intelligence
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: curve-service
+      app: scenario-engine
   template:
     metadata:
       labels:
-        app: curve-service
+        app: scenario-engine
     spec:
       containers:
-      - name: curve-service
-        image: docker.io/254carbon/curve-service:latest
+      - name: scenario-engine
+        image: docker.io/254carbon/scenario-engine:latest
         imagePullPolicy: Never
         ports:
-        - containerPort: 8001
+        - containerPort: 8002
         env:
         - name: DATABASE_URL
           value: postgresql://postgres:postgres@postgresql:5432/market_intelligence
         - name: CLICKHOUSE_HOST
           value: clickhouse
+        - name: S3_ENDPOINT
+          value: http://minio:9000
         - name: PYTHONPATH
           value: /app
         - name: ENVIRONMENT
@@ -32,12 +34,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: curve-service
+  name: scenario-engine
   namespace: market-intelligence
 spec:
   selector:
-    app: curve-service
+    app: scenario-engine
   ports:
-  - port: 8001
-    targetPort: 8001
+  - port: 8002
+    targetPort: 8002
   type: ClusterIP

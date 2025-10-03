@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clickhouse-backup-debug
+  namespace: market-intelligence
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: backup
+        image: clickhouse/clickhouse-server:25.9.2.1
+        env:
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: access_key
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: secret_key
+        - name: CLICKHOUSE_USER
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-credentials
+              key: username
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-credentials
+              key: password
+        command: ["/bin/sh","-lc"]
+        args:
+        - |
+          set -eu
+          ts=$(date -u +%Y%m%dT%H%M%SZ)
+          echo "Using MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}"
+          echo "Using CLICKHOUSE_USER=${CLICKHOUSE_USER}"
+          clickhouse-client -h clickhouse -u "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" \
+            -q "BACKUP DATABASE market_intelligence TO S3('http://minio:9000/clickhouse-backups/daily/${ts}', '$MINIO_ACCESS_KEY', '$MINIO_SECRET_KEY')"

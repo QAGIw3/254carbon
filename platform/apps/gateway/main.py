@@ -15,12 +15,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from .auth import verify_token, has_permission
-from .db import get_clickhouse_client, get_postgres_pool
-from .entitlements import check_entitlement
-from .metrics import track_request, track_latency
-from .stream import StreamManager
-from .websocket_auth import verify_ws_token
+from auth import verify_token, has_permission
+from db import get_clickhouse_client, get_postgres_pool
+from entitlements import check_entitlement
+from metrics import track_request, track_latency
+from stream import StreamManager
+from websocket_auth import verify_ws_token
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

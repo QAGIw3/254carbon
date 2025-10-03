@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: clickhouse-pdb
+  namespace: market-intelligence
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: clickhouse
+

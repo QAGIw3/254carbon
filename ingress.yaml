@@ -6,6 +6,7 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx
   rules:
@@ -30,6 +31,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: gateway
+            name: web-hub
             port:
-              number: 8000
+              number: 3000

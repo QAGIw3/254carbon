@@ -1,10 +1,11 @@
 """
-Main client class for 254Carbon API.
+Main client class for 254Carbon API with enhanced async support and retry logic.
 """
 import asyncio
 import json
 import time
-from typing import List, Optional, Dict, Any, Callable, Union
+import random
+from typing import List, Optional, Dict, Any, Callable, Union, AsyncGenerator
 from datetime import date, datetime
 
 import httpx
@@ -14,6 +15,44 @@ from websockets.exceptions import ConnectionClosedError
 
 from .models import Instrument, PriceTick, ForwardCurve, Scenario, ScenarioRun
 from .exceptions import CarbonAPIError, AuthenticationError, RateLimitError, NotFoundError
+
+
+def retry_with_backoff(
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    backoff_factor: float = 2.0,
+    jitter: bool = True
+):
+    """Decorator for retrying async functions with exponential backoff."""
+    def decorator(func):
+        async def wrapper(*args, **kwargs):
+            last_exception = None
+
+            for attempt in range(max_retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError) as e:
+                    last_exception = e
+
+                    if attempt == max_retries:
+                        raise e
+
+                    # Calculate delay with exponential backoff and jitter
+                    delay = min(base_delay * (backoff_factor ** attempt), max_delay)
+
+                    if jitter:
+                        # Add random jitter to prevent thundering herd
+                        delay = delay * (0.5 + random.random() * 0.5)
+
+                    await asyncio.sleep(delay)
+
+            # This should never be reached, but just in case
+            if last_exception:
+                raise last_exception
+
+        return wrapper
+    return decorator
 
 
 class CarbonClient:
@@ -102,7 +141,7 @@ class CarbonClient:
             raise CarbonAPIError(f"API error ({response.status_code}): {detail}")
     
     # Instruments API
-    
+
     def get_instruments(
         self,
         market: Optional[str] = None,
@@ -110,11 +149,11 @@ class CarbonClient:
     ) -> List[Instrument]:
         """
         Get available instruments.
-        
+
         Args:
             market: Filter by market (power, gas, env, lng)
             product: Filter by product (lmp, curve, rec, etc.)
-        
+
         Returns:
             List of Instrument objects
         """
@@ -123,10 +162,10 @@ class CarbonClient:
             params["market"] = market
         if product:
             params["product"] = product
-        
+
         response = self._client.get("/api/v1/instruments", params=params)
         data = self._handle_response(response)
-        
+
         return [Instrument(**item) for item in data]
     
     # Prices API
@@ -140,13 +179,13 @@ class CarbonClient:
     ) -> List[PriceTick]:
         """
         Get historical price ticks.
-        
+
         Args:
             instrument_id: Instrument identifier
             start_time: Start datetime (UTC)
             end_time: End datetime (UTC)
             price_type: Price type (mid, bid, ask, settle)
-        
+
         Returns:
             List of PriceTick objects
         """
@@ -156,10 +195,10 @@ class CarbonClient:
             "end_time": end_time.isoformat(),
             "price_type": price_type,
         }
-        
+
         response = self._client.get("/api/v1/prices/ticks", params=params)
         data = self._handle_response(response)
-        
+
         return [PriceTick(**item) for item in data]
     
     def get_prices_dataframe(
@@ -319,11 +358,11 @@ class CarbonClient:
     ) -> Dict[str, Any]:
         """
         Get scenario run status.
-        
+
         Args:
             scenario_id: Scenario ID
             run_id: Run ID
-        
+
         Returns:
             Status dict
         """
@@ -331,32 +370,111 @@ class CarbonClient:
             f"/api/v1/scenarios/{scenario_id}/runs/{run_id}"
         )
         return self._handle_response(response)
-    
-    # Async methods
-    
-    async def get_instruments_async(
+
+    @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=10.0)
+    async def get_run_status_async(
         self,
-        market: Optional[str] = None,
-        product: Optional[str] = None,
-    ) -> List[Instrument]:
-        """Async version of get_instruments."""
+        scenario_id: str,
+        run_id: str,
+    ) -> Dict[str, Any]:
+        """Async version of get_run_status with retry logic."""
         if self._async_client is None:
             self._async_client = httpx.AsyncClient(
                 base_url=self.base_url,
                 timeout=self.timeout,
                 headers=self._get_headers(),
             )
-        
+
+        response = await self._async_client.get(
+            f"/api/v1/scenarios/{scenario_id}/runs/{run_id}"
+        )
+        return self._handle_response(response)
+    
+    # Enhanced Async API Methods with Retry Logic
+
+    @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=10.0)
+    async def get_instruments_async(
+        self,
+        market: Optional[str] = None,
+        product: Optional[str] = None,
+    ) -> List[Instrument]:
+        """Async version of get_instruments with retry logic."""
+        if self._async_client is None:
+            self._async_client = httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=self.timeout,
+                headers=self._get_headers(),
+            )
+
         params = {}
         if market:
             params["market"] = market
         if product:
             params["product"] = product
-        
+
         response = await self._async_client.get("/api/v1/instruments", params=params)
         data = self._handle_response(response)
-        
+
         return [Instrument(**item) for item in data]
+
+    @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=10.0)
+    async def get_prices_async(
+        self,
+        instrument_id: str,
+        start_time: datetime,
+        end_time: datetime,
+        price_type: str = "mid",
+    ) -> List[PriceTick]:
+        """Async version of get_prices with retry logic."""
+        if self._async_client is None:
+            self._async_client = httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=self.timeout,
+                headers=self._get_headers(),
+            )
+
+        params = {
+            "instrument_id": [instrument_id],
+            "start_time": start_time.isoformat(),
+            "end_time": end_time.isoformat(),
+            "price_type": price_type,
+        }
+
+        response = await self._async_client.get("/api/v1/prices/ticks", params=params)
+        data = self._handle_response(response)
+
+        return [PriceTick(**item) for item in data]
+
+    @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=10.0)
+    async def get_forward_curve_async(
+        self,
+        instrument_id: str,
+        as_of_date: date,
+        scenario_id: str = "BASE",
+    ) -> ForwardCurve:
+        """Async version of get_forward_curve with retry logic."""
+        if self._async_client is None:
+            self._async_client = httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=self.timeout,
+                headers=self._get_headers(),
+            )
+
+        params = {
+            "instrument_id": [instrument_id],
+            "as_of_date": as_of_date.isoformat(),
+            "scenario_id": scenario_id,
+        }
+
+        response = await self._async_client.get("/api/v1/curves/forward", params=params)
+        points = self._handle_response(response)
+
+        return ForwardCurve(
+            instrument_id=instrument_id,
+            as_of_date=as_of_date,
+            scenario_id=scenario_id,
+            points=points,
+        )
     
     # Context manager support
     
@@ -375,27 +493,41 @@ class CarbonClient:
         if self._ws_client:
             asyncio.run(self._ws_client.close())
 
-    # WebSocket Streaming
+    # Enhanced WebSocket Streaming with Connection Management
 
     async def stream_prices(
         self,
         instrument_ids: List[str],
         callback: Callable[[PriceTick], None],
         reconnect: bool = True,
-    ) -> None:
+        reconnect_delay: float = 5.0,
+        max_reconnect_attempts: int = 10,
+    ) -> AsyncGenerator[PriceTick, None]:
         """
-        Stream real-time price updates via WebSocket.
+        Stream real-time price updates via WebSocket with enhanced connection management.
 
         Args:
             instrument_ids: List of instrument IDs to subscribe to
-            callback: Function to call with each price update
+            callback: Function to call with each price update (deprecated, use async generator)
             reconnect: Auto-reconnect on connection loss
+            reconnect_delay: Delay between reconnection attempts
+            max_reconnect_attempts: Maximum number of reconnection attempts
+
+        Yields:
+            PriceTick objects as they arrive
         """
         uri = f"{self.ws_url}/api/v1/stream"
+        reconnect_count = 0
 
-        while True:
+        while reconnect_count < max_reconnect_attempts:
             try:
-                async with websockets.connect(uri) as websocket:
+                async with websockets.connect(
+                    uri,
+                    extra_headers=self._get_headers(),
+                    ping_interval=30,
+                    ping_timeout=10,
+                    close_timeout=5
+                ) as websocket:
                     # Subscribe to instruments
                     subscription = {
                         "type": "subscribe",
@@ -403,6 +535,8 @@ class CarbonClient:
                         "api_key": self.api_key
                     }
                     await websocket.send(json.dumps(subscription))
+
+                    reconnect_count = 0  # Reset counter on successful connection
 
                     while True:
                         try:
@@ -412,24 +546,83 @@ class CarbonClient:
                             if data.get("type") == "price_update":
                                 tick_data = data.get("data", {})
                                 price_tick = PriceTick(**tick_data)
-                                callback(price_tick)
+                                yield price_tick
+
+                                # Also call legacy callback for backward compatibility
+                                if callback:
+                                    callback(price_tick)
+
+                            elif data.get("type") == "heartbeat":
+                                # Handle heartbeat messages
+                                continue
+
+                            elif data.get("type") == "error":
+                                error_msg = data.get("message", "Unknown WebSocket error")
+                                raise CarbonAPIError(f"WebSocket error: {error_msg}")
 
                         except ConnectionClosedError:
                             break
+                        except json.JSONDecodeError as e:
+                            print(f"Invalid JSON received: {e}")
+                            continue
 
             except Exception as e:
+                reconnect_count += 1
                 if not reconnect:
-                    raise
-                print(f"WebSocket connection lost, reconnecting in 5 seconds: {e}")
-                await asyncio.sleep(5)
+                    raise CarbonAPIError(f"WebSocket connection failed: {e}")
+
+                if reconnect_count >= max_reconnect_attempts:
+                    raise CarbonAPIError(f"Max reconnection attempts ({max_reconnect_attempts}) exceeded: {e}")
+
+                print(f"WebSocket connection lost (attempt {reconnect_count}/{max_reconnect_attempts}), reconnecting in {reconnect_delay}s: {e}")
+                await asyncio.sleep(reconnect_delay)
+
+    async def stream_prices_async(
+        self,
+        instrument_ids: List[str],
+        reconnect: bool = True,
+        reconnect_delay: float = 5.0,
+        max_reconnect_attempts: int = 10,
+    ) -> AsyncGenerator[PriceTick, None]:
+        """
+        Modern async generator interface for price streaming.
+
+        Args:
+            instrument_ids: List of instrument IDs to subscribe to
+            reconnect: Auto-reconnect on connection loss
+            reconnect_delay: Delay between reconnection attempts
+            max_reconnect_attempts: Maximum number of reconnection attempts
+
+        Yields:
+            PriceTick objects as they arrive
+        """
+        async for tick in self.stream_prices(
+            instrument_ids,
+            callback=None,  # Use async generator instead
+            reconnect=reconnect,
+            reconnect_delay=reconnect_delay,
+            max_reconnect_attempts=max_reconnect_attempts
+        ):
+            yield tick
 
     def stream_prices_sync(
         self,
         instrument_ids: List[str],
         callback: Callable[[PriceTick], None],
     ) -> None:
-        """Synchronous wrapper for price streaming."""
-        asyncio.run(self.stream_prices(instrument_ids, callback))
+        """Synchronous wrapper for price streaming (legacy support)."""
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Run the async generator and call callback for each tick
+        async def run_stream():
+            async for tick in self.stream_prices(instrument_ids, callback=callback):
+                pass  # Callback is handled in stream_prices
+
+        loop.run_until_complete(run_stream())
 
     # Advanced Analytics
 
