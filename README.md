@@ -178,6 +178,12 @@ To add more services to Ingress, edit `ingress.yaml` and add additional `paths` 
 - **Location**: `/platform/apps/web-hub/`
 - **Features**: Dashboard, explorer, curve viewer, scenario builder
 
+### Routing Service
+- **Purpose**: Multi-source redundancy with intelligent failover, blending, and trust scoring
+- **Location**: `/platform/apps/routing-service/`
+- **Features**: Automatic source selection, circuit breaker, synthetic fallback, full audit trail
+- **Documentation**: [Design Document](docs/ROUTING_SERVICE_DESIGN.md) | [Integration Guide](platform/apps/routing-service/INTEGRATION.md)
+
 ---
 
 ## 🔌 Data Connectors
