@@ -1,0 +1,130 @@
+# Commodity feature mapping configuration
+#
+# Defines default and region-specific mappings for computing generation
+# spread features (spark/dark spreads, carbon adjustments, capacity).
+# Values can be overridden per instrument via pg.instrument.attrs using the
+# "commodity_features" (preferred) or "generation_spreads" key.
+
+version: 1
+
+# Baseline defaults applied to all instruments before region/instrument overrides.
+defaults:
+  spark:
+    gas_index: HENRY.HUB
+    carbon_index: RGGI
+    heat_rate: 7.5              # MMBtu/MWh
+    emissions_factor: 0.42      # tCO2/MWh
+  dark:
+    coal_index: API2
+    carbon_index: RGGI
+    heat_rate: 10.0             # MMBtu/MWh equivalent for coal
+    emissions_factor: 0.95      # tCO2/MWh
+  capacity:
+    capacity_series:
+      entity_id: SYSTEM
+      variable: capacity_total
+    load_series:
+      entity_id: SYSTEM
+      variable: load
+    fallback_capacity_mw: 150000
+
+# Region-level overrides keyed by ISO or commodity prefix (first token of instrument_id).
+regions:
+  MISO:
+    spark:
+      gas_index: HENRY.HUB
+      carbon_index: RGGI
+      heat_rate: 7.6
+      emissions_factor: 0.41
+    dark:
+      coal_index: PRB.COAL
+      heat_rate: 10.2
+      emissions_factor: 0.98
+    capacity:
+      capacity_series:
+        entity_id: MISO
+        variable: capacity_total
+      load_series:
+        entity_id: MISO
+        variable: load
+      fallback_capacity_mw: 185000
+  PJM:
+    spark:
+      gas_index: HENRY.HUB
+      carbon_index: RGGI
+      heat_rate: 7.7
+      emissions_factor: 0.43
+    dark:
+      coal_index: NAPP.COAL
+      heat_rate: 10.1
+      emissions_factor: 0.96
+    capacity:
+      capacity_series:
+        entity_id: PJM
+        variable: capacity_total
+      load_series:
+        entity_id: PJM
+        variable: load
+      fallback_capacity_mw: 190000
+  CAISO:
+    spark:
+      gas_index: HENRY.HUB
+      carbon_index: CCA
+      heat_rate: 7.4
+      emissions_factor: 0.40
+    dark:
+      coal_index: API2
+      heat_rate: 10.0
+      emissions_factor: 0.95
+    capacity:
+      capacity_series:
+        entity_id: CAISO
+        variable: capacity_total
+      load_series:
+        entity_id: CAISO
+        variable: load
+      fallback_capacity_mw: 65000
+  ERCOT:
+    spark:
+      gas_index: HENRY.HUB
+      carbon_index: RGGI
+      heat_rate: 7.3
+      emissions_factor: 0.39
+    dark:
+      coal_index: PRB.COAL
+      heat_rate: 9.8
+      emissions_factor: 0.92
+    capacity:
+      capacity_series:
+        entity_id: ERCOT
+        variable: capacity_total
+      load_series:
+        entity_id: ERCOT
+        variable: load
+      fallback_capacity_mw: 105000
+
+# Instrument-specific overrides keyed by instrument_id.
+instruments:
+  MISO.HUB.INDIANA:
+    spark:
+      heat_rate: 7.55
+    capacity:
+      fallback_capacity_mw: 182000
+  PJM.HUB.WEST:
+    spark:
+      heat_rate: 7.75
+    capacity:
+      fallback_capacity_mw: 188000
+  CAISO.SP15:
+    spark:
+      gas_index: HENRY.HUB
+      carbon_index: CCA
+      heat_rate: 7.35
+    capacity:
+      fallback_capacity_mw: 68000
+      capacity_series:
+        entity_id: CAISO
+        variable: capacity_total
+      load_series:
+        entity_id: CAISO.SP15
+        variable: load

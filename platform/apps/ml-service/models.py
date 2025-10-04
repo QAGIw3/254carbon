@@ -34,6 +34,7 @@ class PriceForecastModel:
         model_type: str,
         instrument_id: str,
         metrics: Dict[str, float],
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         self.model = model
         self.version = version
@@ -42,6 +43,7 @@ class PriceForecastModel:
         self.metrics = metrics
         self.trained_date = datetime.utcnow()
         self.is_active = False
+        self.metadata = metadata or {}
     
     def predict(self, features: pd.DataFrame) -> np.ndarray:
         """Generate point predictions."""
@@ -93,6 +95,7 @@ class PriceForecastModel:
                     "instrument_id": self.instrument_id,
                     "metrics": self.metrics,
                     "trained_date": self.trained_date,
+                    "metadata": self.metadata,
                 },
                 f,
             )
@@ -111,6 +114,7 @@ class PriceForecastModel:
             model_type=data["model_type"],
             instrument_id=data["instrument_id"],
             metrics=data["metrics"],
+            metadata=data.get("metadata", {}),
         )
 
 
@@ -152,6 +156,7 @@ class ModelRegistry:
         model: Any,
         metrics: Dict[str, float],
         model_type: str = "xgboost",
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Register new model version."""
         # Generate version
@@ -163,6 +168,7 @@ class ModelRegistry:
             model_type=model_type,
             instrument_id=instrument_id,
             metrics=metrics,
+            metadata=metadata,
         )
         
         # Save to disk
@@ -547,4 +553,3 @@ class TransformerLightningModule(pl.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-

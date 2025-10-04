@@ -1,0 +1,24 @@
+{
+  "title": "Data Quality Overview",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Daily DQ Issues by Severity",
+      "targets": [
+        {
+          "query": "SELECT date, sumIf(issue_count, severity='error') as errors, sumIf(issue_count, severity='warning') as warnings FROM market_intelligence.mv_dq_issues_daily WHERE date >= today() - 30 GROUP BY date ORDER BY date"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Quality Score by Source",
+      "targets": [
+        {
+          "query": "SELECT date, source, avg(score) FROM market_intelligence.data_quality_scores WHERE date >= today() - 30 GROUP BY date, source ORDER BY date"
+        }
+      ]
+    }
+  ]
+}
+

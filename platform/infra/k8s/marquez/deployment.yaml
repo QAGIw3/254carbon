@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marquez
+  namespace: marquez
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: marquez
+  template:
+    metadata:
+      labels:
+        app: marquez
+    spec:
+      containers:
+      - name: marquez
+        image: marquezproject/marquez:0.53.0
+        ports:
+        - containerPort: 5000
+        env:
+        - name: MARQUEZ_PORT
+          value: "5000"
+        - name: MARQUEZ_DB_HOST
+          value: marquez-postgres
+        - name: MARQUEZ_DB_PORT
+          value: "5432"
+        - name: MARQUEZ_DB_USER
+          value: postgres
+        - name: MARQUEZ_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: marquez-db
+              key: password
+        - name: MARQUEZ_DB
+          value: marquez
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: marquez
+  namespace: marquez
+spec:
+  selector:
+    app: marquez
+  ports:
+  - name: http
+    port: 5000
+    targetPort: 5000
+
+

@@ -74,6 +74,13 @@
 
 ## ✅ Recently Completed (October 2025)
 
+### Commodity Research Framework
+- ✅ **Analytics Engine**: Extended `CommodityResearchFramework` with STL decomposition, regime detection, supply/demand metrics, and weather regressions.
+- ✅ **Persistence Layer**: New ClickHouse tables (`ch.commodity_decomposition`, `ch.volatility_regimes`, `ch.supply_demand_metrics`, `ch.weather_impact`) with aggregating materialized views.
+- ✅ **Research API**: FastAPI router exposing `/api/v1/research/decomposition`, `/volatility-regimes`, `/sd-balance`, `/weather-impact` with optional Web Hub hooks.
+- ✅ **Airflow DAGs**: Daily and weekly orchestrations (`commodity_decomposition_snapshot`, `volatility_regime_classification`, `supply_demand_balance_update`, `weather_impact_calibration`) including optional Prometheus push metrics.
+- ✅ **Config & Tests**: YAML mapping for instrument/entity sources and pytest coverage for decomposition, regimes, and supply/demand behaviours.
+
 ### Backtesting Pipeline
 - ✅ **Backtesting Service**: Complete with MAPE/WAPE/RMSE calculations
   - File: `/platform/apps/backtesting-service/main.py`
@@ -338,4 +345,3 @@ helm upgrade --install market-intelligence platform/infra/helm/market-intelligen
 
 **Status**: ✅ MVP CODE COMPLETE - Ready for infrastructure provisioning and deployment
 **Last Updated**: October 3, 2025
-

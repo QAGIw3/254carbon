@@ -397,6 +397,79 @@ State-of-the-art transformer models for price forecasting with uncertainty quant
 }
 ```
 
+#### Train Multimodal Transformer
+
+Enable cross-commodity, multimodal forecasting across related instruments.
+
+**POST** `/api/v1/ml/train`
+
+**Request:**
+```json
+{
+  "instrument_ids": [
+    "POWER.NYISO.ZONEA",
+    "GAS.HENRY_HUB.MONTH_AHEAD"
+  ],
+  "start_date": "2024-01-01",
+  "end_date": "2024-12-31",
+  "model_type": "multimodal_transformer",
+  "hyperparameters": {
+    "seq_len": 128,
+    "forecast_horizons": [7, 30, 90],
+    "batch_size": 16,
+    "epochs": 40,
+    "learning_rate": 0.0004,
+    "d_model": 320,
+    "num_heads": 8,
+    "num_layers": 4
+  }
+}
+```
+
+The service automatically aligns price, fundamentals, and weather series based on the multimodal mapping configuration (`config/multimodal_mapping.yaml`). Metrics are logged per commodity and persisted with the model registry metadata.
+
+#### Forecast with Multimodal Transformer
+
+**POST** `/api/v1/ml/forecast`
+
+**Request:**
+```json
+{
+  "instrument_id": "POWER.NYISO.ZONEA",
+  "model_version": "20250218_153045"
+}
+```
+
+**Response:**
+```json
+{
+  "instrument_id": "POWER.NYISO.ZONEA",
+  "model_version": "20250218_153045",
+  "forecasts": [
+    {"month_ahead": 7, "forecast_price": 68.4, "std": 3.1},
+    {"month_ahead": 30, "forecast_price": 71.9, "std": 4.7},
+    {"month_ahead": 90, "forecast_price": 74.2, "std": 6.0}
+  ],
+  "confidence_intervals": [
+    {"lower": 62.3, "upper": 74.5},
+    {"lower": 62.7, "upper": 81.1},
+    {"lower": 62.3, "upper": 86.1}
+  ],
+  "extras": {
+    "fusion_gates": {
+      "price": 0.52,
+      "fundamentals": 0.31,
+      "weather": 0.17
+    },
+    "commodity_key": "commodity_a",
+    "commodity_order": ["commodity_a", "commodity_b"],
+    "cross_attention": [[0.64, 0.36], [0.28, 0.72]]
+  }
+}
+```
+
+`extras` contains modality fusion weights and averaged cross-commodity attention useful for diagnostics and explainability.
+
 ---
 
 ## New Market Connectors
@@ -612,4 +685,3 @@ Error responses include descriptive messages:
 
 **Last Updated:** October 4, 2025  
 **API Version:** 1.0.0
-

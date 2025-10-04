@@ -67,7 +67,14 @@ async def query_clickhouse_data(market: str, as_of_date: date, report_type: str)
             port=9000,
             database='default',
             user='default',
-            password=''
+            password='',
+            settings={
+                'async_insert': 1,
+                'wait_for_async_insert': 0,
+                'max_threads': 32,
+                'max_execution_time': 120,
+                'use_uncompressed_cache': 0,
+            }
         )
 
         # Calculate date range based on report type

@@ -1,0 +1,182 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: infrastructure-connector-alerts
+  namespace: market-intelligence
+  labels:
+    prometheus: kube-prometheus
+spec:
+  groups:
+  - name: infrastructure_connectors
+    interval: 30s
+    rules:
+    
+    # ALSI LNG Connector Alerts
+    - alert: ALSILNGConnectorDown
+      expr: up{job="alsi-lng-connector"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        component: infrastructure
+        connector: alsi_lng
+      annotations:
+        summary: "ALSI LNG connector is down"
+        description: "The ALSI LNG inventory connector has been down for more than 5 minutes"
+    
+    - alert: ALSILNGDataStale
+      expr: time() - connector_last_successful_run{source_id="alsi_lng_inventory"} > 86400
+      for: 10m
+      labels:
+        severity: warning
+        component: infrastructure
+        connector: alsi_lng
+      annotations:
+        summary: "ALSI LNG data is stale"
+        description: "No new LNG inventory data received for more than 24 hours"
+    
+    - alert: ALSILNGHighErrorRate
+      expr: rate(connector_errors_total{source_id="alsi_lng_inventory"}[5m]) > 0.1
+      for: 10m
+      labels:
+        severity: warning
+        component: infrastructure
+        connector: alsi_lng
+      annotations:
+        summary: "High error rate in ALSI LNG connector"
+        description: "Error rate is {{ $value }} errors/second over the last 5 minutes"
+    
+    # REexplorer Connector Alerts
+    - alert: REexplorerConnectorDown
+      expr: up{job="reexplorer-connector"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        component: infrastructure
+        connector: reexplorer
+      annotations:
+        summary: "REexplorer connector is down"
+        description: "The REexplorer renewable resource connector has been down for more than 5 minutes"
+    
+    - alert: REexplorerAPIRateLimit
+      expr: connector_api_rate_limit_hits{source_id="reexplorer_renewable"} > 10
+      for: 5m
+      labels:
+        severity: warning
+        component: infrastructure
+        connector: reexplorer
+      annotations:
+        summary: "REexplorer API rate limit reached"
+        description: "Hit API rate limit {{ $value }} times in the last 5 minutes"
+    
+    # WRI Power Plants Connector Alerts
+    - alert: WRIPowerPlantsUpdateFailed
+      expr: connector_last_update_status{source_id="wri_powerplants"} != 1
+      for: 1h
+      labels:
+        severity: warning
+        component: infrastructure
+        connector: wri_powerplants
+      annotations:
+        summary: "WRI Power Plants update failed"
+        description: "Failed to update power plant database for more than 1 hour"
+    
+    - alert: WRIPowerPlantsDataQualityLow
+      expr: connector_data_quality_score{source_id="wri_powerplants"} < 80
+      for: 30m
+      labels:
+        severity: warning
+        component: infrastructure
+        connector: wri_powerplants
+      annotations:
+        summary: "WRI Power Plants data quality degraded"
+        description: "Data quality score is {{ $value }}%, below threshold of 80%"
+    
+    # GEM Transmission Connector Alerts
+    - alert: GEMTransmissionConnectorDown
+      expr: up{job="gem-transmission-connector"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        component: infrastructure
+        connector: gem_transmission
+      annotations:
+        summary: "GEM Transmission connector is down"
+        description: "The Global Energy Monitor transmission connector has been down for more than 5 minutes"
+    
+    - alert: GEMTransmissionProjectDataMissing
+      expr: connector_records_processed{source_id="gem_transmission", record_type="project"} == 0
+      for: 24h
+      labels:
+        severity: info
+        component: infrastructure
+        connector: gem_transmission
+      annotations:
+        summary: "No transmission project updates"
+        description: "No new transmission project data processed in the last 24 hours"
+    
+    # General Infrastructure Data Alerts
+    - alert: InfrastructureDataIngestionLag
+      expr: |
+        max by (source_id) (
+          time() - connector_last_event_time{source_id=~"alsi_lng_inventory|reexplorer_renewable|wri_powerplants|gem_transmission"}
+        ) > 7200
+      for: 15m
+      labels:
+        severity: warning
+        component: infrastructure
+      annotations:
+        summary: "Infrastructure data ingestion lag detected"
+        description: "Connector {{ $labels.source_id }} has ingestion lag of {{ $value }} seconds"
+    
+    - alert: InfrastructureKafkaBacklog
+      expr: |
+        kafka_consumer_lag{topic="market.infrastructure"} > 10000
+      for: 10m
+      labels:
+        severity: warning
+        component: infrastructure
+      annotations:
+        summary: "High Kafka backlog for infrastructure data"
+        description: "Infrastructure topic has {{ $value }} messages in backlog"
+    
+    - alert: InfrastructureDataCompleteness
+      expr: |
+        (
+          count(connector_records_processed{source_id=~"alsi_lng_inventory|reexplorer_renewable|wri_powerplants|gem_transmission"} > 0) 
+          / 
+          count(connector_records_processed{source_id=~"alsi_lng_inventory|reexplorer_renewable|wri_powerplants|gem_transmission"})
+        ) < 0.75
+      for: 1h
+      labels:
+        severity: warning
+        component: infrastructure
+      annotations:
+        summary: "Infrastructure data completeness below threshold"
+        description: "Only {{ $value | humanizePercentage }} of infrastructure connectors are producing data"
+    
+    # ClickHouse Storage Alerts
+    - alert: InfrastructureTableSizeHigh
+      expr: |
+        clickhouse_table_size_bytes{database="market_intelligence", table=~"infrastructure_metrics|lng_terminal_data|power_plant_data|transmission_flows"} > 1e11
+      for: 30m
+      labels:
+        severity: warning
+        component: infrastructure
+        subsystem: storage
+      annotations:
+        summary: "Infrastructure table size exceeding threshold"
+        description: "Table {{ $labels.table }} size is {{ $value | humanize1024 }}B"
+    
+    - alert: InfrastructureQueryPerformance
+      expr: |
+        histogram_quantile(0.95,
+          rate(clickhouse_query_duration_seconds_bucket{query_type="infrastructure"}[5m])
+        ) > 5
+      for: 15m
+      labels:
+        severity: warning
+        component: infrastructure
+        subsystem: query_performance
+      annotations:
+        summary: "Slow infrastructure queries detected"
+        description: "95th percentile query time is {{ $value }}s, above 5s threshold"

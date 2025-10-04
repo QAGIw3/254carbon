@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: infrastructure-api
+  namespace: market-intelligence
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: infrastructure-api
+  template:
+    metadata:
+      labels:
+        app: infrastructure-api
+        component: api
+    spec:
+      containers:
+      - name: infrastructure-api
+        image: 254carbon/infrastructure-api:latest
+        ports:
+        - containerPort: 8035
+          name: http
+        env:
+        - name: POSTGRES_HOST
+          value: "postgresql"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "market_intelligence"
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: password
+        - name: CLICKHOUSE_HOST
+          value: "clickhouse"
+        - name: CLICKHOUSE_PORT
+          value: "9000"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8035
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8035
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: infrastructure-api
+  namespace: market-intelligence
+spec:
+  selector:
+    app: infrastructure-api
+  ports:
+  - port: 8035
+    targetPort: 8035
+    name: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: infrastructure-api
+  namespace: market-intelligence
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: api.254carbon.local
+    http:
+      paths:
+      - path: /infrastructure(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: infrastructure-api
+            port:
+              number: 8035
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: infrastructure-api
+  namespace: market-intelligence
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: infrastructure-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

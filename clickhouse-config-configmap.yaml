@@ -40,4 +40,63 @@ data:
             <allowed_path>/var/lib/clickhouse/backups/</allowed_path>
         </backups>
         <!-- Rely on default user directories (users.xml) from the image -->
+        
+        <!-- Storage configuration for data tiering (hot/warm/cold) -->
+        <storage_configuration>
+            <disks>
+                <default>
+                    <type>local</type>
+                    <path>/var/lib/clickhouse/</path>
+                </default>
+                <s3_warm>
+                    <type>s3</type>
+                    <endpoint>http://minio:9000/clickhouse-warm</endpoint>
+                    <access_key_id>minioadmin</access_key_id>
+                    <secret_access_key>minioadmin</secret_access_key>
+                    <region>us-east-1</region>
+                </s3_warm>
+                <s3_cold>
+                    <type>s3</type>
+                    <endpoint>http://minio:9000/clickhouse-cold</endpoint>
+                    <access_key_id>minioadmin</access_key_id>
+                    <secret_access_key>minioadmin</secret_access_key>
+                    <region>us-east-1</region>
+                </s3_cold>
+            </disks>
+            <policies>
+                <hot_warm_cold>
+                    <volumes>
+                        <hot>
+                            <disk>default</disk>
+                        </hot>
+                        <warm>
+                            <disk>s3_warm</disk>
+                        </warm>
+                        <cold>
+                            <disk>s3_cold</disk>
+                        </cold>
+                    </volumes>
+                </hot_warm_cold>
+            </policies>
+        </storage_configuration>
+
+        <!-- Cluster topology and background pool tuning -->
+        <remote_servers>
+            <market_cluster>
+                <shard>
+                    <replica>
+                        <host>clickhouse-0.clickhouse.market-intelligence.svc.cluster.local</host>
+                        <port>9000</port>
+                    </replica>
+                    <replica>
+                        <host>clickhouse-1.clickhouse.market-intelligence.svc.cluster.local</host>
+                        <port>9000</port>
+                    </replica>
+                </shard>
+            </market_cluster>
+        </remote_servers>
+
+        <!-- Increase background pool sizes during heavy MV population; tune per env -->
+        <background_pool_size>32</background_pool_size>
+        <background_merges_mutations_concurrency_ratio>2</background_merges_mutations_concurrency_ratio>
     </clickhouse>

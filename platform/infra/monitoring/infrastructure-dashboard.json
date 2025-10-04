@@ -1,0 +1,294 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "infrastructure-monitoring",
+    "title": "Infrastructure Data Monitoring",
+    "tags": ["infrastructure", "connectors", "data-quality"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 0,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "type": "graph",
+        "title": "Connector Health Status",
+        "targets": [
+          {
+            "expr": "up{job=~\"alsi-lng-connector|reexplorer-connector|wri-powerplants-connector|gem-transmission-connector\"}",
+            "legendFormat": "{{ job }}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "min": 0, "max": 1.5},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "type": "graph",
+        "title": "Data Ingestion Rate",
+        "targets": [
+          {
+            "expr": "rate(connector_records_processed{source_id=~\"alsi_lng_inventory|reexplorer_renewable|wri_powerplants|gem_transmission\"}[5m])",
+            "legendFormat": "{{ source_id }}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "ops"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "type": "graph",
+        "title": "Data Quality Score",
+        "targets": [
+          {
+            "expr": "connector_data_quality_score{source_id=~\"alsi_lng_inventory|reexplorer_renewable|wri_powerplants|gem_transmission\"}",
+            "legendFormat": "{{ source_id }}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "min": 0, "max": 100},
+          {"format": "short"}
+        ],
+        "thresholds": [
+          {"value": 80, "op": "lt", "fill": true, "line": true, "colorMode": "critical"}
+        ]
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "type": "graph",
+        "title": "Error Rate",
+        "targets": [
+          {
+            "expr": "rate(connector_errors_total{source_id=~\"alsi_lng_inventory|reexplorer_renewable|wri_powerplants|gem_transmission\"}[5m])",
+            "legendFormat": "{{ source_id }} - {{ error_type }}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "ops"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+        "type": "table",
+        "title": "Infrastructure Assets Summary",
+        "targets": [
+          {
+            "expr": "sum by (asset_type, country) (infrastructure_assets_total)",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"Time": true},
+              "renameByName": {
+                "asset_type": "Asset Type",
+                "country": "Country",
+                "Value": "Count"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "type": "graph",
+        "title": "LNG Terminal Inventory Levels",
+        "targets": [
+          {
+            "expr": "avg by (country) (lng_terminal_fullness_pct)",
+            "legendFormat": "{{ country }}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "min": 0, "max": 100},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 7,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "type": "graph",
+        "title": "Power Generation by Fuel Type",
+        "targets": [
+          {
+            "expr": "sum by (fuel_type) (rate(power_generation_mwh[1h]))",
+            "legendFormat": "{{ fuel_type }}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "watt"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 8,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+        "type": "graph",
+        "title": "Kafka Lag - Infrastructure Topic",
+        "targets": [
+          {
+            "expr": "kafka_consumer_lag{topic=\"market.infrastructure\"}",
+            "legendFormat": "{{ consumer_group }} - {{ partition }}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 9,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+        "type": "heatmap",
+        "title": "API Response Times",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{handler=~\"/api/v1/infrastructure/.*\"}[5m])) by (le))",
+            "format": "heatmap",
+            "refId": "A"
+          }
+        ],
+        "dataFormat": "tsbuckets"
+      },
+      {
+        "id": 10,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40},
+        "type": "logs",
+        "title": "Recent Infrastructure Connector Errors",
+        "targets": [
+          {
+            "expr": "{namespace=\"market-intelligence\", app=~\"alsi-lng-connector|reexplorer-connector|wri-powerplants-connector|gem-transmission-connector\"} |~ \"ERROR|CRITICAL\"",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 48},
+        "type": "stat",
+        "title": "Total Power Plants",
+        "targets": [
+          {
+            "expr": "sum(infrastructure_assets_total{asset_type=\"power_plant\"})",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background"
+        }
+      },
+      {
+        "id": 12,
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 48},
+        "type": "stat",
+        "title": "Total LNG Terminals",
+        "targets": [
+          {
+            "expr": "sum(infrastructure_assets_total{asset_type=\"lng_terminal\"})",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background"
+        }
+      },
+      {
+        "id": 13,
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 48},
+        "type": "stat",
+        "title": "Total Transmission Lines",
+        "targets": [
+          {
+            "expr": "sum(infrastructure_assets_total{asset_type=\"transmission_line\"})",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background"
+        }
+      },
+      {
+        "id": 14,
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 48},
+        "type": "stat",
+        "title": "Active Projects",
+        "targets": [
+          {
+            "expr": "sum(infrastructure_projects_total{status=\"construction\"})",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background"
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "datasource",
+          "type": "datasource",
+          "query": "prometheus",
+          "current": {
+            "text": "Prometheus",
+            "value": "Prometheus"
+          }
+        },
+        {
+          "name": "connector",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(connector_records_processed, source_id)",
+          "multi": true,
+          "includeAll": true,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          }
+        },
+        {
+          "name": "country",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(infrastructure_assets_total, country)",
+          "multi": true,
+          "includeAll": true,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          }
+        }
+      ]
+    },
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    }
+  }
+}

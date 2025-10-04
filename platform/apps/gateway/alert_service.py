@@ -96,7 +96,7 @@ class AlertManager:
                         ORDER BY event_time
                         ROWS BETWEEN 10 PRECEDING AND CURRENT ROW
                     ) as price_volatility
-                FROM ch.market_price_ticks
+                FROM market_intelligence.market_price_ticks
                 WHERE market = 'MISO'
                     AND event_time >= now() - INTERVAL 5 MINUTE
                 ORDER BY instrument_id, event_time DESC

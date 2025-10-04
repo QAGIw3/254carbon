@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wri-powerplants-connector-config
+  namespace: market-intelligence
+data:
+  config.yaml: |
+    source_id: wri_powerplants
+    data_url: https://wri-dataportal-prod.s3.amazonaws.com/manual/global_power_plant_database_v_1_3.zip
+    min_capacity_mw: 10
+    include_generation: true
+    data_dir: /tmp/wri_data
+    kafka:
+      topic: market.infrastructure
+      bootstrap_servers: kafka:9092
+    database:
+      host: postgresql
+      port: 5432
+      database: market_intelligence
+      user: postgres
+      checkpoint_min_interval_seconds: 600
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wri-powerplants-connector-secrets
+  namespace: market-intelligence
+type: Opaque
+stringData:
+  db_password: ${POSTGRES_PASSWORD}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wri-powerplants-connector
+  namespace: market-intelligence
+spec:
+  schedule: "0 3 1 * *"  # Monthly on the 1st at 3 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: wri-powerplants-connector
+            component: infrastructure
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: connector
+            image: 254carbon/infrastructure-connectors:latest
+            command: ["python", "-m", "data.connectors.external.infrastructure.wri_powerplants_connector"]
+            env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: wri-powerplants-connector-secrets
+                  key: db_password
+            - name: CONFIG_PATH
+              value: /config/config.yaml
+            volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: temp-data
+              mountPath: /tmp/wri_data
+            resources:
+              requests:
+                memory: "2Gi"
+                cpu: "500m"
+              limits:
+                memory: "4Gi"
+                cpu: "2"
+          volumes:
+          - name: config
+            configMap:
+              name: wri-powerplants-connector-config
+          - name: temp-data
+            emptyDir:
+              sizeLimit: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wri-powerplants-connector-metrics
+  namespace: market-intelligence
+  labels:
+    app: wri-powerplants-connector
+spec:
+  selector:
+    app: wri-powerplants-connector
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: wri-powerplants-connector
+  namespace: market-intelligence
+spec:
+  selector:
+    matchLabels:
+      app: wri-powerplants-connector
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

@@ -1,0 +1,29 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: dq.flags.v1
+  labels:
+    strimzi.io/cluster: kafka-prod
+spec:
+  partitions: 24
+  replicas: 3
+  config:
+    compression.type: zstd
+    retention.ms: 1209600000
+    min.insync.replicas: 2
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: dq.reports.v1
+  labels:
+    strimzi.io/cluster: kafka-prod
+spec:
+  partitions: 12
+  replicas: 3
+  config:
+    compression.type: zstd
+    retention.ms: 2592000000
+    min.insync.replicas: 2
+
+

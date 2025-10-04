@@ -4,6 +4,7 @@ pydantic==2.5.3
 numpy==1.26.3
 pandas==2.1.4
 scikit-learn==1.4.0
+statsmodels==0.14.1
 xgboost==2.0.3
 lightgbm==4.2.0
 mlflow==2.8.1
@@ -12,9 +13,11 @@ asyncpg==0.29.0
 clickhouse-driver==0.2.6
 websockets==12.0
 requests==2.31.0
+pyyaml==6.0.1
 
 # PyTorch and related libraries for transformer models
 torch==2.1.0
 torchvision==0.16.0
 torchaudio==2.1.0
 pytorch-lightning==2.1.0
+hmmlearn==0.3.0

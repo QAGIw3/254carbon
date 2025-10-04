@@ -42,6 +42,13 @@ def get_clickhouse_client() -> Client:
             host=CLICKHOUSE_HOST,
             port=CLICKHOUSE_PORT,
             database="default",
+            settings={
+                "async_insert": 1,
+                "wait_for_async_insert": 0,
+                "max_threads": 32,
+                "max_execution_time": 120,
+                "use_uncompressed_cache": 0,
+            },
         )
         logger.info("ClickHouse client created")
     

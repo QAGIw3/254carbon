@@ -156,6 +156,103 @@ query FilteredInstruments {
 }
 ```
 
+## LNG Routing Optimization
+
+```graphql
+query LngRouting {
+  lngRouting(
+    asOf: "2025-10-03"
+    exportTerminals: ["Sabine Pass"]
+    importTerminals: ["Zeebrugge", "Rotterdam"]
+    limit: 10
+  ) {
+    asOfDate
+    metadata
+    options {
+      routeId
+      exportTerminal
+      importTerminal
+      totalCostUsd
+      costPerMmbtuUsd
+      isOptimalRoute
+    }
+  }
+}
+```
+
+## Coal Transport Cost Breakdown
+
+```graphql
+query CoalTransportCosts {
+  coalTransportCosts(routeId: "newcastle_to_rotterdam", limit: 6) {
+    asOfMonth
+    transportMode
+    cargoTonnes
+    totalCostUsd
+    breakdown {
+      bunkerCostUsd
+      portFeesUsd
+      congestionPremiumUsd
+      carbonCostUsd
+    }
+  }
+}
+```
+
+## Pipeline Congestion Forecast
+
+```graphql
+query PipelineForecast {
+  pipelineCongestion(pipelineId: "TCO_MAINLINE", limit: 14) {
+    forecastDate
+    utilizationForecastPct
+    riskTier
+    riskScore
+  }
+}
+```
+
+## Pipeline Alerts
+
+```graphql
+query PipelineAlerts {
+  pipelineAlerts(pipelineId: "TCO_MAINLINE", lookaheadDays: 7) {
+    date
+    utilizationForecastPct
+    riskTier
+    alertLevel
+    message
+  }
+}
+```
+
+## Seasonal Demand Forecast
+
+```graphql
+query SeasonalDemandForecast {
+  seasonalDemand(
+    region: "northeast"
+    scenarioId: "BASE"
+    limit: 30
+  ) {
+    region
+    scenarioId
+    peakAssessment {
+      forecastPeakMw
+      averagePeakRisk
+      observations
+    }
+    points {
+      forecastDate
+      finalForecastMw
+      peakRiskScore
+      confidenceLowMw
+      confidenceHighMw
+    }
+  }
+}
+```
+
 ## Advantages of GraphQL
 
 1. **Request exactly what you need** - no overfetching or underfetching
@@ -163,4 +260,3 @@ query FilteredInstruments {
 3. **Strongly typed schema** - automatic documentation and validation
 4. **Introspection** - explore API interactively
 5. **Great tooling** - GraphQL Playground, Apollo Client, etc.
-

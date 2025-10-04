@@ -240,6 +240,24 @@ airflow:
       value: ""
     - name: EIA_BACKFILL_STEP_MONTHS
       value: "6"
+    - name: EIA_STORAGE_QUERIES
+      value: ""  # JSON array of storage query specs
+    # AGSI+ defaults
+    - name: AGSI_API_BASE
+      value: https://agsi.gie.eu/api/v1
+    - name: AGSI_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: agsi-api-credentials
+          key: api-key
+    - name: AGSI_GRANULARITY
+      value: facility
+    - name: AGSI_ENTITIES
+      value: ""  # optional CSV of facility/country codes
+    - name: AGSI_INCLUDE_ROLLUPS
+      value: "true"
+    - name: AGSI_SCHEDULE
+      value: "0 6 * * *"
     # ENTSO-E defaults
     - name: ENTSOE_API_BASE
       value: https://web-api.tp.entsoe.eu
@@ -279,6 +297,18 @@ airflow:
       value: ""  # OSM area id
     - name: OIM_REGION_NAME
       value: WORLD
+    - name: COAL_SITES_CSV
+      value: /opt/airflow/dags/platform/data/reference/coal_sites.csv
+    - name: SATELLITE_INTEL_BASE
+      value: http://satellite-intel:8025
+    - name: COAL_STOCKPILE_SCHEDULE
+      value: "0 5 * * MON"
+    - name: LNG_LOOKBACK_HOURS
+      value: "24"
+    - name: LNG_PROVIDER
+      value: adapter_stub
+    - name: LNG_TERMINAL_FILE
+      value: /opt/airflow/dags/platform/data/reference/lng_terminals.geojson
     # US Census defaults
     - name: CENSUS_API_BASE
       value: https://api.census.gov/data

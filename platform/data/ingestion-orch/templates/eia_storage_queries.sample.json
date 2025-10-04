@@ -1,0 +1,71 @@
+[
+  {
+    "path": "natural-gas/stor/wng",
+    "variable": "ng_storage_total_bcf",
+    "unit": "Bcf",
+    "frequency": "weekly",
+    "facets": {
+      "series": ["STORAGE"],
+      "region": ["Total Lower 48"]
+    },
+    "entity_fields": ["region"]
+  },
+  {
+    "path": "natural-gas/stor/wng",
+    "variable": "ng_storage_east_bcf",
+    "unit": "Bcf",
+    "frequency": "weekly",
+    "facets": {
+      "series": ["STORAGE"],
+      "region": ["East"]
+    },
+    "entity_fields": ["region"]
+  },
+  {
+    "path": "natural-gas/stor/wng",
+    "variable": "ng_storage_west_bcf",
+    "unit": "Bcf",
+    "frequency": "weekly",
+    "facets": {
+      "series": ["STORAGE"],
+      "region": ["West"]
+    },
+    "entity_fields": ["region"]
+  },
+  {
+    "path": "natural-gas/stor/wng",
+    "variable": "ng_storage_producing_bcf",
+    "unit": "Bcf",
+    "frequency": "weekly",
+    "facets": {
+      "series": ["STORAGE"],
+      "region": ["Producing"]
+    },
+    "entity_fields": ["region"]
+  },
+  {
+    "path": "natural-gas/stor/wng",
+    "variable": "ng_injection_bcf",
+    "unit": "Bcf",
+    "frequency": "weekly",
+    "facets": {
+      "series": ["NET INJECTIONS/ WITHDRAWALS"],
+      "region": ["Total Lower 48"]
+    },
+    "entity_fields": ["region"],
+    "transform": {"field": "value", "operation": "max", "min_value": 0}
+  },
+  {
+    "path": "natural-gas/stor/wng",
+    "variable": "ng_withdrawal_bcf",
+    "unit": "Bcf",
+    "frequency": "weekly",
+    "facets": {
+      "series": ["NET INJECTIONS/ WITHDRAWALS"],
+      "region": ["Total Lower 48"]
+    },
+    "entity_fields": ["region"],
+    "transform": {"field": "value", "operation": "min", "max_value": 0}
+  }
+]
+

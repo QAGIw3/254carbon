@@ -118,7 +118,10 @@ class StreamManager:
                 value_deserializer=self._deserialize_avro_message,
                 enable_auto_commit=True,
                 auto_commit_interval_ms=1000,
-                max_poll_records=100
+                max_poll_records=1000,
+                fetch_max_bytes=134217728,  # 128 MiB
+                max_partition_fetch_bytes=16777216,  # 16 MiB
+                partition_assignment_strategy=("cooperative-sticky",)
             )
 
             await self._kafka_consumer.start()

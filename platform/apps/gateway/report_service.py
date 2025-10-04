@@ -68,7 +68,7 @@ class ReportGenerator:
                     MIN(value) as lowest_price,
                     STDDEV(value) as price_volatility,
                     COUNT(*) as tick_count
-                FROM ch.market_price_ticks
+                FROM market_intelligence.market_price_ticks
                 WHERE market = 'MISO'
                     AND event_time >= toDateTime('{report_date}')
                     AND event_time < toDateTime('{report_date}') + INTERVAL 1 DAY
@@ -136,7 +136,7 @@ class ReportGenerator:
                     AVG(value) as daily_avg_price,
                     MAX(value) as daily_peak,
                     MIN(value) as daily_low
-                FROM ch.market_price_ticks
+                FROM market_intelligence.market_price_ticks
                 WHERE market = 'MISO'
                     AND event_time >= toDateTime('{start_date}')
                     AND event_time < toDateTime('{end_date}') + INTERVAL 1 DAY

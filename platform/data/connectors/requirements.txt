@@ -22,3 +22,9 @@ psycopg2-binary==2.9.7
 cdsapi==0.6.1
 netCDF4==1.6.5
 numpy==1.26.4
+
+# Geospatial utilities for infrastructure connectors
+geopy==2.4.0
+
+# Monitoring and health checks
+prometheus-client==0.19.0

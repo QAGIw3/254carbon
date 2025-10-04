@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-quality-service
+  namespace: market-intelligence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-quality-service
+  template:
+    metadata:
+      labels:
+        app: data-quality-service
+    spec:
+      containers:
+      - name: data-quality-service
+        image: 254carbon/data-quality-service:latest
+        ports:
+        - containerPort: 8010
+        env:
+        - name: CLICKHOUSE_HOST
+          value: clickhouse
+        - name: KAFKA_BOOTSTRAP
+          value: kafka:9092
+        - name: OPENLINEAGE_URL
+          value: http://marquez.marquez:5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-quality-service
+  namespace: market-intelligence
+spec:
+  selector:
+    app: data-quality-service
+  ports:
+  - port: 8010
+    targetPort: 8010
+
+

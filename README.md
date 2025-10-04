@@ -1,3 +1,32 @@
+# Market Intelligence Commodities Extension
+
+## Schema rollout
+
+- Unified on `market_intelligence` ClickHouse database; legacy MergeTree retained as `market_price_ticks_legacy` for migration.
+- New composite-partitioned `market_price_ticks` (`PARTITION BY (toYYYYMM(event_time), commodity_type)`), quality/spec tables, futures curves, and contract rollover audit table.
+- Kafka landing tables + MVs ingest `commodities.ticks.v1` and `commodities.futures.v1` topics.
+- Compatibility views under `ch.*` allow phased app migrations.
+
+## Connector updates
+
+- Added `BaseCommodityConnector` (canonical Kafka wiring, rollover helper).
+- Implemented live `EIAPetroleumConnector` (daily schedule) and stubbed CME/Platts/Argus connectors with paused Airflow DAGs.
+
+## Airflow
+
+- New DAGs: `eia_petroleum_ingestion` (daily + DQ check), `cme_oil_ingestion`, `platts_oil_ingestion`, `argus_oil_ingestion` (paused stubs).
+
+## Service layer
+
+- Gateway API queries now hit `market_intelligence.*`; analytics/commodity endpoints support oil/gas/coal/biofuels filters.
+- Added commodity futures/spec endpoints leveraging new schema.
+
+## Migration plan
+
+1. Deploy schema changes (idempotent) → backfill `market_price_ticks` from legacy → validate counts.
+2. Swap application queries to `market_intelligence.*`; monitor via DQ DAGs.
+3. Enable CME/Platts/Argus DAGs once credentials are provided; tune connectors from stub to live.
+4. Update documentation/ops runbooks post verification.
 # 254Carbon Market Intelligence Platform
 
 **Enterprise-grade market data platform for power, gas, and carbon markets**
@@ -223,6 +252,12 @@ class MyConnector(Ingestor):
 **Latin America:**
 - **Brazil ONS**: PLD prices and hydro reservoirs ✨ NEW
 
+**Infrastructure & Storage:** ✨ NEW
+- **ALSI LNG**: European LNG terminal inventory and flows (GIE)
+- **REexplorer**: Renewable energy resource assessments (NREL)
+- **WRI Power Plants**: Global power plant database (~30k plants)
+- **GEM Transmission**: Transmission infrastructure and projects
+
 See `/platform/data/connectors/` for complete list
 
 ### Orchestration
@@ -234,6 +269,8 @@ Airflow DAGs schedule connector runs with data quality checks:
 - `/platform/data/ingestion-orch/dags/ieso_ingestion_dag.py` ✨ NEW
 - `/platform/data/ingestion-orch/dags/nem_ingestion_dag.py` ✨ NEW
 - `/platform/data/ingestion-orch/dags/brazil_ons_ingestion_dag.py` ✨ NEW
+- `/platform/data/ingestion-orch/dags/agsi_ingestion_dag.py` ✨ NEW
+- `/platform/data/ingestion-orch/dags/coal_stockpile_monitoring_dag.py` ✨ NEW
 
 ---
 

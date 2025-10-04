@@ -145,7 +145,7 @@ async def get_miso_daily_report(
     Get comprehensive daily trading report for MISO.
 
     Data Sourcing
-    - ClickHouse: ch.market_price_ticks for summary metrics
+    - ClickHouse: market_intelligence.market_price_ticks for summary metrics
     - Top nodes are mocked placeholders pending full PnL calculation
     """
     track_request("get_miso_daily_report")
@@ -169,7 +169,7 @@ async def get_miso_daily_report(
                 MAX(value) as peak_price,
                 MIN(value) as lowest_price,
                 STDDEV(value) as price_volatility
-            FROM ch.market_price_ticks
+            FROM market_intelligence.market_price_ticks
             WHERE market = 'MISO'
                 AND event_time >= toDateTime('{report_date}')
                 AND event_time < toDateTime('{report_date}') + INTERVAL 1 DAY

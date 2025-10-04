@@ -1,0 +1,89 @@
+defaults:
+  supply_demand:
+    lookback_days: 365
+  weather:
+    lookback_days: 365
+    window_days: 90
+pipelines:
+  supply_demand:
+    instruments:
+      - NBP_GAS
+      - PJM.ATSI.POWER
+  weather_impact:
+    entities:
+      - PJM
+      - NBP
+instruments:
+  NBP_GAS:
+    commodity_type: gas
+    supply_demand:
+      entity_id: NBP
+      lookback_days: 365
+      inventory:
+        entity_id: NBP.GAS
+        variable: inventory
+        unit: mcm
+      production:
+        entity_id: NBP.GAS
+        variable: production
+        unit: mcm_per_day
+      consumption:
+        entity_id: NBP.GAS
+        variable: consumption
+        unit: mcm_per_day
+    weather:
+      instrument_id: NBP_GAS
+      entity_id: NBP
+  PJM.ATSI.POWER:
+    commodity_type: power
+    supply_demand:
+      entity_id: PJM
+      lookback_days: 365
+      inventory:
+        entity_id: PJM.POWER
+        variable: reserve_margin
+        unit: percent
+      production:
+        entity_id: PJM.POWER
+        variable: generation
+        unit: mw
+      consumption:
+        entity_id: PJM.POWER
+        variable: load
+        unit: mw
+    weather:
+      instrument_id: PJM.ATSI.POWER
+      entity_id: PJM
+entities:
+  PJM:
+    weather:
+      instrument_id: PJM.ATSI.POWER
+      entity_id: PJM
+      lookback_days: 365
+      window_days: 90
+      lags: [1, 3, 7]
+      temperature:
+        entity_id: PJM
+        variable: temperature_avg
+      hdd:
+        entity_id: PJM
+        variable: hdd
+      cdd:
+        entity_id: PJM
+        variable: cdd
+  NBP:
+    weather:
+      instrument_id: NBP_GAS
+      entity_id: NBP
+      lookback_days: 365
+      window_days: 60
+      lags: [1, 5, 10]
+      temperature:
+        entity_id: UK
+        variable: temp_avg
+      hdd:
+        entity_id: UK
+        variable: hdd
+      cdd:
+        entity_id: UK
+        variable: cdd

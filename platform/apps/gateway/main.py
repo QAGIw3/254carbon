@@ -125,6 +125,18 @@ app.include_router(caiso_compliance_router)
 # Include report endpoints
 app.include_router(create_report_router())
 
+# Include commodity-specific endpoints
+from commodity_endpoints import commodity_router
+app.include_router(commodity_router)
+
+# Include analytics endpoints
+from analytics_endpoints import analytics_router
+app.include_router(analytics_router)
+
+# Include research endpoints
+from research_endpoints import research_router
+app.include_router(research_router)
+
 # Add UX optimization middleware
 add_ux_middleware(app)
 
@@ -401,7 +413,7 @@ async def get_price_ticks(
             currency,
             unit,
             source
-        FROM ch.market_price_ticks
+        FROM market_intelligence.market_price_ticks
         WHERE instrument_id IN %(ids)s
           AND event_time BETWEEN %(start)s AND %(end)s
           AND price_type = %(price_type)s
@@ -471,7 +483,7 @@ async def get_forward_curves(
             price,
             currency,
             unit
-        FROM ch.forward_curve_points
+        FROM market_intelligence.forward_curve_points
         WHERE instrument_id IN %(ids)s
           AND as_of_date = %(date)s
           AND scenario_id = %(scenario)s
@@ -531,7 +543,7 @@ async def get_fundamentals(
             unit,
             scenario_id,
             source
-        FROM ch.fundamentals_series
+        FROM market_intelligence.fundamentals_series
         WHERE market = %(market)s
           AND entity_id = %(entity_id)s
           AND variable = %(variable)s

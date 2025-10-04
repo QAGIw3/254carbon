@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openmetadata
+  namespace: openmetadata
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openmetadata
+  template:
+    metadata:
+      labels:
+        app: openmetadata
+    spec:
+      containers:
+      - name: openmetadata
+        image: openmetadata/server:1.6.0
+        ports:
+        - containerPort: 8585
+        env:
+        - name: OM_DATABASE_HOST
+          value: openmetadata-postgres
+        - name: OM_DATABASE_PORT
+          value: "5432"
+        - name: OM_DATABASE_USER
+          value: postgres
+        - name: OM_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: openmetadata-db
+              key: password
+        - name: OM_DATABASE_DB
+          value: openmetadata_db
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openmetadata
+  namespace: openmetadata
+spec:
+  selector:
+    app: openmetadata
+  ports:
+  - name: http
+    port: 8585
+    targetPort: 8585
+
+

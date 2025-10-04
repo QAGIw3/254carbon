@@ -1,0 +1,107 @@
+# Multimodal instrument to commodity modality mapping
+#
+# This configuration drives the multimodal dataset builder.
+# Each instrument maps to a commodity group and defines which
+# modalities (price, fundamentals, weather) should be fetched.
+#
+# Schema:
+# instruments:
+#   <instrument_id>:
+#     commodity: <commodity_key>
+#     commodity_group: <group_key>
+#     modalities:
+#       price:
+#         series: [<instrument_id>, ...]
+#         lookback_days: <int>
+#       fundamentals:
+#         - entity: <entity_id>
+#           variable: <variable_name>
+#           lookback_days: <int>
+#       weather:
+#         - location: <location_id>
+#           variable: <variable_name>
+#           lookback_days: <int>
+# defaults:
+#   commodity_groups:
+#     <group_key>:
+#       fused_heads: [<head_idx>, ...]
+#       mask_graph_neighbors: [<commodity_key>, ...]
+#
+# Optional:
+#   modalities:
+#     price:
+#       lookback_days: 365
+#     fundamentals:
+#       lookback_days: 180
+#     weather:
+#       lookback_days: 120
+
+version: 1
+
+modalities:
+  price:
+    lookback_days: 365
+  fundamentals:
+    lookback_days: 180
+  weather:
+    lookback_days: 120
+
+defaults:
+  commodity_groups:
+    power:
+      fused_heads: [0, 1, 2]
+      mask_graph_neighbors: [power, gas]
+    gas:
+      fused_heads: [3, 4]
+      mask_graph_neighbors: [gas, power, oil]
+    oil:
+      fused_heads: [5, 6]
+      mask_graph_neighbors: [oil, refined]
+    refined:
+      fused_heads: [6, 7]
+      mask_graph_neighbors: [oil]
+    emissions:
+      fused_heads: [2, 7]
+      mask_graph_neighbors: [power]
+
+instruments:
+  POWER.NYISO.ZONEA:
+    commodity: ny_power
+    commodity_group: power
+    modalities:
+      price:
+        series: [POWER.NYISO.ZONEA]
+      fundamentals:
+        - entity: load.nyiso.zone_a
+          variable: load_mwh
+        - entity: gen.nyiso.statewide
+          variable: thermal_generation_mwh
+      weather:
+        - location: weather.nyiso.zone_a
+          variable: cdd
+        - location: weather.nyiso.zone_a
+          variable: hdd
+  GAS.HENRY_HUB.MONTH_AHEAD:
+    commodity: henry_hub
+    commodity_group: gas
+    modalities:
+      price:
+        series: [GAS.HENRY_HUB.MONTH_AHEAD]
+      fundamentals:
+        - entity: storage.eia.ng
+          variable: working_gas_bcf
+        - entity: supply.eia.ng
+          variable: dry_production_bcf_per_day
+      weather:
+        - location: weather.us.national
+          variable: temp_avg_c
+  OIL.BRENT.FRONT_MONTH:
+    commodity: brent
+    commodity_group: oil
+    modalities:
+      price:
+        series: [OIL.BRENT.FRONT_MONTH]
+      fundamentals:
+        - entity: inventory.eia.oil
+          variable: total_stock_mmbbl
+      weather: []

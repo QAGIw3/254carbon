@@ -29,7 +29,12 @@ logger = logging.getLogger("fundamentals_consumer")
 def get_clickhouse_client() -> ClickHouseClient:
     host = os.getenv("CLICKHOUSE_HOST", "clickhouse")
     port = int(os.getenv("CLICKHOUSE_PORT", "9000"))
-    return ClickHouseClient(host=host, port=port, database="ch", send_receive_timeout=60)
+    return ClickHouseClient(host=host, port=port, database="ch", send_receive_timeout=60, settings={
+        'async_insert': 1,
+        'wait_for_async_insert': 0,
+        'max_threads': 16,
+        'use_uncompressed_cache': 0,
+    })
 
 
 def to_row(msg: Dict[str, Any]) -> List[Any]:

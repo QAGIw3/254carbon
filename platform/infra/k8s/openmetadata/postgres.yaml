@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openmetadata-db
+  namespace: openmetadata
+type: Opaque
+stringData:
+  password: postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openmetadata-postgres
+  namespace: openmetadata
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openmetadata-postgres
+  template:
+    metadata:
+      labels:
+        app: openmetadata-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        env:
+        - name: POSTGRES_DB
+          value: openmetadata_db
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: openmetadata-db
+              key: password
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openmetadata-postgres
+  namespace: openmetadata
+spec:
+  selector:
+    app: openmetadata-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+
+

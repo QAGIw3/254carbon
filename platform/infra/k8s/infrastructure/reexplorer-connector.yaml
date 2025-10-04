@@ -1,0 +1,117 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reexplorer-connector-config
+  namespace: market-intelligence
+data:
+  config.yaml: |
+    source_id: reexplorer_renewable
+    regions:
+      - global
+    resource_types:
+      - solar_ghi
+      - solar_dni
+      - wind_speed_100m
+      - wind_speed_50m
+    include_projects: true
+    grid_resolution: 0.5
+    lookback_days: 30
+    kafka:
+      topic: market.infrastructure
+      bootstrap_servers: kafka:9092
+    database:
+      host: postgresql
+      port: 5432
+      database: market_intelligence
+      user: postgres
+      checkpoint_min_interval_seconds: 300
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: reexplorer-connector-secrets
+  namespace: market-intelligence
+type: Opaque
+stringData:
+  api_key: ${NREL_API_KEY}
+  db_password: ${POSTGRES_PASSWORD}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: reexplorer-connector
+  namespace: market-intelligence
+spec:
+  schedule: "0 2 * * 1"  # Weekly on Monday at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: reexplorer-connector
+            component: infrastructure
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: connector
+            image: 254carbon/infrastructure-connectors:latest
+            command: ["python", "-m", "data.connectors.external.infrastructure.reexplorer_connector"]
+            env:
+            - name: NREL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: reexplorer-connector-secrets
+                  key: api_key
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: reexplorer-connector-secrets
+                  key: db_password
+            - name: CONFIG_PATH
+              value: /config/config.yaml
+            volumeMounts:
+            - name: config
+              mountPath: /config
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "1"
+          volumes:
+          - name: config
+            configMap:
+              name: reexplorer-connector-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reexplorer-connector-metrics
+  namespace: market-intelligence
+  labels:
+    app: reexplorer-connector
+spec:
+  selector:
+    app: reexplorer-connector
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: reexplorer-connector
+  namespace: market-intelligence
+spec:
+  selector:
+    matchLabels:
+      app: reexplorer-connector
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

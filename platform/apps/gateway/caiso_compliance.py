@@ -101,7 +101,7 @@ async def generate_settlement_report(
     Generate CAISO settlement data compliance report.
 
     Data sourcing
-    - ClickHouse: ch.market_price_ticks filtered by market=CAISO and date range
+    - ClickHouse: market_intelligence.market_price_ticks filtered by market=CAISO and date range
     - Aggregates volume, amount, and price statistics by instrument
     """
     # Check CAISO entitlement
@@ -118,7 +118,7 @@ async def generate_settlement_report(
                 SUM(volume * value) as settlement_amount,
                 AVG(value) as avg_price,
                 COUNT(*) as settlement_count
-            FROM ch.market_price_ticks
+            FROM market_intelligence.market_price_ticks
             WHERE market = 'CAISO'
                 AND event_time >= toDateTime('{start_date}')
                 AND event_time < toDateTime('{end_date}') + INTERVAL 1 DAY

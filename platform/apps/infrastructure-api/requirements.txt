@@ -1,0 +1,6 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.4.2
+asyncpg==0.29.0
+clickhouse-driver==0.2.6
+python-dateutil==2.8.2

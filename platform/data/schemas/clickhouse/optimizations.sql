@@ -120,23 +120,23 @@ GROUP BY hour_start, instrument_id, location_code, market;
 -- =========================================================================
 
 -- Bloom filter index on location_code for nodal queries
-ALTER TABLE ch.market_price_ticks 
+ALTER TABLE market_intelligence.market_price_ticks 
 ADD INDEX IF NOT EXISTS idx_location_bloom location_code TYPE bloom_filter GRANULARITY 4;
 
 -- Min-max index on value for price range filters
-ALTER TABLE ch.market_price_ticks 
+ALTER TABLE market_intelligence.market_price_ticks 
 ADD INDEX IF NOT EXISTS idx_value_minmax value TYPE minmax GRANULARITY 8;
 
 -- Set index on market for quick market filtering
-ALTER TABLE ch.market_price_ticks 
+ALTER TABLE market_intelligence.market_price_ticks 
 ADD INDEX IF NOT EXISTS idx_market_set market TYPE set(100) GRANULARITY 4;
 
 -- Bloom filter on scenario_id for curve queries
-ALTER TABLE ch.forward_curve_points 
+ALTER TABLE market_intelligence.forward_curve_points 
 ADD INDEX IF NOT EXISTS idx_scenario_bloom scenario_id TYPE bloom_filter GRANULARITY 4;
 
 -- Min-max index on delivery_start for date range queries
-ALTER TABLE ch.forward_curve_points 
+ALTER TABLE market_intelligence.forward_curve_points 
 ADD INDEX IF NOT EXISTS idx_delivery_minmax delivery_start TYPE minmax GRANULARITY 8;
 
 -- =========================================================================
@@ -144,15 +144,15 @@ ADD INDEX IF NOT EXISTS idx_delivery_minmax delivery_start TYPE minmax GRANULARI
 -- =========================================================================
 
 -- Keep raw ticks for 2 years, delete older data
-ALTER TABLE ch.market_price_ticks
+ALTER TABLE market_intelligence.market_price_ticks
 MODIFY TTL event_time + INTERVAL 2 YEAR;
 
 -- Keep forward curves for 5 years
-ALTER TABLE ch.forward_curve_points
+ALTER TABLE market_intelligence.forward_curve_points
 MODIFY TTL as_of_date + INTERVAL 5 YEAR;
 
 -- Keep fundamentals for 10 years
-ALTER TABLE ch.fundamentals_series
+ALTER TABLE market_intelligence.fundamentals_series
 MODIFY TTL ts + INTERVAL 10 YEAR;
 
 -- Keep aggregated views for 5 years
@@ -167,30 +167,119 @@ MODIFY TTL date + INTERVAL 5 YEAR;
 -- =========================================================================
 
 -- Optimize merge settings for high-throughput ingestion
-ALTER TABLE ch.market_price_ticks
+ALTER TABLE market_intelligence.market_price_ticks
 MODIFY SETTING max_parts_in_total = 10000,
                parts_to_delay_insert = 300,
                parts_to_throw_insert = 500;
 
 -- Enable adaptive granularity for sparse partitions
-ALTER TABLE ch.forward_curve_points
+ALTER TABLE market_intelligence.forward_curve_points
 MODIFY SETTING index_granularity_bytes = 1024000;
+
+-- =========================================================================
+-- PROJECTIONS (accelerate common predicate orderings)
+-- =========================================================================
+
+-- Market + Instrument + Time ordering
+ALTER TABLE market_intelligence.market_price_ticks
+ADD PROJECTION IF NOT EXISTS p_by_market_inst_time
+(
+    SELECT
+        market,
+        instrument_id,
+        event_time,
+        location_code,
+        price_type,
+        value,
+        volume,
+        source
+    ORDER BY (market, instrument_id, event_time)
+);
+
+-- Instrument + Time ordering
+ALTER TABLE market_intelligence.market_price_ticks
+ADD PROJECTION IF NOT EXISTS p_by_inst_time
+(
+    SELECT
+        instrument_id,
+        event_time,
+        price_type,
+        value,
+        volume
+    ORDER BY (instrument_id, event_time)
+);
+
+ALTER TABLE market_intelligence.forward_curve_points
+ADD PROJECTION IF NOT EXISTS p_curve_by_inst_date
+(
+    SELECT
+        instrument_id,
+        as_of_date,
+        delivery_start,
+        delivery_end,
+        tenor_type,
+        price
+    ORDER BY (instrument_id, as_of_date, delivery_start)
+);
 
 -- =========================================================================
 -- COMPRESSION OPTIMIZATION
 -- =========================================================================
 
 -- Optimize compression for timestamp columns (Delta encoding)
-ALTER TABLE ch.market_price_ticks
+ALTER TABLE market_intelligence.market_price_ticks
 MODIFY COLUMN event_time CODEC(DoubleDelta, LZ4);
 
--- Optimize compression for price columns (T64 + LZ4)
-ALTER TABLE ch.market_price_ticks
-MODIFY COLUMN value CODEC(T64, LZ4);
+-- Optimize compression for price columns (Gorilla + ZSTD)
+ALTER TABLE market_intelligence.market_price_ticks
+MODIFY COLUMN value CODEC(Gorilla, ZSTD(1));
+
+-- Forward curves price compression
+ALTER TABLE market_intelligence.forward_curve_points
+MODIFY COLUMN price CODEC(Gorilla, ZSTD(1));
 
 -- Optimize compression for enum-like columns (ZSTD level 1)
-ALTER TABLE ch.market_price_ticks
+ALTER TABLE market_intelligence.market_price_ticks
 MODIFY COLUMN instrument_id CODEC(ZSTD(1));
+
+-- Additional categorical codecs for improved compression
+ALTER TABLE market_intelligence.market_price_ticks
+MODIFY COLUMN market CODEC(ZSTD(1));
+ALTER TABLE market_intelligence.market_price_ticks
+MODIFY COLUMN price_type CODEC(ZSTD(1));
+ALTER TABLE market_intelligence.market_price_ticks
+MODIFY COLUMN location_code CODEC(ZSTD(1));
+
+-- =========================================================================
+-- DATA TIERING (hot/warm/cold storage via storage policy)
+-- =========================================================================
+
+-- Apply storage policy and tiered TTL for raw ticks
+ALTER TABLE market_intelligence.market_price_ticks
+MODIFY SETTING storage_policy = 'hot_warm_cold';
+
+ALTER TABLE market_intelligence.market_price_ticks
+MODIFY TTL
+    event_time + INTERVAL 7 DAY TO VOLUME 'warm',
+    event_time + INTERVAL 90 DAY TO VOLUME 'cold';
+
+-- Apply storage policy and tiered TTL for forward curves (longer retention)
+ALTER TABLE market_intelligence.forward_curve_points
+MODIFY SETTING storage_policy = 'hot_warm_cold';
+
+ALTER TABLE market_intelligence.forward_curve_points
+MODIFY TTL
+    as_of_date + INTERVAL 30 DAY TO VOLUME 'warm',
+    as_of_date + INTERVAL 365 DAY TO VOLUME 'cold';
+
+-- Apply storage policy and tiered TTL for fundamentals (long retention)
+ALTER TABLE market_intelligence.fundamentals_series
+MODIFY SETTING storage_policy = 'hot_warm_cold';
+
+ALTER TABLE market_intelligence.fundamentals_series
+MODIFY TTL
+    ts + INTERVAL 90 DAY TO VOLUME 'warm',
+    ts + INTERVAL 730 DAY TO VOLUME 'cold';
 
 -- =========================================================================
 -- DICTIONARIES FOR FAST LOOKUPS
@@ -263,6 +352,20 @@ ENGINE = MergeTree()
 PARTITION BY toYYYYMM(event_time)
 ORDER BY (event_time, query_duration_ms DESC)
 TTL event_time + INTERVAL 90 DAY;
+
+-- =========================================================================
+-- DISTRIBUTED TABLES (read path for sharding)
+-- =========================================================================
+
+-- Cluster name is assumed as 'market_cluster'. Adjust to actual cluster name.
+CREATE TABLE IF NOT EXISTS ch.market_price_ticks_dist AS market_intelligence.market_price_ticks
+ENGINE = Distributed('market_cluster', 'market_intelligence', 'market_price_ticks', cityHash64(commodity_type, instrument_id));
+
+CREATE TABLE IF NOT EXISTS ch.forward_curve_points_dist AS market_intelligence.forward_curve_points
+ENGINE = Distributed('market_cluster', 'market_intelligence', 'forward_curve_points', cityHash64(curve_id, scenario_id));
+
+CREATE TABLE IF NOT EXISTS ch.fundamentals_series_dist AS market_intelligence.fundamentals_series
+ENGINE = Distributed('market_cluster', 'market_intelligence', 'fundamentals_series', cityHash64(entity_id, variable));
 
 -- =========================================================================
 -- OPTIMIZATION NOTES

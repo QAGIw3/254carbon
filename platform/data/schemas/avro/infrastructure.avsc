@@ -1,0 +1,86 @@
+{
+  "namespace": "com.carbon254.infrastructure",
+  "type": "record",
+  "name": "InfrastructureEvent",
+  "doc": "Canonical schema for infrastructure data events",
+  "fields": [
+    {
+      "name": "event_time_utc",
+      "type": "long",
+      "doc": "Event timestamp in milliseconds since epoch (UTC)"
+    },
+    {
+      "name": "arrival_time_utc",
+      "type": ["null", "long"],
+      "default": null,
+      "doc": "Processing timestamp in milliseconds since epoch (UTC)"
+    },
+    {
+      "name": "market",
+      "type": "string",
+      "doc": "Market identifier (always 'infra' for infrastructure)"
+    },
+    {
+      "name": "product",
+      "type": "string",
+      "doc": "Metric or product type (e.g., lng_inventory_gwh, line_capacity_mw)"
+    },
+    {
+      "name": "instrument_id",
+      "type": "string",
+      "doc": "Unique identifier for the infrastructure asset"
+    },
+    {
+      "name": "location_code",
+      "type": "string",
+      "doc": "Geographic location code"
+    },
+    {
+      "name": "price_type",
+      "type": "string",
+      "doc": "Type of value (observation, forecast, etc.)"
+    },
+    {
+      "name": "value",
+      "type": "double",
+      "doc": "Metric value"
+    },
+    {
+      "name": "unit",
+      "type": "string",
+      "doc": "Unit of measurement"
+    },
+    {
+      "name": "currency",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Currency code if applicable"
+    },
+    {
+      "name": "source",
+      "type": "string",
+      "doc": "Data source identifier"
+    },
+    {
+      "name": "commodity_type",
+      "type": {
+        "type": "enum",
+        "name": "CommodityType",
+        "symbols": ["power", "gas", "oil", "coal", "renewables", "emissions", "refined_products", "biofuels"]
+      },
+      "doc": "Associated commodity type"
+    },
+    {
+      "name": "metadata",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Additional metadata as JSON string"
+    },
+    {
+      "name": "version_id",
+      "type": "int",
+      "default": 1,
+      "doc": "Schema version identifier"
+    }
+  ]
+}

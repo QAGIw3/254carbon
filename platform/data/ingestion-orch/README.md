@@ -20,10 +20,31 @@ EIA Open Data (variables)
 - EIA_API_KEY: <your key>
 - EIA_DATASETS: (optional) csv paths, e.g. electricity/retail-sales,petroleum/pri/gnd/data
 - EIA_QUERIES: JSON array of advanced query specs
-  - See template: platform/data/ingestion-orch/templates/eia_queries.sample.json
+  - See general template: platform/data/ingestion-orch/templates/eia_queries.sample.json
+- EIA_STORAGE_QUERIES: JSON array tailored for natural gas storage series (Total Lower 48 + regions, injections/withdrawals)
+  - See storage template: platform/data/ingestion-orch/templates/eia_storage_queries.sample.json
 
 Load EIA queries from file
 - airflow variables set EIA_QUERIES "$(cat platform/data/ingestion-orch/templates/eia_queries.sample.json)"
+- airflow variables set EIA_STORAGE_QUERIES "$(cat platform/data/ingestion-orch/templates/eia_storage_queries.sample.json)"
+
+AGSI+ (GIE) Gas Storage (variables)
+- AGSI_API_BASE: https://agsi.gie.eu/api/v1
+- AGSI_API_KEY: <your key>
+- AGSI_GRANULARITY: facility|country|eu (default: facility)
+- AGSI_ENTITIES: optional CSV of facility or country codes
+- AGSI_INCLUDE_ROLLUPS: true|false (facility-level roll-ups to country/EU)
+- AGSI_SCHEDULE: cron expr (default: 0 6 * * *)
+
+Coal Stockpile Monitoring
+- SATELLITE_INTEL_BASE: http://satellite-intel:8025
+- COAL_SITES_CSV: path to site registry CSV (default: platform/data/reference/coal_sites.csv)
+- COAL_STOCKPILE_SCHEDULE: cron (default: 0 5 * * MON)
+
+LNG Vessel Tracking (provider-agnostic stub)
+- LNG_PROVIDER: adapter identifier (default: adapter_stub)
+- LNG_LOOKBACK_HOURS: integer lookback window for arrivals/departures (default: 24)
+- LNG_TERMINAL_FILE: reference GeoJSON for terminal polygons (default: platform/data/reference/lng_terminals.geojson)
 
 ENTSO-E (variables)
 - ENTSOE_API_BASE: https://web-api.tp.entsoe.eu
@@ -78,3 +99,10 @@ airflow variables set WB_COUNTRY WLD
 Connections
 - If using HTTP hooks, define conn id with host and extra headers.
 - Current DAGs read env vars directly; connections are optional.
+
+Supply Chain Analytics (new DAGs)
+- ML_SERVICE_URL: base URL for the ML service (default http://ml-service:8000)
+- LNG_EXPORT_TERMINALS / LNG_IMPORT_TERMINALS: CSV lists for LNG optimisation
+- COAL_ROUTES / COAL_MULTIMODAL_OPTIONS: CSV or JSON definitions for coal cost refreshes
+- PIPELINE_CONGESTION_TARGETS: JSON array with pipeline_id, flow/weather configuration
+- SEASONAL_DEMAND_TARGETS: JSON array specifying region, weather, and economic inputs

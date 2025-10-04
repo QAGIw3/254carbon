@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alsi-lng-connector-config
+  namespace: market-intelligence
+data:
+  config.yaml: |
+    source_id: alsi_lng_inventory
+    api_base: https://alsi.gie.eu/api
+    granularity: terminal
+    lookback_days: 30
+    include_rollups: true
+    batch_size: 1000
+    kafka:
+      topic: market.infrastructure
+      bootstrap_servers: kafka:9092
+    database:
+      host: postgresql
+      port: 5432
+      database: market_intelligence
+      user: postgres
+      checkpoint_min_interval_seconds: 60
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alsi-lng-connector-secrets
+  namespace: market-intelligence
+type: Opaque
+stringData:
+  api_key: ${ALSI_API_KEY}
+  db_password: ${POSTGRES_PASSWORD}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: alsi-lng-connector
+  namespace: market-intelligence
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: alsi-lng-connector
+            component: infrastructure
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: connector
+            image: 254carbon/infrastructure-connectors:latest
+            command: ["python", "-m", "data.connectors.external.infrastructure.alsi_lng_connector"]
+            env:
+            - name: ALSI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: alsi-lng-connector-secrets
+                  key: api_key
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: alsi-lng-connector-secrets
+                  key: db_password
+            - name: CONFIG_PATH
+              value: /config/config.yaml
+            volumeMounts:
+            - name: config
+              mountPath: /config
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "250m"
+              limits:
+                memory: "1Gi"
+                cpu: "500m"
+          volumes:
+          - name: config
+            configMap:
+              name: alsi-lng-connector-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alsi-lng-connector-metrics
+  namespace: market-intelligence
+  labels:
+    app: alsi-lng-connector
+spec:
+  selector:
+    app: alsi-lng-connector
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: alsi-lng-connector
+  namespace: market-intelligence
+spec:
+  selector:
+    matchLabels:
+      app: alsi-lng-connector
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

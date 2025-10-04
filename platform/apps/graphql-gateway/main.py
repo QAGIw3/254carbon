@@ -12,6 +12,9 @@ from fastapi import FastAPI
 import asyncpg
 from clickhouse_driver import Client
 
+from infrastructure_schema import InfrastructureQuery
+from analytics_schema import AnalyticsQuery
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -85,7 +88,7 @@ class BacktestResult:
 # GraphQL Queries
 
 @strawberry.type
-class Query:
+class Query(AnalyticsQuery, InfrastructureQuery):
     
     @strawberry.field
     async def instruments(
@@ -342,8 +345,14 @@ schema = strawberry.Schema(query=Query)
 # Create FastAPI app
 app = FastAPI(title="254Carbon GraphQL Gateway")
 
-# Add GraphQL router
-graphql_app = GraphQLRouter(schema)
+# Add GraphQL router with context
+async def get_context():
+    return {
+        "pg_pool": await get_pg_pool(),
+        "ch_client": get_ch_client()
+    }
+
+graphql_app = GraphQLRouter(schema, context_getter=get_context)
 app.include_router(graphql_app, prefix="/graphql")
 
 
@@ -355,4 +364,3 @@ async def health():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8007)
-

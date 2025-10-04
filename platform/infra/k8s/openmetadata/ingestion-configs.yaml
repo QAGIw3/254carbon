@@ -1,0 +1,117 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: om-ingestion-configs
+  namespace: openmetadata
+data:
+  clickhouse.yaml: |
+    source:
+      type: clickhouse
+      serviceName: clickhouse-market-intelligence
+      serviceConnection:
+        config:
+          type: Clickhouse
+          hostPort: clickhouse:9000
+          database: market_intelligence
+    sink:
+      type: metadata-rest
+    workflowConfig:
+      loggerLevel: INFO
+  kafka.yaml: |
+    source:
+      type: kafka
+      serviceName: kafka-broker
+      serviceConnection:
+        config:
+          type: Kafka
+          bootstrapServers: kafka:9092
+    sink:
+      type: metadata-rest
+    workflowConfig:
+      loggerLevel: INFO
+  airflow.yaml: |
+    source:
+      type: airflow
+      serviceName: airflow-scheduler
+      serviceConnection:
+        config:
+          type: Airflow
+          hostPort: http://airflow-web:8080
+    sink:
+      type: metadata-rest
+    workflowConfig:
+      loggerLevel: INFO
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: om-ingest-clickhouse
+  namespace: openmetadata
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: ingest
+            image: openmetadata/ingestion:1.6.0
+            args: ["ingest", "-c", "/configs/clickhouse.yaml"]
+            volumeMounts:
+            - name: configs
+              mountPath: /configs
+          restartPolicy: OnFailure
+          volumes:
+          - name: configs
+            configMap:
+              name: om-ingestion-configs
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: om-ingest-kafka
+  namespace: openmetadata
+spec:
+  schedule: "30 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: ingest
+            image: openmetadata/ingestion:1.6.0
+            args: ["ingest", "-c", "/configs/kafka.yaml"]
+            volumeMounts:
+            - name: configs
+              mountPath: /configs
+          restartPolicy: OnFailure
+          volumes:
+          - name: configs
+            configMap:
+              name: om-ingestion-configs
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: om-ingest-airflow
+  namespace: openmetadata
+spec:
+  schedule: "0 3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: ingest
+            image: openmetadata/ingestion:1.6.0
+            args: ["ingest", "-c", "/configs/airflow.yaml"]
+            volumeMounts:
+            - name: configs
+              mountPath: /configs
+          restartPolicy: OnFailure
+          volumes:
+          - name: configs
+            configMap:
+              name: om-ingestion-configs
+
+

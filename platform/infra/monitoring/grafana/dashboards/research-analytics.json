@@ -1,0 +1,96 @@
+{
+  "dashboard": {
+    "title": "Commodity Research Analytics",
+    "tags": ["research", "commodities", "analytics"],
+    "timezone": "UTC",
+    "schemaVersion": 36,
+    "version": 1,
+    "refresh": "1m",
+    "time": {"from": "now-30d", "to": "now"},
+    "panels": [
+      {
+        "id": 1,
+        "title": "Seasonal Intensity Trend",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "ClickHouse",
+            "rawSql": "SELECT\n  snapshot_date AS time,\n  instrument_id AS metric,\n  avgMerge(seasonal_intensity_state) AS value\nFROM market_intelligence.mv_commodity_decomposition_daily\nWHERE snapshot_date >= now() - INTERVAL 90 DAY\nGROUP BY snapshot_date, instrument_id\nORDER BY snapshot_date",
+            "format": "time_series"
+          }
+        ],
+        "lines": true,
+        "linewidth": 2,
+        "nullPointMode": "null",
+        "yaxes": [
+          {"label": "Seasonal Intensity", "format": "short"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Monthly Regime Share (%)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "stack": true,
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "ClickHouse",
+            "rawSql": "WITH monthly_counts AS (\n  SELECT\n    month,\n    instrument_id,\n    regime_label,\n    sum(observation_count) AS observations\n  FROM market_intelligence.mv_volatility_regime_share_monthly\n  WHERE month >= toStartOfMonth(now() - INTERVAL 12 MONTH)\n  GROUP BY month, instrument_id, regime_label\n), totals AS (\n  SELECT\n    month,\n    instrument_id,\n    sum(observations) AS total_obs\n  FROM monthly_counts\n  GROUP BY month, instrument_id\n)\nSELECT\n  month AS time,\n  concat(instrument_id, ' - ', regime_label) AS metric,\n  observations * 100.0 / nullIf(total_obs, 0) AS value\nFROM monthly_counts\nJOIN totals USING (month, instrument_id)\nORDER BY month, metric",
+            "format": "time_series"
+          }
+        ],
+        "lines": true,
+        "linewidth": 2,
+        "fill": 3,
+        "nullPointMode": "null",
+        "yaxes": [
+          {"label": "Share (%)", "format": "percent"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Latest Supply/Demand Metrics",
+        "type": "table",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "ClickHouse",
+            "rawSql": "WITH ranked AS (\n  SELECT\n    date,\n    entity_id,\n    instrument_id,\n    metric_name,\n    metric_value,\n    unit,\n    created_at,\n    ROW_NUMBER() OVER (PARTITION BY entity_id, metric_name ORDER BY created_at DESC) AS rn\n  FROM market_intelligence.supply_demand_metrics\n)\nSELECT\n  entity_id,\n  instrument_id,\n  metric_name,\n  metric_value,\n  unit,\n  date,\n  created_at,\n  multiIf(metric_name = 'cusum_supply_shock' AND metric_value > 0, 'Alert', 'Normal') AS status\nFROM ranked\nWHERE rn = 1\nORDER BY entity_id, metric_name",
+            "format": "table"
+          }
+        ],
+        "styles": [
+          {"alias": "metric_value", "unit": "short"},
+          {"alias": "date", "dateFormat": "YYYY-MM-DD"},
+          {"alias": "created_at", "dateFormat": "YYYY-MM-DD HH:mm:ss"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Weather Coefficients & Rolling Betas",
+        "type": "table",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "ClickHouse",
+            "rawSql": "WITH ranked AS (\n  SELECT\n    entity_id,\n    coef_type,\n    coefficient,\n    r2,\n    diagnostics,\n    as_of,\n    ROW_NUMBER() OVER (PARTITION BY entity_id, coef_type ORDER BY as_of DESC) AS rn\n  FROM market_intelligence.weather_impact\n)\nSELECT\n  entity_id,\n  coef_type,\n  coefficient,\n  r2,\n  multiIf(\n    coef_type = 'temperature', JSONExtractFloat(diagnostics, 'temperature', 'avg_beta'),\n    coef_type = 'hdd', JSONExtractFloat(diagnostics, 'hdd', 'avg_beta'),\n    coef_type = 'cdd', JSONExtractFloat(diagnostics, 'cdd', 'avg_beta'),\n    NULL\n  ) AS avg_beta,\n  multiIf(\n    coef_type = 'temperature', JSONExtractFloat(diagnostics, 'temperature', 'beta_std'),\n    coef_type = 'hdd', JSONExtractFloat(diagnostics, 'hdd', 'beta_std'),\n    coef_type = 'cdd', JSONExtractFloat(diagnostics, 'cdd', 'beta_std'),\n    NULL\n  ) AS beta_std,\n  as_of\nFROM ranked\nWHERE rn = 1\nORDER BY entity_id, coef_type",
+            "format": "table"
+          }
+        ],
+        "styles": [
+          {"alias": "coefficient", "unit": "short"},
+          {"alias": "avg_beta", "unit": "short"},
+          {"alias": "beta_std", "unit": "short"},
+          {"alias": "as_of", "dateFormat": "YYYY-MM-DD HH:mm:ss"}
+        ]
+      }
+    ]
+  }
+}

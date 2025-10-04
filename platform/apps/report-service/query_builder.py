@@ -177,7 +177,7 @@ def build_price_aggregation_query(
     market: str,
     start_date: date,
     end_date: date,
-    table: str = "market_price_ticks",
+    table: str = "market_intelligence.market_price_daily_agg",
 ) -> BuiltQuery:
     """Daily aggregation of prices for a market between dates.
 
@@ -194,21 +194,20 @@ def build_price_aggregation_query(
     builder = (
         ClickHouseQueryBuilder()
         .select(
-            "toDate(timestamp) as date",
+            "date",
             "market",
             "instrument_id",
-            "AVG(price) as avg_price",
-            "MIN(price) as min_price",
-            "MAX(price) as max_price",
-            "argMin(price, timestamp) as open_price",
-            "argMax(price, timestamp) as close_price",
-            "COUNT(*) as sample_count",
+            "avg_price",
+            "min_price",
+            "max_price",
+            "first_price as open_price",
+            "last_price as close_price",
+            "tick_count as sample_count",
         )
         .from_table(table)
         .prewhere("market = %(market)s", market=market)
-        .where("toDate(timestamp) >= %(start_date)s", start_date=start_date)
-        .where("toDate(timestamp) <= %(end_date)s", end_date=end_date)
-        .group_by("date", "market", "instrument_id")
+        .where("date >= %(start_date)s", start_date=start_date)
+        .where("date <= %(end_date)s", end_date=end_date)
         .order_by("date", "instrument_id")
     )
 
@@ -218,7 +217,7 @@ def build_price_aggregation_query(
 def build_forward_curve_query(
     market: str,
     as_of_date: date,
-    table: str = "forward_curve_points",
+    table: str = "market_intelligence.forward_curve_points",
 ) -> BuiltQuery:
     """Select forward curve points for a market and as-of date.
 
@@ -234,7 +233,7 @@ def build_forward_curve_query(
         ClickHouseQueryBuilder()
         .select(
             "instrument_id",
-            "delivery_period",
+            "delivery_start as delivery_period",
             "price",
             "as_of_date",
         )
