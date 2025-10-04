@@ -37,3 +37,4 @@ output "kubeconfig" {
   })
   sensitive = true
 }
+

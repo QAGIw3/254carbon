@@ -77,3 +77,4 @@ defaultRules:
     prometheus: true
     prometheusOperator: true
     time: true
+

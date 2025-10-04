@@ -28,3 +28,4 @@ dependencies:
     version: "0.9.0"
     repository: "https://charts.external-secrets.io"
     condition: external-secrets.enabled
+

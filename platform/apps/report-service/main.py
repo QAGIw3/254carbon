@@ -50,7 +50,16 @@ class ReportResponse(BaseModel):
 
 
 async def query_clickhouse_data(market: str, as_of_date: date, report_type: str) -> Dict[str, Any]:
-    """Query market data from ClickHouse for report generation."""
+    """Query market data from ClickHouse for report generation.
+
+    Args:
+        market: Market identifier (e.g., 'MISO').
+        as_of_date: Report as-of date.
+        report_type: Report type (e.g., 'monthly_brief', 'custom').
+
+    Returns:
+        Dict containing price_data, curve_data, and date boundaries.
+    """
     try:
         # Connect to ClickHouse
         client = ClickHouseClient(
@@ -94,7 +103,15 @@ async def query_clickhouse_data(market: str, as_of_date: date, report_type: str)
 
 
 async def generate_charts(data: Dict[str, Any], market: str) -> Dict[str, str]:
-    """Generate charts for the report."""
+    """Generate charts for the report.
+
+    Args:
+        data: Query results including price_data and curve_data.
+        market: Market code used for labeling.
+
+    Returns:
+        Mapping of chart_name -> HTML snippet.
+    """
     charts = {}
 
     try:
@@ -164,7 +181,16 @@ async def render_html_template(
     data: Dict[str, Any],
     charts: Dict[str, str]
 ) -> str:
-    """Render HTML template with data and charts."""
+    """Render HTML template with data and charts.
+
+    Args:
+        request: Original report request.
+        data: Data queried from ClickHouse.
+        charts: Generated chart HTML snippets.
+
+    Returns:
+        Rendered HTML string for the report.
+    """
     try:
         # Setup Jinja2 environment
         env = Environment(loader=FileSystemLoader('templates'))
@@ -211,7 +237,15 @@ async def render_html_template(
 
 
 async def calculate_report_statistics(data: Dict[str, Any], market: str) -> Dict[str, Any]:
-    """Calculate comprehensive report statistics."""
+    """Calculate comprehensive report statistics.
+
+    Args:
+        data: Query results including price_data.
+        market: Market label (unused in core metrics but kept for future use).
+
+    Returns:
+        Dict with avg_price, min_price, max_price, total_volume, volatility.
+    """
     try:
         if not data['price_data']:
             return {
@@ -269,7 +303,14 @@ async def calculate_report_statistics(data: Dict[str, Any], market: str) -> Dict
 
 
 async def generate_pdf(html_content: str) -> bytes:
-    """Generate PDF from HTML content using enhanced PDF generator."""
+    """Generate PDF from HTML content using enhanced PDF generator.
+
+    Args:
+        html_content: Rendered report HTML.
+
+    Returns:
+        PDF bytes; falls back to HTML bytes when PDF stack is unavailable.
+    """
     try:
         # Use the enhanced PDF generator
         pdf_gen = PDFGenerator()
@@ -308,7 +349,17 @@ async def generate_pdf(html_content: str) -> bytes:
 
 
 async def store_in_minio(report_id: str, content: bytes, extension: str, content_type: str) -> str:
-    """Store report content in MinIO."""
+    """Store report content in MinIO and return a public URL.
+
+    Args:
+        report_id: Report identifier.
+        content: File bytes to upload.
+        extension: File extension (pdf or html).
+        content_type: HTTP content-type.
+
+    Returns:
+        Public URL to the stored object.
+    """
     try:
         # Connect to MinIO
         s3_client = boto3.client(
@@ -351,7 +402,11 @@ async def health():
 
 @app.post("/api/v1/reports", response_model=ReportResponse)
 async def generate_report(request: ReportRequest):
-    """Generate a market report."""
+    """Generate a market report.
+
+    Orchestrates data fetch, chart generation, HTML rendering, optional PDF
+    conversion, and storage in MinIO.
+    """
     report_id = str(uuid.uuid4())
 
     logger.info(
@@ -415,7 +470,11 @@ async def generate_report(request: ReportRequest):
 
 @app.get("/api/v1/reports/{report_id}", response_model=ReportResponse)
 async def get_report(report_id: str):
-    """Get report status and download URL."""
+    """Get report status and download URL.
+
+    Probes MinIO for either PDF or HTML variants and returns a signed URL if
+    found (here, a public read URL for simplicity).
+    """
     try:
         # Connect to MinIO to check if report exists
         s3_client = boto3.client(
@@ -463,4 +522,3 @@ async def get_report(report_id: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8004)
-

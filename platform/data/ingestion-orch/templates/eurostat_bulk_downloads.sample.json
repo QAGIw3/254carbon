@@ -1,0 +1,13 @@
+[
+  {
+    "url": "https://ec.europa.eu/eurostat/api/bulkdownload/1.0/tsv/pop_demo.tsv", 
+    "variable": "population",
+    "unit": "people",
+    "date_col": "time",
+    "value_col": "value",
+    "entity_col": "geo",
+    "delimiter": "\t",
+    "encoding": "utf-8"
+  }
+]
+

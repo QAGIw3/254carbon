@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 from pathlib import Path
 import json
 
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, APIRouter, Depends, HTTPException
 from jinja2 import Template
 
 import sys
@@ -261,105 +261,86 @@ class ReportGenerator:
             logger.error(f"Error scheduling reports: {e}")
 
 
-# Global report generator instance
 report_generator = ReportGenerator()
 
 
-# Background task for automated reports
 async def run_scheduled_reports():
-    """Run scheduled report generation (to be called by scheduler)."""
     logger.info("Running scheduled report generation...")
     await report_generator.schedule_reports()
     logger.info("Scheduled reports completed")
 
 
-# API endpoints for report management
+def create_report_router() -> APIRouter:
+    router = APIRouter(prefix="/api/v1/miso/reports", tags=["reports"])
 
-@app.post("/api/v1/miso/reports/daily")
-async def generate_miso_daily_report(
-    report_date: Optional[str] = None,
-    email_recipients: List[str] = [],
-    user=Depends(verify_token),
-):
-    """Generate and optionally email daily MISO trading report."""
-    track_request("generate_miso_daily_report")
+    @router.post("/daily")
+    async def generate_miso_daily_report(
+        report_date: Optional[str] = None,
+        email_recipients: List[str] = [],
+        user=Depends(verify_token),
+    ):
+        track_request("generate_miso_daily_report")
+        await check_entitlement(user, "market", "power", "api")
 
-    # Check MISO entitlement
-    await check_entitlement(user, "market", "power", "api")
+        try:
+            report_data = await report_generator.generate_daily_trading_report(report_date)
+            if 'error' in report_data:
+                raise HTTPException(status_code=500, detail=report_data['error'])
 
-    try:
-        report_data = await report_generator.generate_daily_trading_report(report_date)
-
-        if 'error' in report_data:
-            raise HTTPException(status_code=500, detail=report_data['error'])
-
-        # Send emails if recipients provided
-        email_results = []
-        if email_recipients:
+            email_results: List[Dict] = []
             for recipient in email_recipients:
-                email_result = await report_generator.send_email_report(
-                    report_data, recipient, 'daily_trading'
+                email_results.append(
+                    await report_generator.send_email_report(report_data, recipient, 'daily_trading')
                 )
-                email_results.append(email_result)
 
+            return {
+                "status": "generated",
+                "report_data": report_data,
+                "email_results": email_results,
+                "generated_at": datetime.utcnow().isoformat()
+            }
+
+        except Exception as exc:
+            logger.error(f"Error generating MISO daily report: {exc}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    @router.post("/weekly")
+    async def generate_miso_weekly_report(
+        email_recipients: List[str] = [],
+        user=Depends(verify_token),
+    ):
+        track_request("generate_miso_weekly_report")
+        await check_entitlement(user, "market", "power", "api")
+
+        try:
+            report_data = await report_generator.generate_weekly_summary_report()
+            if 'error' in report_data:
+                raise HTTPException(status_code=500, detail=report_data['error'])
+
+            email_results: List[Dict] = []
+            for recipient in email_recipients:
+                email_results.append(
+                    await report_generator.send_email_report(report_data, recipient, 'weekly_summary')
+                )
+
+            return {
+                "status": "generated",
+                "report_data": report_data,
+                "email_results": email_results,
+                "generated_at": datetime.utcnow().isoformat()
+            }
+
+        except Exception as exc:
+            logger.error(f"Error generating MISO weekly report: {exc}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    @router.get("/templates")
+    async def get_report_templates(user=Depends(verify_token)):
+        track_request("get_report_templates")
+        await check_entitlement(user, "market", "power", "api")
         return {
-            "status": "generated",
-            "report_data": report_data,
-            "email_results": email_results,
-            "generated_at": datetime.utcnow().isoformat()
+            "templates": list(report_generator.email_templates.keys()),
+            "description": "Available email templates for MISO reports"
         }
 
-    except Exception as e:
-        logger.error(f"Error generating MISO daily report: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@app.post("/api/v1/miso/reports/weekly")
-async def generate_miso_weekly_report(
-    email_recipients: List[str] = [],
-    user=Depends(verify_token),
-):
-    """Generate and optionally email weekly MISO summary report."""
-    track_request("generate_miso_weekly_report")
-
-    # Check MISO entitlement
-    await check_entitlement(user, "market", "power", "api")
-
-    try:
-        report_data = await report_generator.generate_weekly_summary_report()
-
-        if 'error' in report_data:
-            raise HTTPException(status_code=500, detail=report_data['error'])
-
-        # Send emails if recipients provided
-        email_results = []
-        if email_recipients:
-            for recipient in email_recipients:
-                email_result = await report_generator.send_email_report(
-                    report_data, recipient, 'weekly_summary'
-                )
-                email_results.append(email_result)
-
-        return {
-            "status": "generated",
-            "report_data": report_data,
-            "email_results": email_results,
-            "generated_at": datetime.utcnow().isoformat()
-        }
-
-    except Exception as e:
-        logger.error(f"Error generating MISO weekly report: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-# Report email templates (basic HTML templates)
-
-@app.get("/api/v1/miso/reports/templates")
-async def get_report_templates(user=Depends(verify_token)):
-    """Get available report templates."""
-    track_request("get_report_templates")
-
-    return {
-        "templates": list(report_generator.email_templates.keys()),
-        "description": "Available email templates for MISO reports"
-    }
+    return router

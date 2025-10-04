@@ -246,3 +246,4 @@ resource "random_password" "grafana_admin" {
   length  = 16
   special = true
 }
+

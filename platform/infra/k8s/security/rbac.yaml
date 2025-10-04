@@ -1,0 +1,194 @@
+---
+# RBAC Configuration for 254Carbon Production Deployment
+
+# Service Account for External Secrets Operator
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-secrets-sa
+  namespace: market-intelligence
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/ExternalSecretsRole
+
+---
+# Role for External Secrets Operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: external-secrets-role
+  namespace: market-intelligence
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["external-secrets.io"]
+  resources: ["externalsecrets", "secretstores"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# RoleBinding for External Secrets Operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: external-secrets-rolebinding
+  namespace: market-intelligence
+subjects:
+- kind: ServiceAccount
+  name: external-secrets-sa
+  namespace: market-intelligence
+roleRef:
+  kind: Role
+  name: external-secrets-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Cluster Role for External Secrets Operator (if needed for cluster-wide operations)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-secrets-cluster-role
+rules:
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Cluster Role Binding for External Secrets Operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: external-secrets-cluster-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: external-secrets-sa
+  namespace: market-intelligence
+roleRef:
+  kind: ClusterRole
+  name: external-secrets-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Service Account for Application Services
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: market-intelligence-sa
+  namespace: market-intelligence
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/MarketIntelligenceRole
+
+---
+# Role for Application Services
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: market-intelligence-role
+  namespace: market-intelligence
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+
+---
+# RoleBinding for Application Services
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: market-intelligence-rolebinding
+  namespace: market-intelligence
+subjects:
+- kind: ServiceAccount
+  name: market-intelligence-sa
+  namespace: market-intelligence
+roleRef:
+  kind: Role
+  name: market-intelligence-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Service Account for Data Connectors
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: data-connector-sa
+  namespace: market-intelligence
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/DataConnectorRole
+
+---
+# Role for Data Connectors (minimal permissions)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: data-connector-role
+  namespace: market-intelligence
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list"]
+- apiGroups: ["apps"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch", "create"]
+
+---
+# RoleBinding for Data Connectors
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: data-connector-rolebinding
+  namespace: market-intelligence
+subjects:
+- kind: ServiceAccount
+  name: data-connector-sa
+  namespace: market-intelligence
+roleRef:
+  kind: Role
+  name: data-connector-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Service Account for Monitoring
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: monitoring-sa
+  namespace: market-intelligence-infra
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/MonitoringRole
+
+---
+# Role for Monitoring (read-only access)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: monitoring-role
+  namespace: market-intelligence
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch"]
+
+---
+# RoleBinding for Monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: monitoring-rolebinding
+  namespace: market-intelligence
+subjects:
+- kind: ServiceAccount
+  name: monitoring-sa
+  namespace: market-intelligence-infra
+roleRef:
+  kind: Role
+  name: monitoring-role
+  apiGroup: rbac.authorization.k8s.io

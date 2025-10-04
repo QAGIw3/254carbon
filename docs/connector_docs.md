@@ -74,3 +74,92 @@ Implementation status highlights:
 - MISO: done (RT nodal + DA ex-ante hub via JSON).
 - CAISO: done (OASIS SingleZip CSV-in-ZIP with hub-only entitlement).
 - PJM/NYISO/SPP/ERCOT/IESO/AESO: code scaffolds with strong mocks; live APIs ready to be wired once keys/endpoint details are provided.
+
+---
+
+New external connectors (infrastructure, weather, demographics, economics, geospatial):
+
+Energy infrastructure
+- US EIA Open Data: https://www.eia.gov/opendata/
+  - Class: platform/data/connectors/external/infrastructure/eia_connector.py:EIAOpenDataConnector
+  - Notes: Configure `api_key`, `datasets`; emits retail electricity sales and fuel prices.
+- ENTSO-E Transparency Platform: https://transparency.entsoe.eu/
+  - Class: platform/data/connectors/external/infrastructure/entsoe_connector.py:ENTSOETransparencyConnector
+  - Notes: Configure `api_token`, `area` (EIC); emits load, generation, transmission, balancing price.
+- OECD Energy Statistics: https://data.oecd.org/energy.htm
+  - Class: platform/data/connectors/external/infrastructure/oecd_energy_connector.py:OECDEnergyStatsConnector
+  - Notes: Download/SDMX in prod; emits energy balance, household electricity price.
+- Open Infrastructure Map: https://openinframap.org/
+  - Class: platform/data/connectors/external/infrastructure/open_inframap_connector.py:OpenInfrastructureMapConnector
+  - Notes: Overpass/OSM-derived in prod; emits lines km, substation counts, pipelines km.
+- World Bank Energy Data: https://datacatalog.worldbank.org/
+  - Class: platform/data/connectors/external/infrastructure/world_bank_energy_connector.py:WorldBankEnergyConnector
+  - Notes: Configure `indicators`, `country`; emits energy use per capita, electricity access.
+
+Weather and climate
+- NOAA Climate Data Online (CDO): https://www.ncdc.noaa.gov/cdo-web/
+  - Class: platform/data/connectors/external/weather/noaa_cdo_connector.py:NOAACDOConnector
+  - Notes: Configure `token`, `location`; emits temp, wind, precipitation.
+- Copernicus Climate Data Store (CDS): https://cds.climate.copernicus.eu/
+  - Class: platform/data/connectors/external/weather/copernicus_cds_connector.py:CopernicusCDSConnector
+  - Notes: Configure `dataset`, `area`; emits t2m, precip, wind.
+- ECMWF ERA5 Reanalysis: https://www.ecmwf.int/en/forecasts/datasets/reanalysis-datasets/era5
+  - Class: platform/data/connectors/external/weather/era5_connector.py:ERA5Connector
+  - Notes: Hourly global reanalysis; emits t2m, wind, precip.
+- NASA POWER: https://power.larc.nasa.gov/
+  - Class: platform/data/connectors/external/weather/nasa_power_connector.py:NASAPowerConnector
+  - Notes: Configure `site`; emits GHI, wind, temperature.
+- OpenWeatherMap: https://openweathermap.org/api
+  - Class: platform/data/connectors/external/weather/openweathermap_connector.py:OpenWeatherMapConnector
+  - Notes: Configure `api_key`, `location`; emits current conditions.
+
+Population and demographics
+- US Census Bureau APIs: https://www.census.gov/data/developers/data-sets.html
+  - Class: platform/data/connectors/external/demographics/us_census_connector.py:USCensusConnector
+  - Notes: Configure `dataset`, `geo`; emits population, housing units.
+- UN Data: https://data.un.org/
+  - Class: platform/data/connectors/external/demographics/un_data_connector.py:UNDataConnector
+  - Notes: Emits world population and life expectancy.
+- WorldPop: https://www.worldpop.org/
+  - Class: platform/data/connectors/external/demographics/worldpop_connector.py:WorldPopConnector
+  - Notes: Emits total population and density summary.
+- Eurostat: https://ec.europa.eu/eurostat/data/database
+  - Class: platform/data/connectors/external/demographics/eurostat_connector.py:EurostatConnector
+  - Notes: Emits EU population and net migration.
+
+Economics and trade
+- FRED: https://fred.stlouisfed.org/
+  - Class: platform/data/connectors/external/economics/fred_connector.py:FREDConnector
+  - Notes: Configure `api_key`; emits GDP, CPI, fed funds rate.
+- World Bank Open Data: https://data.worldbank.org/
+  - Class: platform/data/connectors/external/economics/world_bank_econ_connector.py:WorldBankEconomicsConnector
+  - Notes: Emits GDP per capita and inflation.
+- IMF Data: https://data.imf.org/
+  - Class: platform/data/connectors/external/economics/imf_connector.py:IMFConnector
+  - Notes: Emits current account and government debt ratios.
+- OECD Data: https://data.oecd.org/
+  - Class: platform/data/connectors/external/economics/oecd_data_connector.py:OECDDataConnector
+  - Notes: Emits unemployment rate and trade balance.
+- UN Comtrade: https://comtradeplus.un.org/
+  - Class: platform/data/connectors/external/economics/un_comtrade_connector.py:UNComtradeConnector
+  - Notes: Emits exports, imports, and trade balance.
+- WTO Data Portal: https://timeseries.wto.org/
+  - Class: platform/data/connectors/external/economics/wto_connector.py:WTODataConnector
+  - Notes: Emits average tariff rate and trade policy index.
+
+Geospatial and environment
+- OpenStreetMap: https://www.openstreetmap.org/
+  - Class: platform/data/connectors/external/geospatial/openstreetmap_connector.py:OpenStreetMapConnector
+  - Notes: Overpass/planet in prod; emits road/rail/power line km.
+- Natural Earth Data: https://www.naturalearthdata.com/
+  - Class: platform/data/connectors/external/geospatial/natural_earth_connector.py:NaturalEarthConnector
+  - Notes: Emits country and populated places counts by scale.
+- GBIF: https://www.gbif.org/
+  - Class: platform/data/connectors/external/geospatial/gbif_connector.py:GBIFConnector
+  - Notes: Emits species occurrence counts and biodiversity index.
+- FAO FAOSTAT: https://www.fao.org/faostat/en/
+  - Class: platform/data/connectors/external/geospatial/faostat_connector.py:FAOSTATConnector
+  - Notes: Emits cereal production and agricultural land share.
+
+All new connectors default to emitting JSON records to Kafka topic `market.fundamentals`.
+Swap to real APIs by providing credentials in config and replacing the mocked pull step.

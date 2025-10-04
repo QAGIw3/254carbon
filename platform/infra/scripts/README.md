@@ -313,3 +313,4 @@ kubectl apply -f platform/infra/k8s/security/cluster-issuer.yaml
 - [Kubernetes Documentation](https://kubernetes.io/docs/)
 - [Helm Documentation](https://helm.sh/docs/)
 - [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
+

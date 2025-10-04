@@ -42,3 +42,4 @@ spec:
       annotations:
         summary: "254Carbon service is down"
         description: "Service {{ $labels.job }} has been down for more than 2 minutes"
+

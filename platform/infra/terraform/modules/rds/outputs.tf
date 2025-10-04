@@ -53,3 +53,4 @@ output "enhanced_monitoring_role_arn" {
   description = "Enhanced monitoring IAM role ARN"
   value       = var.monitoring_interval > 0 ? aws_iam_role.rds_enhanced_monitoring[0].arn : null
 }
+

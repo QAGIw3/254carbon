@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../services/api';
+import { apiClient } from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -39,7 +39,7 @@ export default function MarketExplorer() {
   const { data: instruments = [] } = useQuery({
     queryKey: ['instruments', selectedMarket, selectedProduct],
     queryFn: async () => {
-      const response = await api.get('/api/v1/instruments', {
+      const response = await apiClient.get('/api/v1/instruments', {
         params: { market: selectedMarket, product: selectedProduct }
       });
       return response.data;
@@ -51,7 +51,7 @@ export default function MarketExplorer() {
     queryKey: ['prices', selectedInstruments],
     queryFn: async () => {
       if (selectedInstruments.length === 0) return [];
-      const response = await api.get('/api/v1/prices/ticks', {
+      const response = await apiClient.get('/api/v1/prices/ticks', {
         params: {
           instrument_ids: selectedInstruments.join(','),
           limit: 100
@@ -274,7 +274,7 @@ export default function MarketExplorer() {
                       <XAxis dataKey="timestamp" />
                       <YAxis />
                       <Tooltip />
-                      {selectedInstruments.map((instrumentId, index) => (
+                  {selectedInstruments.map((instrumentId, index: number) => (
                         <Line
                           key={instrumentId}
                           type="monotone"
@@ -295,7 +295,7 @@ export default function MarketExplorer() {
                       <XAxis dataKey="timestamp" />
                       <YAxis />
                       <Tooltip />
-                      {selectedInstruments.map((instrumentId, index) => (
+                      {selectedInstruments.map((instrumentId, index: number) => (
                         <Area
                           key={instrumentId}
                           type="monotone"
@@ -334,7 +334,7 @@ export default function MarketExplorer() {
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedInstruments.map(instrumentId => {
+                  {selectedInstruments.map((instrumentId) => {
                     const latestTick = priceHistory
                       .filter(tick => tick.instrument_id === instrumentId)
                       .slice(-1)[0];
@@ -343,14 +343,14 @@ export default function MarketExplorer() {
                       .filter(tick => tick.instrument_id === instrumentId)
                       .slice(-2, -1)[0];
 
-                    const change = latestTick && previousTick
+                    const change = latestTick && previousTick && previousTick.price !== 0
                       ? ((latestTick.price - previousTick.price) / previousTick.price * 100).toFixed(2)
                       : '0.00';
 
                     return (
                       <tr key={instrumentId} className="border-b hover:bg-gray-50">
                         <td className="py-2 font-medium">
-                          {instruments.find(i => i.instrument_id === instrumentId)?.location_code || instrumentId}
+                          {instruments.find((instrument: Instrument) => instrument.instrument_id === instrumentId)?.location_code || instrumentId}
                         </td>
                         <td className="text-right py-2 font-mono">
                           {latestTick ? `$${latestTick.price.toFixed(2)}` : '—'}

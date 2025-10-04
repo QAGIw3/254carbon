@@ -34,3 +34,4 @@ inputs = {
   # Domain
   domain_name = "254carbon-staging.local"
 }
+

@@ -28,12 +28,24 @@ class FundamentalsResult:
 
 
 class FundamentalsEngine:
-    """Calculates fundamental drivers for scenario execution."""
+    """Calculate fundamental drivers for scenario execution.
+
+    Produces load forecasts, generation mix projections, fuel forward curves,
+    policy impacts, macro indicators, weather drivers, and composite risk.
+    """
 
     def __init__(self) -> None:
         self.default_forecast_horizon = 10
 
     async def run(self, assumptions: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute fundamentals pipeline using provided assumptions.
+
+        Args:
+            assumptions: Structured assumptions dict (macro, fuels, power, policy, weather).
+
+        Returns:
+            Dict with fundamentals components and metadata.
+        """
         try:
             load_task = asyncio.create_task(self._calculate_load_forecast(assumptions))
             supply_task = asyncio.create_task(self._calculate_generation_stack(assumptions))
@@ -73,6 +85,11 @@ class FundamentalsEngine:
             return self._fallback(assumptions)
 
     async def _calculate_load_forecast(self, assumptions: Dict[str, Any]) -> Dict[str, Any]:
+        """Build regional load forecast and peaks from growth and sensitivities.
+
+        Returns:
+            Dict with regional projections, overall growth, and horizon.
+        """
         power = assumptions.get("power", {})
         base_growth = power.get("load_growth", 1.5)
         horizon = power.get("forecast_horizon", self.default_forecast_horizon)
@@ -107,6 +124,11 @@ class FundamentalsEngine:
         }
 
     async def _calculate_generation_stack(self, assumptions: Dict[str, Any]) -> Dict[str, Any]:
+        """Project generation mix trajectory with build/retirement assumptions.
+
+        Returns:
+            Dict with current mix, projected mix by year, and reserve margin.
+        """
         power = assumptions.get("power", {})
         current_mix = power.get(
             "current_mix",
@@ -166,6 +188,11 @@ class FundamentalsEngine:
         }
 
     async def _calculate_fuel_prices(self, assumptions: Dict[str, Any]) -> Dict[str, Any]:
+        """Construct fuel forward curves from growth and volatility inputs.
+
+        Returns:
+            Dict with current prices, growth rates, volatility, and forward curves.
+        """
         fuels = assumptions.get("fuels", {})
         current = fuels.get(
             "current_prices",
@@ -206,6 +233,11 @@ class FundamentalsEngine:
         }
 
     async def _assess_policy_impacts(self, assumptions: Dict[str, Any]) -> Dict[str, Any]:
+        """Aggregate policy-related inputs into a normalized impact score.
+
+        Returns:
+            Dict with individual policy inputs and composite impact score.
+        """
         policy = assumptions.get("policy", {})
 
         carbon = policy.get("carbon_price", 0.0)
@@ -230,6 +262,7 @@ class FundamentalsEngine:
         }
 
     async def _calculate_macro_indicators(self, assumptions: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract macroeconomic indicators with sane defaults."""
         macro = assumptions.get("macro", {})
         return {
             "gdp_growth": macro.get("gdp_growth", 2.4),
@@ -240,6 +273,7 @@ class FundamentalsEngine:
         }
 
     async def _calculate_weather_drivers(self, assumptions: Dict[str, Any]) -> Dict[str, Any]:
+        """Assemble weather drivers and seasonal patterns."""
         weather = assumptions.get("weather", {})
         return {
             "temperature_sensitivity": weather.get("temperature_sensitivity", 0.65),
@@ -253,6 +287,7 @@ class FundamentalsEngine:
         }
 
     async def _calculate_risk_factors(self, assumptions: Dict[str, Any]) -> Dict[str, Any]:
+        """Combine fuel and macro volatilities into composite risk factor."""
         macro = assumptions.get("macro", {})
         fuels = assumptions.get("fuels", {})
 
@@ -276,4 +311,3 @@ class FundamentalsEngine:
             "risk_factors": {"status": "fallback"},
             "metadata": {"status": "fallback"},
         }
-

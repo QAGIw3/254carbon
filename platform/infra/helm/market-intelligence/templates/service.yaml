@@ -21,3 +21,4 @@ spec:
     app.kubernetes.io/color: {{ include "market-intelligence.activeColor" $ }}
 {{- end }}
 {{- end }}
+

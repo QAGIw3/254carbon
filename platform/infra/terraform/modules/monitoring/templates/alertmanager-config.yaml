@@ -21,3 +21,4 @@ stringData:
     - name: 'pagerduty'
       pagerduty_configs:
       - routing_key: '${pagerduty_integration_key}'
+

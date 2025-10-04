@@ -22,3 +22,4 @@ EXPOSE 8011
 
 # Use uvicorn with reload for development
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8011", "--reload", "--log-level", "debug"]
+

@@ -47,3 +47,4 @@ spec:
     name: market-intelligence-.*-green
     jsonPointers:
     - /spec/replicas
+

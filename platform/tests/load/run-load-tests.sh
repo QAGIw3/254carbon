@@ -5,9 +5,10 @@
 set -euo pipefail
 
 # Configuration
-API_URL="${API_URL:-https://api.254carbon.ai}"
-WS_URL="${WS_URL:-wss://api.254carbon.ai/ws/stream}"
-AUTH_TOKEN="${AUTH_TOKEN:-}"
+API_URL="${API_URL:-http://localhost:8000}"
+WS_URL="${WS_URL:-ws://localhost:8000/ws/stream}"
+AUTH_TOKEN="${AUTH_TOKEN:-test-token}"
+TEST_MODE="${TEST_MODE:-local}"  # local or production
 RESULTS_DIR="./results"
 
 # Colors
@@ -48,14 +49,19 @@ check_prerequisites() {
 # Test API health before load testing
 test_api_health() {
     log_info "Testing API health..."
-    
+
+    if [ "$TEST_MODE" = "local" ]; then
+        log_info "Local test mode - skipping external API health check"
+        return 0
+    fi
+
     response=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/health")
-    
+
     if [ "$response" != "200" ]; then
         log_error "API health check failed (HTTP $response)"
         exit 1
     fi
-    
+
     log_info "API is healthy"
 }
 

@@ -68,3 +68,4 @@ spec:
         type: PostSync
         url: http://api-gateway:8000/health
         path: /health
+

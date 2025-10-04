@@ -1,20 +1,31 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useWebSocketStore } from '../stores/websocketStore';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 interface LivePriceChartProps {
-  instrumentIds?: string[];
+  defaultInstrumentIds?: string[];
   timeWindow?: number; // minutes to show
   height?: number;
 }
 
 export default function LivePriceChart({
-  instrumentIds = ['MISO.HUB.INDIANA', 'PJM.HUB.WEST'],
+  defaultInstrumentIds = ['MISO.HUB.INDIANA', 'PJM.HUB.WEST'],
   timeWindow = 60, // 60 minutes
   height = 300
 }: LivePriceChartProps) {
   const { latestPrices, getPriceHistory } = useWebSocketStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const instrumentIds = defaultInstrumentIds;
+
+  const filteredHistories = useMemo(() => {
+    return instrumentIds.reduce<Record<string, any[]>>((acc, instrumentId) => {
+      const history = getPriceHistory(instrumentId, 100);
+      const cutoff = Date.now() - timeWindow * 60 * 1000;
+      acc[instrumentId] = history.filter(point => new Date(point.timestamp).getTime() >= cutoff);
+      return acc;
+    }, {} as Record<string, any[]>);
+  }, [instrumentIds, latestPrices, getPriceHistory, timeWindow]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -30,10 +41,13 @@ export default function LivePriceChart({
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw chart
-    drawChart(ctx, canvas.width, canvas.height);
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
 
-  }, [latestPrices, instrumentIds, timeWindow, height]);
+    // Draw chart
+    drawChart(ctx, canvasWidth, canvasHeight);
+
+  }, [filteredHistories, instrumentIds, timeWindow, height]);
 
   const drawChart = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const padding = 40;
@@ -60,11 +74,11 @@ export default function LivePriceChart({
     const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b'];
 
     instrumentIds.forEach((instrumentId, index) => {
-      const history = getPriceHistory(instrumentId, 100); // Get last 100 points
+      const history = filteredHistories[instrumentId] || [];
       if (history.length < 2) return;
 
       const color = colors[index % colors.length];
-      drawPriceLine(ctx, history, color, padding, chartWidth, chartHeight, width, height);
+      drawPriceLine(ctx, history, color, padding, chartWidth, chartHeight, height - padding * 2);
     });
 
     // Draw legend
@@ -78,7 +92,6 @@ export default function LivePriceChart({
     padding: number,
     chartWidth: number,
     chartHeight: number,
-    canvasWidth: number,
     canvasHeight: number
   ) => {
     if (history.length === 0) return;
@@ -95,7 +108,8 @@ export default function LivePriceChart({
     ctx.beginPath();
 
     history.forEach((point, index) => {
-      const x = padding + (index / (history.length - 1)) * chartWidth;
+      const denominator = Math.max(history.length - 1, 1);
+      const x = padding + (index / denominator) * chartWidth;
       const y = canvasHeight - padding - ((point.value - minPrice) / priceRange) * chartHeight;
 
       if (index === 0) {
@@ -110,7 +124,8 @@ export default function LivePriceChart({
     // Draw data points
     ctx.fillStyle = color;
     history.forEach((point, index) => {
-      const x = padding + (index / (history.length - 1)) * chartWidth;
+      const denominator = Math.max(history.length - 1, 1);
+      const x = padding + (index / denominator) * chartWidth;
       const y = canvasHeight - padding - ((point.value - minPrice) / priceRange) * chartHeight;
 
       ctx.beginPath();
@@ -124,7 +139,7 @@ export default function LivePriceChart({
     instrumentIds: string[],
     colors: string[],
     width: number,
-    height: number
+    _height: number
   ) => {
     const legendY = 20;
     const itemHeight = 20;
@@ -145,7 +160,7 @@ export default function LivePriceChart({
       ctx.fillText(instrumentId, 30, y);
 
       // Draw current price
-      const price = useWebSocketStore.getState().latestPrices[instrumentId];
+      const price = filteredHistories[instrumentId]?.slice(-1)[0];
       if (price) {
         ctx.fillStyle = '#1f2937';
         ctx.font = 'bold 12px sans-serif';

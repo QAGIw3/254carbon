@@ -219,3 +219,12 @@ secrets:
     secretStore:
       name: aws-secrets-manager
       kind: SecretStore
+
+ingress:
+  enabled: true
+  host: 254carbon.local
+
+serviceAccount:
+  create: false
+  name: ""
+

@@ -239,7 +239,15 @@ async def generate_caiso_curve_scenario(
     scenario_config: CAISOCurveScenario,
     user=Depends(verify_token),
 ):
-    """Generate CAISO-specific curve scenario."""
+    """Generate CAISO-specific curve scenario.
+
+    Args:
+        scenario_config: Scenario configuration payload.
+        user: Authenticated user (injected).
+
+    Returns:
+        CAISOCurveResult with curves, metrics, and optional regulatory impact.
+    """
     try:
         # Create scenario specification from template
         template = CAISO_SCENARIO_TEMPLATES[scenario_config.market_condition]
@@ -319,7 +327,11 @@ async def generate_caiso_curve_scenario(
 
 @caiso_scenarios_router.get("/templates", response_model=List[Dict[str, Any]])
 async def get_caiso_scenario_templates(user=Depends(verify_token)):
-    """Get available CAISO scenario templates."""
+    """Get available CAISO scenario templates.
+
+    Returns:
+        List of template descriptors with assumptions and suitability.
+    """
     templates = []
 
     for condition, config in CAISO_SCENARIO_TEMPLATES.items():
@@ -339,7 +351,15 @@ async def create_caiso_regulatory_scenario(
     scenario: CAISORegulatoryScenario,
     user=Depends(verify_token),
 ):
-    """Create CAISO regulatory compliance scenario."""
+    """Create CAISO regulatory compliance scenario.
+
+    Args:
+        scenario: Regulatory scenario definition.
+        user: Authenticated user (injected).
+
+    Returns:
+        Dict summarizing compliance costs, curve impacts, and recommendations.
+    """
     try:
         # Create regulatory scenario specification
         regulatory_spec = {
@@ -412,7 +432,14 @@ async def create_caiso_regulatory_scenario(
 
 
 def get_regional_overrides(region: CAISORegion) -> Dict[str, Any]:
-    """Get regional overrides for CAISO regions."""
+    """Get regional overrides for CAISO regions.
+
+    Args:
+        region: CAISORegion enum value.
+
+    Returns:
+        Dict of overrides to merge into base template.
+    """
     regional_configs = {
         CAISORegion.SP15: {
             "power": {
@@ -445,7 +472,14 @@ def get_regional_overrides(region: CAISORegion) -> Dict[str, Any]:
 
 
 def get_condition_description(condition: CAISOMarketCondition) -> str:
-    """Get human-readable description for market condition."""
+    """Get human-readable description for market condition.
+
+    Args:
+        condition: CAISOMarketCondition enum.
+
+    Returns:
+        Description string.
+    """
     descriptions = {
         CAISOMarketCondition.NORMAL: "Standard market conditions with baseline assumptions",
         CAISOMarketCondition.HIGH_DEMAND: "Elevated demand scenario with economic growth acceleration",
@@ -460,7 +494,14 @@ def get_condition_description(condition: CAISOMarketCondition) -> str:
 
 
 def get_suitable_regions(condition: CAISOMarketCondition) -> List[str]:
-    """Get regions most suitable for each market condition."""
+    """Get regions most suitable for each market condition.
+
+    Args:
+        condition: CAISOMarketCondition enum.
+
+    Returns:
+        List of region codes in string form.
+    """
     suitability = {
         CAISOMarketCondition.NORMAL: [CAISORegion.ALL],
         CAISOMarketCondition.HIGH_DEMAND: [CAISORegion.SP15, CAISORegion.ALL],
@@ -472,3 +513,4 @@ def get_suitable_regions(condition: CAISOMarketCondition) -> List[str]:
     }
 
     return [region.value for region in suitability.get(condition, [CAISORegion.ALL])]
+

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 254Carbon Production Infrastructure Deployment Script
-# This script deploys the complete infrastructure stack to production
+# This script deploys the complete infrastructure stack to production with security hardening
 
 set -euo pipefail
 
@@ -9,6 +9,7 @@ set -euo pipefail
 ENVIRONMENT=${1:-prod}
 REGION=${2:-us-east-1}
 TERRAFORM_DIR="../terraform/environments/${ENVIRONMENT}"
+NAMESPACE="market-intelligence"
 
 # Colors for output
 RED='\033[0;31m'
@@ -31,6 +32,10 @@ log_error() {
 
 log_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $*"
+}
+
+log_step() {
+    echo -e "${BLUE}[STEP]${NC} $*"
 }
 
 # Prerequisites check
@@ -158,6 +163,89 @@ run_health_checks() {
     log_success "All health checks passed"
 }
 
+# Configure secrets management
+configure_secrets() {
+    log_step "Configuring secrets management..."
+
+    cd "../../k8s/security"
+
+    # Apply External Secrets Operator
+    log_info "Deploying External Secrets Operator..."
+    kubectl apply -f external-secrets.yaml
+
+    # Wait for operator to be ready
+    log_info "Waiting for External Secrets Operator..."
+    kubectl wait --for=condition=available --timeout=300s deployment/external-secrets -n "$NAMESPACE"
+
+    # Apply secret definitions
+    log_info "Creating secret definitions..."
+    kubectl apply -f external-secrets.yaml
+
+    log_success "Secrets management configured"
+}
+
+# Apply security policies
+apply_security_policies() {
+    log_step "Applying security policies..."
+
+    cd "../../k8s/security"
+
+    # Apply network policies
+    log_info "Applying network policies..."
+    kubectl apply -f network-policies.yaml
+
+    # Apply pod security policies (legacy) or Pod Security Standards
+    log_info "Applying pod security standards..."
+    kubectl apply -f pod-security-policy.yaml
+
+    # Apply RBAC policies
+    log_info "Applying RBAC policies..."
+    kubectl apply -f rbac.yaml
+
+    log_success "Security policies applied"
+}
+
+# Run security scan
+run_security_scan() {
+    log_step "Running security scan..."
+
+    cd "$(dirname "$0")"
+    ./security-scan.sh
+
+    if [[ $? -ne 0 ]]; then
+        log_error "Security scan failed. Please review and fix issues before proceeding."
+        exit 1
+    fi
+
+    log_success "Security scan passed"
+}
+
+# Initialize databases
+initialize_databases() {
+    log_step "Initializing databases..."
+
+    # Initialize PostgreSQL schema
+    log_info "Initializing PostgreSQL schema..."
+    kubectl exec -n "${NAMESPACE}-infra" postgresql-0 -- \
+        psql -U postgres -d market_intelligence -f /docker-entrypoint-initdb.d/init.sql
+
+    # Initialize ClickHouse schema
+    log_info "Initializing ClickHouse schema..."
+    kubectl exec -n "${NAMESPACE}-infra" clickhouse-0 -- \
+        clickhouse-client --query "CREATE DATABASE IF NOT EXISTS ch;"
+
+    # Load initial schema files
+    for schema_file in ../../../data/schemas/clickhouse/*.sql; do
+        if [[ -f "$schema_file" ]]; then
+            log_info "Loading ClickHouse schema: $(basename "$schema_file")"
+            kubectl exec -n "${NAMESPACE}-infra" clickhouse-0 -- \
+                clickhouse-client --multiquery < "$schema_file"
+        fi
+    done
+
+    log_success "Databases initialized"
+}
+
 # Main deployment flow
 main() {
     log_info "Starting 254Carbon production deployment for ${ENVIRONMENT} environment"
@@ -176,7 +264,11 @@ main() {
 
     apply_infrastructure
     configure_kubectl
+    configure_secrets
+    apply_security_policies
+    run_security_scan
     deploy_monitoring
+    initialize_databases
     deploy_application
     run_health_checks
 
@@ -191,3 +283,4 @@ main() {
 
 # Run main function
 main "$@"
+

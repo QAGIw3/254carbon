@@ -83,12 +83,17 @@ Blue-green deployment helpers
 Generate full image name
 */}}
 {{- define "market-intelligence.image" -}}
-{{- $registry := default .Values.global.imageRegistry .Values.image.registry -}}
-{{- $repository := .repository -}}
-{{- $tag := default .Chart.AppVersion .tag -}}
+{{- $values := default dict .Values -}}
+{{- $global := default dict $values.global -}}
+{{- $image := default dict .image -}}
+{{- $registry := default "" (default $global.imageRegistry $image.registry) -}}
+{{- $repository := default "" .repository -}}
+{{- $appVersion := default "latest" (default "" (and $values.app $values.app.version)) -}}
+{{- $tag := default $appVersion (default "latest" .tag) -}}
 {{- if $registry -}}
 {{- printf "%s/%s:%s" $registry $repository $tag -}}
 {{- else -}}
 {{- printf "%s:%s" $repository $tag -}}
 {{- end -}}
 {{- end -}}
+

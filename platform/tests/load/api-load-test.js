@@ -45,7 +45,8 @@ export const options = {
 };
 
 // Configuration
-const BASE_URL = __ENV.API_URL || 'https://api.254carbon.ai';
+const BASE_URL = __ENV.API_URL || 'http://localhost:8000';
+const TEST_MODE = __ENV.TEST_MODE || 'local';
 const AUTH_TOKEN = __ENV.AUTH_TOKEN || 'test-token';
 
 // Test scenarios

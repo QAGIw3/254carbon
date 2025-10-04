@@ -1,0 +1,17 @@
+[
+  {
+    "dataset": "UNData",
+    "filter": "POP.A.WLD.A", 
+    "variable": "population",
+    "unit": "people",
+    "time_param": "time=2000-2025"
+  },
+  {
+    "dataset": "UNData",
+    "filter": "LIFE_EXP.A.WLD.A",
+    "variable": "life_exp_years",
+    "unit": "years",
+    "time_param": "time=2000-2025"
+  }
+]
+

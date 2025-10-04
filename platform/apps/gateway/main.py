@@ -18,7 +18,7 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 import uvicorn
@@ -43,12 +43,13 @@ from entitlements import check_entitlement
 from metrics import track_request, track_latency
 from stream import StreamManager
 from websocket_auth import verify_ws_token
-from cache import cache_response, CacheStrategy, cache_invalidate
+from cache import CacheStrategy, cache_invalidate, create_cache_decorator, start_cache_warmers_background, get_cache_manager
 from miso_endpoints import miso_router
-from report_service import run_scheduled_reports
+from report_service import create_report_router, run_scheduled_reports
 from alert_service import run_alert_monitoring
 from caiso_compliance import caiso_compliance_router
 from ux_optimization import add_ux_middleware, add_loading_metadata, create_progressive_response
+from graphql_schema import schema
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -66,10 +67,9 @@ async def lifespan(app: FastAPI):
     # Initialize database connections
     await get_postgres_pool()
 
-    # Warm cache for common endpoints
-    from cache import cache_manager
-    logger.info("Warming cache for common endpoints...")
-    await cache_manager.warm_all_cache()
+    # Start cache warming asynchronously without blocking startup
+    from cache import start_cache_warmers_background
+    start_cache_warmers_background(asyncio.get_running_loop())
 
     # Start background tasks for MISO pilot features
     logger.info("Starting MISO pilot background services...")
@@ -121,6 +121,9 @@ app.include_router(miso_router)
 
 # Include CAISO-specific endpoints
 app.include_router(caiso_compliance_router)
+
+# Include report endpoints
+app.include_router(create_report_router())
 
 # Add UX optimization middleware
 add_ux_middleware(app)
@@ -187,6 +190,82 @@ async def health_check():
         timestamp=datetime.utcnow(),
         services=services,
     )
+
+
+# GraphQL endpoints
+@app.get("/graphql")
+async def graphql_playground():
+    """GraphQL Playground for interactive queries."""
+    return JSONResponse(content={
+        "message": "GraphQL Playground available",
+        "endpoint": "/graphql",
+        "docs": "Use GraphQL queries at /graphql endpoint"
+    })
+
+
+@app.post("/graphql")
+@track_request
+@track_latency
+async def graphql_endpoint(request: dict):
+    """GraphQL endpoint with authentication and caching."""
+    try:
+        # Extract query from request
+        query = request.get("query")
+        variables = request.get("variables", {})
+        operation_name = request.get("operationName")
+
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+
+        # Execute GraphQL query
+        result = await schema.execute_async(
+            query,
+            variable_values=variables,
+            operation_name=operation_name,
+            context_value={"request": request}
+        )
+
+        # Handle errors
+        if result.errors:
+            logger.error(f"GraphQL errors: {result.errors}")
+            raise HTTPException(status_code=400, detail=str(result.errors[0]))
+
+        return JSONResponse(content=result.data)
+
+    except Exception as e:
+        logger.error(f"GraphQL execution error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.websocket("/graphql-ws")
+async def graphql_websocket(websocket: WebSocket):
+    """GraphQL WebSocket endpoint for subscriptions."""
+    await websocket.accept()
+
+    try:
+        while True:
+            # Receive subscription request
+            data = await websocket.receive_json()
+
+            # Handle subscription logic here
+            # This would integrate with the subscription resolvers
+
+            # Send initial response
+            await websocket.send_json({
+                "type": "connection_ack"
+            })
+
+            # Keep connection alive
+            while True:
+                await asyncio.sleep(30)
+                await websocket.send_json({
+                    "type": "ka"  # Keep alive
+                })
+
+    except WebSocketDisconnect:
+        logger.info("GraphQL WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"GraphQL WebSocket error: {e}")
 
 
 # Cache statistics endpoint (for monitoring)

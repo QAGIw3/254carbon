@@ -1,17 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-
-interface SurfacePoint { x: number; y: number; z: number }
 
 interface ForwardCurveSurfaceProps {
-  points?: SurfacePoint[];
   width?: number;
   height?: number;
 }
 
-export default function ForwardCurveSurface({ points = [], width = 800, height = 500 }: ForwardCurveSurfaceProps) {
+export default function ForwardCurveSurface({ width = 800, height = 500 }: ForwardCurveSurfaceProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -161,54 +157,47 @@ export default function ForwardCurveSurface({ points = [], width = 800, height =
   const toggleAutoRotate = () => setAutoRotate(!autoRotate);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>3D Forward Curve Surface (Three.js)</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="relative">
-          <div ref={containerRef} style={{ width, height }} />
+    <div className="relative">
+      <div ref={containerRef} style={{ width, height }} />
 
-          {/* Controls */}
-          <div className="flex gap-2 mt-4">
-            <button
-              className={`px-3 py-1 text-sm border rounded hover:bg-gray-50 ${wireframeMode ? 'bg-blue-50 border-blue-200' : ''}`}
-              onClick={toggleWireframe}
-            >
-              {wireframeMode ? 'Solid' : 'Wireframe'}
-            </button>
-            <button
-              className={`px-3 py-1 text-sm border rounded hover:bg-gray-50 ${autoRotate ? 'bg-green-50 border-green-200' : ''}`}
-              onClick={toggleAutoRotate}
-            >
-              {autoRotate ? 'Stop Rotation' : 'Auto Rotate'}
-            </button>
-            <button className="px-3 py-1 text-sm border rounded hover:bg-gray-50">
-              Reset View
-            </button>
+      {/* Controls */}
+      <div className="flex gap-2 mt-4">
+        <button
+          className={`px-3 py-1 text-sm border rounded hover:bg-gray-50 ${wireframeMode ? 'bg-blue-50 border-blue-200' : ''}`}
+          onClick={toggleWireframe}
+        >
+          {wireframeMode ? 'Solid' : 'Wireframe'}
+        </button>
+        <button
+          className={`px-3 py-1 text-sm border rounded hover:bg-gray-50 ${autoRotate ? 'bg-green-50 border-green-200' : ''}`}
+          onClick={toggleAutoRotate}
+        >
+          {autoRotate ? 'Stop Rotation' : 'Auto Rotate'}
+        </button>
+        <button className="px-3 py-1 text-sm border rounded hover:bg-gray-50">
+          Reset View
+        </button>
+      </div>
+
+      {/* Legend */}
+      <div className="mt-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span>Features:</span>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-blue-200 rounded"></div>
+            <span>Surface Height</span>
           </div>
-
-          {/* Legend */}
-          <div className="mt-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <span>Features:</span>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-blue-200 rounded"></div>
-                <span>Surface Height</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-gray-200 rounded"></div>
-                <span>Grid</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-red-200 rounded"></div>
-                <span>X-Axis</span>
-              </div>
-            </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-gray-200 rounded"></div>
+            <span>Grid</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-red-200 rounded"></div>
+            <span>X-Axis</span>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

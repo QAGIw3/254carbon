@@ -25,3 +25,4 @@ users:
         - "${cluster_name}"
         - "--region"
         - "us-east-1"
+

@@ -1,0 +1,26 @@
+[
+  {
+    "path": "electricity/retail-sales",
+    "variable": "retail_sales",
+    "unit": "GWh",
+    "frequency": "monthly",
+    "start": "2020-01",
+    "end": "2025-01",
+    "facets": {
+      "state": ["CA"]
+    },
+    "entity_fields": ["state"]
+  },
+  {
+    "path": "petroleum/pri/gnd",
+    "variable": "gasoline_price",
+    "unit": "USD/gal",
+    "frequency": "weekly",
+    "facets": {
+      "product": ["MGE"],
+      "area": ["PADD"]
+    },
+    "entity_fields": ["area", "product"]
+  }
+]
+

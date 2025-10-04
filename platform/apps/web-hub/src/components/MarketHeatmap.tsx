@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import * as d3 from 'd3';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
@@ -32,7 +32,7 @@ const MarketHeatmapComponent = ({
   const [isExporting, setIsExporting] = useState(false);
 
   const handleDrillDown = useCallback((region: string, market: string) => {
-    setSelectedCell({region, market});
+    setSelectedCell({ region, market });
     onDrillDown?.(region, market);
   }, [onDrillDown]);
 
@@ -100,25 +100,25 @@ const MarketHeatmapComponent = ({
           market
         };
 
-        // Choose color scale based on view mode
-        const colorScale = viewMode === 'price' ? priceScale : changeScale;
         const value = viewMode === 'price' ? cellData.price : cellData.change;
+        const fillColor = viewMode === 'price' ? priceScale(value) : changeScale(value);
 
         // Draw cell with enhanced styling and drill-down
-        const cell = g.append("rect")
+        g.append("rect")
           .attr("x", x)
           .attr("y", y)
           .attr("width", cellWidth - 2)
           .attr("height", cellHeight - 2)
-          .attr("fill", colorScale(value))
+          .attr("fill", fillColor)
           .attr("stroke", selectedCell?.region === region && selectedCell?.market === market ? "#333" : "#fff")
           .attr("stroke-width", selectedCell?.region === region && selectedCell?.market === market ? 3 : 1)
           .attr("rx", 4)
           .attr("cursor", "pointer")
           .style("filter", "drop-shadow(0 2px 4px rgba(0,0,0,0.1))")
           .on("click", () => onDrillDown(region, market))
-          .on("mouseover", function() {
-            d3.select(this)
+          .on("mouseover", function(event) {
+            const current = d3.select<SVGRectElement, unknown>(this);
+            current
               .transition()
               .duration(200)
               .attr("stroke-width", 3)
@@ -126,11 +126,12 @@ const MarketHeatmapComponent = ({
               .style("filter", "drop-shadow(0 4px 8px rgba(0,0,0,0.2))");
 
             if (showTooltips) {
-              showTooltip(d3.event, cellData, viewMode);
+              showTooltip(event as any, cellData, viewMode);
             }
           })
           .on("mouseout", function() {
-            d3.select(this)
+            const current = d3.select<SVGRectElement, unknown>(this);
+            current
               .transition()
               .duration(200)
               .attr("stroke-width", selectedCell?.region === region && selectedCell?.market === market ? 3 : 1)
@@ -170,7 +171,8 @@ const MarketHeatmapComponent = ({
     drawAxes(g, regions, markets, innerWidth, innerHeight);
 
     // Add legend
-    addLegend(g, priceScale, innerWidth, innerHeight);
+    const legendScale = viewMode === 'price' ? priceScale : changeScale;
+    addLegend(g, legendScale, innerWidth, innerHeight);
   };
 
   const drawAxes = (
@@ -239,45 +241,48 @@ const MarketHeatmapComponent = ({
       .attr("y", legendY - 10)
       .attr("font-size", "12px")
       .attr("font-weight", "bold")
-      .text("Price ($/MWh)");
+      .text(viewMode === 'price' ? "Price ($/MWh)" : "Change (%)");
 
     // Legend gradient
     const defs = g.append("defs");
+    const gradientId = viewMode === 'price' ? 'priceGradient' : 'changeGradient';
     const gradient = defs.append("linearGradient")
-      .attr("id", "priceGradient")
+      .attr("id", gradientId)
       .attr("x1", "0%")
       .attr("y1", "0%")
       .attr("x2", "100%")
       .attr("y2", "0%");
 
+    const gradientStart = colorScale.range()[0];
+    const gradientEnd = colorScale.range()[1];
+
     gradient.append("stop")
       .attr("offset", "0%")
-      .attr("stop-color", d3.interpolateRdYlBu(0));
+      .attr("stop-color", gradientStart);
 
     gradient.append("stop")
       .attr("offset", "100%")
-      .attr("stop-color", d3.interpolateRdYlBu(1));
+      .attr("stop-color", gradientEnd);
 
     g.append("rect")
       .attr("x", legendX)
       .attr("y", legendY)
       .attr("width", legendWidth)
       .attr("height", legendHeight)
-      .style("fill", "url(#priceGradient)");
+      .style("fill", `url(#${gradientId})`);
 
-    // Legend labels
     g.append("text")
       .attr("x", legendX)
       .attr("y", legendY + legendHeight + 15)
       .attr("font-size", "11px")
-      .text("$30");
+      .text(viewMode === 'price' ? "$30" : "-10%");
 
     g.append("text")
       .attr("x", legendX + legendWidth)
       .attr("y", legendY + legendHeight + 15)
       .attr("text-anchor", "end")
       .attr("font-size", "11px")
-      .text("$60");
+      .text(viewMode === 'price' ? "$60" : "10%");
   };
 
   const showTooltip = (event: MouseEvent, data: MarketData, viewMode: 'price' | 'change') => {
@@ -430,4 +435,4 @@ const MarketHeatmapComponent = ({
 };
 
 // Memoize component for performance
-export default React.memo(MarketHeatmapComponent);
+export default MarketHeatmapComponent;

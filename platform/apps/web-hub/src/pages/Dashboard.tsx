@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useWebSocketStore } from '../stores/websocketStore';
-import { api } from '../services/api';
+import { apiClient } from '../services/api';
 import PriceTicker from '../components/PriceTicker';
 import LivePriceChart from '../components/LivePriceChart';
 
 export default function Dashboard() {
-  const { data: health } = useQuery({
+  useQuery({
     queryKey: ['health'],
-    queryFn: () => api.get('/health').then(res => res.data),
+    queryFn: () => apiClient.get('/health').then(res => res.data),
   });
 
   const { isConnected, latestPrices } = useWebSocketStore();
@@ -37,7 +37,7 @@ export default function Dashboard() {
         />
 
         <LivePriceChart
-          instrumentIds={['MISO.HUB.INDIANA', 'PJM.HUB.WEST']}
+          defaultInstrumentIds={['MISO.HUB.INDIANA', 'PJM.HUB.WEST']}
           timeWindow={60}
         />
       </div>

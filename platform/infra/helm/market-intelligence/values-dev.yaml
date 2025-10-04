@@ -3,9 +3,31 @@
 app:
   environment: "development"
 
+global:
+  imageRegistry: ""
+
+serviceAccount:
+  create: false
+
+# Disable bundled ingress; local cluster uses standalone manifest
+ingress:
+  enabled: false
+  host: 254carbon.local
+
+ingress-nginx:
+  enabled: false
+
+cert-manager:
+  enabled: false
+
+external-secrets:
+  enabled: false
+
 # Reduced resource requirements for dev
 services:
   api-gateway:
+    image:
+      registry: ""
     replicas: 1
     resources:
       limits:
@@ -16,6 +38,8 @@ services:
         memory: 256Mi
 
   curve-service:
+    image:
+      registry: ""
     replicas: 1
     resources:
       limits:
@@ -26,6 +50,8 @@ services:
         memory: 512Mi
 
   scenario-engine:
+    image:
+      registry: ""
     replicas: 1
     resources:
       limits:
@@ -36,6 +62,8 @@ services:
         memory: 256Mi
 
   backtesting-service:
+    image:
+      registry: ""
     replicas: 1
     resources:
       limits:
@@ -46,6 +74,8 @@ services:
         memory: 256Mi
 
   download-center:
+    image:
+      registry: ""
     replicas: 1
     resources:
       limits:
@@ -56,6 +86,8 @@ services:
         memory: 128Mi
 
   web-hub:
+    image:
+      registry: ""
     replicas: 1
     resources:
       limits:
@@ -80,3 +112,4 @@ pdb:
 # Relaxed monitoring for dev
 monitoring:
   enabled: false
+

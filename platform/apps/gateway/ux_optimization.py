@@ -251,3 +251,4 @@ def add_ux_middleware(app):
     asyncio.create_task(monitor_slow_requests())
 
     logger.info("UX optimization middleware added to application")
+

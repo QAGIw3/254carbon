@@ -33,3 +33,4 @@ output "auth_token" {
   value       = var.auth_token
   sensitive   = true
 }
+

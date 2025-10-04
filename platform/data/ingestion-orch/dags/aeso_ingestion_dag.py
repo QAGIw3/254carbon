@@ -21,6 +21,7 @@ Auth & runtime configuration
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.models import Variable
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.utils.dates import days_ago
 
@@ -49,6 +50,8 @@ def run_aeso_pool_ingestion(**context):
         'data_type': 'POOL',
         'use_live_pool': True,  # Toggle live API
         'api_base': os.getenv('AESO_API_BASE', 'https://api.aeso.ca/report/v1'),
+        # Pass auth explicitly; connector also reads env
+        'bearer_token': os.getenv('AESO_BEARER_TOKEN', Variable.get('AESO_BEARER_TOKEN', default_var='')),
         'kafka_topic': 'power.ticks.v1',
         'kafka_bootstrap': 'kafka:9092',
     }
@@ -67,6 +70,7 @@ def run_aeso_ail_ingestion(**context):
         'data_type': 'AIL',
         'use_live_ail': True,  # Toggle live API
         'api_base': os.getenv('AESO_API_BASE', 'https://api.aeso.ca/report/v1'),
+        'bearer_token': os.getenv('AESO_BEARER_TOKEN', Variable.get('AESO_BEARER_TOKEN', default_var='')),
         'kafka_topic': 'power.load.v1',
         'kafka_bootstrap': 'kafka:9092',
     }

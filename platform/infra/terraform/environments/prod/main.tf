@@ -35,3 +35,4 @@ inputs = {
   # Domain
   domain_name = "254carbon.com"
 }
+

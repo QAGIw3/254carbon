@@ -18,11 +18,26 @@ class PDFGenerator:
         self.page_count = 0
 
     def render_html(self, template_name: str, context: Dict[str, Any]) -> str:
+        """Render a Jinja2 template to HTML.
+
+        Args:
+            template_name: Name of the template file.
+            context: Template context mapping.
+
+        Returns:
+            Rendered HTML string.
+        """
         template = self.env.get_template(template_name)
         return template.render(**context)
 
     def add_toc_item(self, title: str, level: int = 1, page: int = 1) -> None:
-        """Add an item to the table of contents."""
+        """Add an item to the table of contents.
+
+        Args:
+            title: Section title.
+            level: Hierarchy level (1=top).
+            page: Target page number.
+        """
         self.toc_items.append({
             "title": title,
             "level": level,
@@ -30,7 +45,11 @@ class PDFGenerator:
         })
 
     def generate_toc_html(self) -> str:
-        """Generate HTML for table of contents."""
+        """Generate HTML for table of contents.
+
+        Returns:
+            HTML fragment for TOC, or empty string if no items.
+        """
         if not self.toc_items:
             return ""
 
@@ -42,7 +61,15 @@ class PDFGenerator:
         return toc_html
 
     def to_pdf(self, html_content: str, options: Optional[Dict[str, Any]] = None) -> bytes:
-        """Generate PDF with advanced features."""
+        """Generate PDF with advanced features.
+
+        Args:
+            html_content: Full HTML string to render.
+            options: Optional WeasyPrint options mapping.
+
+        Returns:
+            Bytes of PDF; falls back to HTML bytes if WeasyPrint is unavailable.
+        """
         try:
             from weasyprint import HTML, CSS  # type: ignore
             from weasyprint.text.fonts import FontConfiguration  # type: ignore
@@ -78,6 +105,7 @@ class PDFGenerator:
         return html_doc.write_pdf(**pdf_options)
 
     def _generate_pdf_css(self) -> str:
+        """Return CSS string with page layout and typographic rules."""
         """Generate comprehensive CSS for PDF formatting."""
         return """
         @page {
@@ -334,5 +362,4 @@ class PDFGenerator:
             pointer-events: none;
         }
         """
-
 

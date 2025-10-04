@@ -1,0 +1,17 @@
+[
+  {
+    "dataset": "2020/dec/pl",
+    "variables": ["NAME", "P1_001N"],
+    "geo_for": "state:*",
+    "aliases": { "P1_001N": ["population", "people"] },
+    "entity_field": "NAME"
+  },
+  {
+    "dataset": "{year}/acs/acs1",
+    "variables": ["NAME", "B25001_001E"],
+    "geo_for": "state:*",
+    "aliases": { "B25001_001E": ["housing_units", "units"] },
+    "entity_field": "NAME"
+  }
+]
+

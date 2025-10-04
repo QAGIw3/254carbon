@@ -1,4 +1,4 @@
-{{- if .Values.ingress.enabled }}
+{{- if and (.Values.ingress) (.Values.ingress.enabled) }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -30,12 +30,12 @@ spec:
               service:
                 name: {{ include "market-intelligence.fullname" . }}-api-gateway
                 port:
-                  number: {{ .Values.services.api-gateway.port }}
+                  number: {{ index (index .Values.services "api-gateway") "port" }}
           - path: /
             pathType: Prefix
             backend:
               service:
                 name: {{ include "market-intelligence.fullname" . }}-web-hub
                 port:
-                  number: {{ .Values.services.web-hub.port }}
+                  number: {{ index (index .Values.services "web-hub") "port" }}
 {{- end }}

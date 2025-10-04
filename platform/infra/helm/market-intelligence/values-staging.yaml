@@ -83,3 +83,4 @@ pdb:
 # Enable monitoring for staging
 monitoring:
   enabled: true
+

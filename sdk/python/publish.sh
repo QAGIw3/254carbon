@@ -37,3 +37,4 @@ echo "   - Or use 'twine upload dist/*' manually"
 
 echo "✅ Build complete! Ready for PyPI publishing."
 echo "   To publish: twine upload dist/*"
+

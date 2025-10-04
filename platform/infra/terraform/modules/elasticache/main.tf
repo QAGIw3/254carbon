@@ -120,3 +120,4 @@ resource "aws_elasticache_parameter_group" "this" {
 
   tags = local.tags
 }
+

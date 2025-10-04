@@ -1,0 +1,4 @@
+kafka-python==2.0.2
+clickhouse-driver==0.2.7
+ujson==5.10.0
+

@@ -1,10 +1,10 @@
 """
 Intelligent Redis caching layer for API Gateway with adaptive TTL and cache warming.
 """
-import logging
-import json
-import hashlib
 import asyncio
+import json
+import logging
+import hashlib
 from typing import Optional, Any, Dict, List, Callable
 from datetime import timedelta, datetime
 from enum import Enum
@@ -460,22 +460,52 @@ async def warm_curve_metadata_cache():
 
 
 # Register cache warming functions
-def initialize_cache_warming():
-    """Initialize cache warming for common endpoints."""
-    cache_manager.register_warm_function("instruments", warm_instruments_cache)
-    cache_manager.register_warm_function("markets", warm_markets_cache)
-    cache_manager.register_warm_function("curves", warm_curve_metadata_cache)
+cache_manager_instance: Optional[CacheManager] = None
 
+
+def _register_warm_functions(manager: CacheManager) -> None:
+    manager.register_warm_function("instruments", warm_instruments_cache)
+    manager.register_warm_function("markets", warm_markets_cache)
+    manager.register_warm_function("curves", warm_curve_metadata_cache)
     logger.info("Cache warming functions registered")
 
 
-# Initialize cache warming on module import
-initialize_cache_warming()
+def get_cache_manager() -> CacheManager:
+    global cache_manager_instance
+    if cache_manager_instance is None:
+        cache_manager_instance = CacheManager(
+            redis_url="redis://redis:6379",
+            max_connections=20,
+            retry_on_timeout=True,
+        )
+        _register_warm_functions(cache_manager_instance)
+    return cache_manager_instance
 
 
-# Global cache manager instance with enhanced configuration
-cache_manager = CacheManager(
-    redis_url="redis://redis-cluster:6379",
-    max_connections=20,
-    retry_on_timeout=True,
-)
+def start_cache_warmers_background(loop: asyncio.AbstractEventLoop) -> None:
+    async def _warm_with_retry() -> None:
+        manager = get_cache_manager()
+        while True:
+            try:
+                await manager.warm_all_cache()
+                break
+            except Exception as exc:
+                logger.warning("Cache warming failed: %s. Retrying in 10s", exc)
+                await asyncio.sleep(10)
+
+    loop.create_task(_warm_with_retry())
+
+
+def create_cache_decorator(prefix: str, strategy: CacheStrategy = CacheStrategy.DYNAMIC):
+    manager = get_cache_manager()
+    def decorator(func):
+        async def wrapper(*args, **kwargs):
+            cache_key = manager._generate_key(prefix, **kwargs)
+            cached_value = await manager.get_with_strategy(cache_key, strategy)
+            if cached_value is not None:
+                return cached_value
+            result = await func(*args, **kwargs)
+            await manager.set_with_strategy(cache_key, result, strategy)
+            return result
+        return wrapper
+    return decorator

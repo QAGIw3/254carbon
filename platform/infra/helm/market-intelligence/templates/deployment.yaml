@@ -14,18 +14,17 @@ spec:
   replicas: {{ if $.Values.blueGreen.enabled }}{{ if eq $.Values.blueGreen.primaryColor "blue" }}{{ $serviceConfig.replicas }}{{ else }}0{{ end }}{{ else }}{{ $serviceConfig.replicas }}{{ end }}
   selector:
     matchLabels:
-      {{- include "market-intelligence.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/name: {{ include "market-intelligence.name" $ }}
       app.kubernetes.io/component: {{ $serviceName }}
       app.kubernetes.io/color: blue
   template:
     metadata:
       labels:
-        {{- include "market-intelligence.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/name: {{ include "market-intelligence.name" $ }}
         app.kubernetes.io/component: {{ $serviceName }}
         app.kubernetes.io/color: blue
-        app.kubernetes.io/instance: {{ $.Release.Name }}-{{ $serviceName }}-blue
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+        checksum/config: ""
     spec:
       {{- if $.Values.global.imagePullSecrets }}
       imagePullSecrets:
@@ -36,7 +35,7 @@ spec:
       {{- end }}
       containers:
         - name: {{ $serviceName }}
-          image: {{ include "market-intelligence.image" (dict "repository" $serviceConfig.image.repository "tag" $serviceConfig.image.tag "Values" $) }}
+          image: {{ include "market-intelligence.image" (dict "Values" $ "image" $serviceConfig.image "repository" $serviceConfig.image.repository "tag" $serviceConfig.image.tag) }}
           imagePullPolicy: {{ $serviceConfig.image.pullPolicy }}
           ports:
             - name: http
@@ -85,18 +84,17 @@ spec:
   replicas: {{ if $.Values.blueGreen.enabled }}{{ if eq $.Values.blueGreen.primaryColor "green" }}{{ $serviceConfig.replicas }}{{ else }}0{{ end }}{{ else }}0{{ end }}
   selector:
     matchLabels:
-      {{- include "market-intelligence.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/name: {{ include "market-intelligence.name" $ }}
       app.kubernetes.io/component: {{ $serviceName }}
       app.kubernetes.io/color: green
   template:
     metadata:
       labels:
-        {{- include "market-intelligence.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/name: {{ include "market-intelligence.name" $ }}
         app.kubernetes.io/component: {{ $serviceName }}
         app.kubernetes.io/color: green
-        app.kubernetes.io/instance: {{ $.Release.Name }}-{{ $serviceName }}-green
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+        checksum/config: ""
     spec:
       {{- if $.Values.global.imagePullSecrets }}
       imagePullSecrets:
@@ -107,7 +105,7 @@ spec:
       {{- end }}
       containers:
         - name: {{ $serviceName }}
-          image: {{ include "market-intelligence.image" (dict "repository" $serviceConfig.image.repository "tag" $serviceConfig.image.tag "Values" $) }}
+          image: {{ include "market-intelligence.image" (dict "Values" $ "image" $serviceConfig.image "repository" $serviceConfig.image.repository "tag" $serviceConfig.image.tag) }}
           imagePullPolicy: {{ $serviceConfig.image.pullPolicy }}
           ports:
             - name: http
@@ -143,3 +141,4 @@ spec:
       {{- end }}
 {{- end }}
 {{- end }}
+

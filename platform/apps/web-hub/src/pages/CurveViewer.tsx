@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ForwardCurve3D from '../components/ForwardCurve3D';
 import MarketHeatmap from '../components/MarketHeatmap';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';

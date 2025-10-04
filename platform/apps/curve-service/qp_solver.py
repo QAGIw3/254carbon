@@ -71,14 +71,15 @@ def smooth_curve(
     ]
 
     # Add tenor reconciliation constraints (monthly → quarterly → annual)
-    # This ensures consistency across different contract tenors
-    if T >= 12:  # Need at least 12 months for quarterly constraints
-        # Quarterly averages should be consistent with monthly prices
-        quarterly_indices = np.arange(2, T, 3)  # Every 3rd month starting from month 3
+    # This encourages local quarterly consistency by tying the end-of-quarter
+    # month to the average of the preceding two months within that quarter.
+    # Note: we only need 3 months to apply the constraint.
+    if T >= 3:
+        quarterly_indices = np.arange(2, T, 3)  # 3rd, 6th, 9th, ... months (0-based)
         for i in quarterly_indices:
-            if i + 2 < T:  # Ensure we have 3 months for the quarter
-                # Average of months i-2, i-1, i should equal month i
-                constraints.append(p[i] == (p[i-2] + p[i-1] + p[i]) / 3)
+            # Use the mathematically equivalent, clearer form:
+            # p[i] == (p[i-1] + p[i-2]) / 2
+            constraints.append(p[i] == (p[i-1] + p[i-2]) / 2)
 
     # Annual constraints (if we have enough data)
     if T >= 12:
@@ -248,4 +249,3 @@ def optimize_curve_with_tenor_reconciliation(
         results['annual'] = annual_prices
 
     return results
-

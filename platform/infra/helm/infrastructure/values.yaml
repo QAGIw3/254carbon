@@ -145,6 +145,156 @@ airflow:
     enabled: true
   redis:
     enabled: false
+  env:
+    - name: KAFKA_BOOTSTRAP
+      value: kafka:9092
+    - name: NOAA_CDO_API_BASE
+      value: https://www.ncdc.noaa.gov/cdo-web/api/v2
+    - name: WB_API_BASE
+      value: https://api.worldbank.org/v2
+    - name: NOAA_CDO_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: noaa-cdo-token
+          key: token
+    - name: AESO_BEARER_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: aeso-api-credentials
+          key: bearer-token
+    # ERA5 defaults (can be overridden by Airflow Variables)
+    - name: ERA5_DATASET
+      value: reanalysis-era5-single-levels
+    - name: ERA5_VARIABLES
+      value: "2m_temperature,10m_u_component_of_wind,10m_v_component_of_wind,total_precipitation"
+    - name: ERA5_AREA
+      value: ""  # format: N,W,S,E (e.g., 50,-130,25,-65)
+    - name: ERA5_HOURS
+      value: ""  # csv HH:MM list; default is all 24 hours when empty
+    - name: ERA5_LATITUDE
+      value: ""
+    - name: ERA5_LONGITUDE
+      value: ""
+    - name: ERA5_SCHEDULE
+      value: "0 3 * * *"
+    - name: ERA5_BACKFILL_START
+      value: ""
+    - name: ERA5_BACKFILL_END
+      value: ""
+    - name: ERA5_BACKFILL_CHUNK_DAYS
+      value: "1"
+    - name: CDS_URL
+      value: https://cds.climate.copernicus.eu/api/v2
+    - name: CDS_KEY
+      value: ""  # prefer ~/.cdsapirc or set via Airflow Variable
+    # Copernicus CDS defaults (can be overridden by Airflow Variables)
+    - name: CDS_DATASET
+      value: reanalysis-era5-single-levels
+    - name: CDS_VARIABLES
+      value: "2m_temperature,10m_u_component_of_wind,10m_v_component_of_wind,total_precipitation"
+    - name: CDS_AREA
+      value: ""  # format: N,W,S,E (e.g., 50,-130,25,-65)
+    - name: CDS_HOURS
+      value: ""  # csv HH:MM list; default all 24h when empty
+    - name: CDS_LATITUDE
+      value: ""
+    - name: CDS_LONGITUDE
+      value: ""
+    - name: CDS_SCHEDULE
+      value: "0 4 * * *"
+    - name: CDS_BACKFILL_START
+      value: ""
+    - name: CDS_BACKFILL_END
+      value: ""
+    - name: CDS_BACKFILL_CHUNK_DAYS
+      value: "1"
+    - name: WB_COUNTRY
+      value: WLD
+    - name: WB_ENERGY_INDICATORS
+      value: EG.USE.PCAP.KG.OE,EG.ELC.ACCS.ZS
+    - name: WB_ECON_INDICATORS
+      value: NY.GDP.PCAP.CD,FP.CPI.TOTL.ZG
+    - name: WB_START_YEAR
+      value: "2010"
+    - name: WB_END_YEAR
+      value: "2025"
+    - name: NOAA_CDO_LIMIT
+      value: "1000"
+    # EIA defaults
+    - name: EIA_API_BASE
+      value: https://api.eia.gov/v2
+    - name: EIA_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: eia-api-credentials
+          key: api-key
+    - name: EIA_SCHEDULE
+      value: "@weekly"
+    - name: EIA_DATASETS
+      value: ""  # csv list of dataset paths
+    - name: EIA_QUERIES
+      value: ""  # JSON array of advanced query specs
+    - name: EIA_BACKFILL_START
+      value: ""
+    - name: EIA_BACKFILL_END
+      value: ""
+    - name: EIA_BACKFILL_STEP_MONTHS
+      value: "6"
+    # ENTSO-E defaults
+    - name: ENTSOE_API_BASE
+      value: https://web-api.tp.entsoe.eu
+    - name: ENTSOE_SECURITY_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: entsoe-api-credentials
+          key: security-token
+    - name: ENTSOE_SCHEDULE
+      value: "0 5 * * *"
+    - name: ENTSOE_AREA
+      value: 10Y1001A1001A83F
+    - name: ENTSOE_OUT_AREA
+      value: ""
+    - name: ENTSOE_MODES
+      value: load,generation
+    - name: ENTSOE_PERIOD_START
+      value: ""
+    - name: ENTSOE_PERIOD_END
+      value: ""
+    - name: ENTSOE_BACKFILL_START
+      value: ""
+    - name: ENTSOE_BACKFILL_END
+      value: ""
+    - name: ENTSOE_BACKFILL_STEP_HOURS
+      value: "24"
+    - name: ENTSOE_AREA_NAMES
+      value: ""  # JSON mapping of EIC → friendly names
+    # Open Infrastructure Map defaults
+    - name: OIM_SCHEDULE
+      value: "@weekly"
+    - name: OIM_OVERPASS_URL
+      value: https://overpass-api.de/api/interpreter
+    - name: OIM_BBOX
+      value: ""  # south,west,north,east
+    - name: OIM_AREA_ID
+      value: ""  # OSM area id
+    - name: OIM_REGION_NAME
+      value: WORLD
+    # US Census defaults
+    - name: CENSUS_API_BASE
+      value: https://api.census.gov/data
+    - name: CENSUS_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: census-api-credentials
+          key: api-key
+    - name: CENSUS_SCHEDULE
+      value: "@monthly"
+    - name: CENSUS_QUERIES
+      value: ""  # JSON array of query specs
+    - name: CENSUS_BACKFILL_START_YEAR
+      value: "2010"
+    - name: CENSUS_BACKFILL_END_YEAR
+      value: "2025"
   webserver:
     defaultUser:
       enabled: true
@@ -154,4 +304,3 @@ airflow:
     requests:
       memory: "1Gi"
       cpu: "500m"
-

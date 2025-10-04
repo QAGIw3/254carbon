@@ -48,6 +48,41 @@ class ERCOTConnector(Ingestor):
             "streams": [
                 {
                     "name": "spp_realtime",
+                    "description": "Settlement Point Prices (SPP) - Real-time",
+                    "frequency": "5min",
+                    "data_points": "~1000 nodes",
+                    "endpoint": "/np4-181-cd/spp_realtime"
+                },
+                {
+                    "name": "spp_day_ahead",
+                    "description": "Settlement Point Prices (SPP) - Day-ahead",
+                    "frequency": "hourly",
+                    "data_points": "~1000 nodes",
+                    "endpoint": "/np4-181-cd/spp_day_ahead"
+                },
+                {
+                    "name": "hub_prices",
+                    "description": "Hub Prices (HB_HOUSTON, HB_NORTH, HB_SOUTH, HB_WEST)",
+                    "frequency": "5min",
+                    "data_points": "4 hubs",
+                    "endpoint": "/np4-181-cd/hub_prices"
+                },
+                {
+                    "name": "ordc_adders",
+                    "description": "Operating Reserve Demand Curve (ORDC) Adders",
+                    "frequency": "5min",
+                    "data_points": "system-wide",
+                    "endpoint": "/np4-181-cd/ordc_adders"
+                },
+                {
+                    "name": "resource_telemetry",
+                    "description": "Resource-specific telemetry data",
+                    "frequency": "5min",
+                    "data_points": "~500 resources",
+                    "endpoint": "/np4-181-cd/resource_telemetry"
+                }
+            ]
+        }
                     "market": "power",
                     "product": "lmp",
                     "update_freq": "15min",  # ERCOT uses 15-min intervals

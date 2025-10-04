@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import ForwardCurveSurface from './Three/ForwardCurveSurface';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -30,7 +30,7 @@ export default function ForwardCurve3D({
 
   const draw3DCurveSurface = (
     svg: SVGSVGElement,
-    curveData: CurvePoint[][],
+    _curveData: CurvePoint[][],
     width: number,
     height: number
   ) => {
@@ -51,22 +51,21 @@ export default function ForwardCurve3D({
     // Sample data for 3D surface visualization
     const sampleData = generateSampleSurfaceData();
 
-    // Create scales
     const xScale = d3.scaleLinear()
-      .domain([0, 10])
+      .domain(d3.extent(sampleData, d => d.x) as [number, number])
       .range([0, innerWidth]);
 
     const yScale = d3.scaleLinear()
-      .domain([0, 10])
+      .domain(d3.extent(sampleData, d => d.y) as [number, number])
       .range([innerHeight, 0]);
 
     const zScale = d3.scaleLinear()
-      .domain([0, 1])
+      .domain(d3.extent(sampleData, d => Math.abs(d.z)) as [number, number])
       .range([0, 50]);
 
     // Create color scale
     const colorScale = d3.scaleSequential(d3.interpolateViridis)
-      .domain([0, 1]);
+      .domain(d3.extent(sampleData, d => d.z) as [number, number]);
 
     // Draw 3D surface using rectangles for simplicity
     const gridSize = 20;
@@ -96,7 +95,7 @@ export default function ForwardCurve3D({
     }
 
     // Draw axes
-    draw3DAxes(g, xScale, yScale, innerWidth, innerHeight);
+    draw3DAxes(g, innerWidth, innerHeight);
 
     // Draw labels
     g.append("text")
@@ -125,8 +124,6 @@ export default function ForwardCurve3D({
 
   const draw3DAxes = (
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
-    xScale: d3.ScaleLinear<number, number>,
-    yScale: d3.ScaleLinear<number, number>,
     width: number,
     height: number
   ) => {
