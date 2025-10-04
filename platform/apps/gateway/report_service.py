@@ -11,6 +11,11 @@ import json
 from fastapi import BackgroundTasks, APIRouter, Depends, HTTPException
 from jinja2 import Template
 
+# Add required imports for auth, metrics, and entitlements
+from auth import verify_token
+from metrics import track_request
+from entitlements import check_entitlement
+
 import sys
 import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
