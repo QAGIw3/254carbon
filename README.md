@@ -205,17 +205,35 @@ class MyConnector(Ingestor):
 
 ### Implemented Connectors
 
+**North America:**
 - **MISO**: Real-time and day-ahead LMP data
 - **CAISO**: Hub-only data with entitlement restrictions (pilot)
-- **PJM**, **ERCOT**, **NYISO**: North American ISOs
+- **PJM**, **ERCOT**, **NYISO**: US ISOs
+- **AESO**: Alberta pool price and demand ✨ NEW
+- **IESO**: Ontario HOEP and generation mix ✨ NEW
+
+**Europe:**
 - **EPEX**, **Nord Pool**: European power exchanges
-- See `/platform/data/connectors/` for complete list
+- **ENTSOE**: Pan-European transparency platform
+
+**APAC:**
+- **NEM**: Australian 5-region spot market ✨ NEW
+- **JEPX**: Japan Electric Power Exchange
+
+**Latin America:**
+- **Brazil ONS**: PLD prices and hydro reservoirs ✨ NEW
+
+See `/platform/data/connectors/` for complete list
 
 ### Orchestration
 
 Airflow DAGs schedule connector runs with data quality checks:
 - `/platform/data/ingestion-orch/dags/miso_ingestion_dag.py`
 - `/platform/data/ingestion-orch/dags/caiso_ingestion_dag.py`
+- `/platform/data/ingestion-orch/dags/aeso_ingestion_dag.py`
+- `/platform/data/ingestion-orch/dags/ieso_ingestion_dag.py` ✨ NEW
+- `/platform/data/ingestion-orch/dags/nem_ingestion_dag.py` ✨ NEW
+- `/platform/data/ingestion-orch/dags/brazil_ons_ingestion_dag.py` ✨ NEW
 
 ---
 

@@ -85,4 +85,6 @@ output "kubeconfig" {
   value       = module.eks.kubeconfig
   sensitive   = true
 }
-
+# Public outputs for downstream tooling and operators
+#
+# Keep secrets out of outputs; prefer using secret managers

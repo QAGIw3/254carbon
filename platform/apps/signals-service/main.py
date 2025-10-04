@@ -11,7 +11,11 @@ from enum import Enum
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
+
+# Prometheus metrics
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,6 +24,31 @@ app = FastAPI(
     title="Trading Signals Service",
     description="Algorithmic trading signals and FIX integration",
     version="1.0.0",
+)
+
+# Prometheus metrics
+signals_generated_total = Counter(
+    'signals_generated_total',
+    'Total trading signals generated',
+    ['strategy', 'signal_type', 'instrument_id']
+)
+
+signal_confidence = Histogram(
+    'signal_confidence',
+    'Trading signal confidence distribution',
+    ['strategy']
+)
+
+backtest_total = Counter(
+    'backtest_total',
+    'Total backtests executed',
+    ['strategy']
+)
+
+fix_orders_sent = Counter(
+    'fix_orders_sent',
+    'Total FIX orders sent',
+    ['instrument_id', 'side', 'order_type']
 )
 
 
@@ -453,6 +482,12 @@ async def health():
     return {"status": "healthy"}
 
 
+@app.get("/metrics")
+async def get_metrics():
+    """Prometheus metrics endpoint."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
 @app.post("/api/v1/signals/generate", response_model=TradingSignal)
 async def generate_signal(
     strategy: Strategy,
@@ -478,6 +513,15 @@ async def generate_signal(
             instrument_id,
             market_data
         )
+        
+        # Track metrics
+        signals_generated_total.labels(
+            strategy=strategy.value,
+            signal_type=signal.signal_type.value,
+            instrument_id=instrument_id
+        ).inc()
+        
+        signal_confidence.labels(strategy=strategy.value).observe(signal.confidence)
         
         logger.info(f"Generated {signal.signal_type} signal for {instrument_id}")
         
@@ -518,6 +562,9 @@ async def backtest_strategy(request: BacktestRequest):
             worst_trade=-5.8,
         )
         
+        # Track metrics
+        backtest_total.labels(strategy=request.strategy.value).inc()
+        
         return result
         
     except Exception as e:
@@ -548,6 +595,13 @@ async def send_fix_order(order: FIXOrder):
     
     if order.price:
         fix_message["44"] = str(order.price)  # Price
+    
+    # Track metrics
+    fix_orders_sent.labels(
+        instrument_id=order.instrument_id,
+        side=order.side,
+        order_type=order.order_type
+    ).inc()
     
     return {
         "status": "sent",

@@ -1,0 +1,305 @@
+{
+  "dashboard": {
+    "title": "New Services Performance Dashboard",
+    "tags": ["performance", "new-services", "lmp", "signals", "marketplace", "ml"],
+    "timezone": "UTC",
+    "schemaVersion": 36,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "LMP Decomposition Service - Request Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{service=\"lmp-decomposition-service\"}[5m])",
+            "legendFormat": "{{method}} {{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"label": "Requests/sec"}, {}],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "nullPointMode": "null"
+      },
+      {
+        "id": 2,
+        "title": "LMP Decomposition Service - Latency (p95)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=\"lmp-decomposition-service\"}[5m]))",
+            "legendFormat": "{{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"label": "Latency (ms)", "format": "ms"}, {}],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "nullPointMode": "null",
+        "alert": {
+          "name": "LMP Decomposition High Latency",
+          "conditions": [
+            {
+              "evaluator": {"type": "gt", "params": [300]},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"type": "avg"}
+            }
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "title": "Trading Signals Service - Signal Generation Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(signals_generated_total{service=\"signals-service\"}[5m])",
+            "legendFormat": "{{strategy}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"label": "Signals/sec"}, {}],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "nullPointMode": "null"
+      },
+      {
+        "id": 4,
+        "title": "Trading Signals - Confidence Distribution",
+        "type": "heatmap",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(signal_confidence_bucket{service=\"signals-service\"}[5m]))",
+            "legendFormat": "{{strategy}}",
+            "refId": "A"
+          }
+        ],
+        "dataFormat": "tsbuckets",
+        "yAxis": {"format": "short"},
+        "cards": {"cardPadding": 2},
+        "color": {"mode": "spectrum", "colorScheme": "interpolateRdYlGn"}
+      },
+      {
+        "id": 5,
+        "title": "ML Service - Transformer Model Performance",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "ml_model_mape{model_type=\"transformer\"}",
+            "legendFormat": "{{instrument_id}} MAPE",
+            "refId": "A"
+          },
+          {
+            "expr": "ml_model_rmse{model_type=\"transformer\"}",
+            "legendFormat": "{{instrument_id}} RMSE",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [{"label": "Error Metric"}, {}],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "nullPointMode": "null"
+      },
+      {
+        "id": 6,
+        "title": "ML Service - Forecast Generation Latency",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(ml_forecast_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{model_type}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"label": "Latency (ms)", "format": "ms"}, {}],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "nullPointMode": "null"
+      },
+      {
+        "id": 7,
+        "title": "Marketplace Service - Active Partners",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 24, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "marketplace_active_partners",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "justifyMode": "auto",
+          "textMode": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 10, "color": "yellow"},
+                {"value": 50, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Marketplace Service - API Call Volume",
+        "type": "graph",
+        "gridPos": {"x": 6, "y": 24, "w": 18, "h": 4},
+        "targets": [
+          {
+            "expr": "rate(marketplace_api_calls_total[5m])",
+            "legendFormat": "{{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"label": "Calls/sec"}, {}],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "nullPointMode": "null"
+      },
+      {
+        "id": 9,
+        "title": "Cache Hit Rate (All Services)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(cache_hits_total[5m]) / (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m]))",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"label": "Hit Rate", "format": "percentunit", "max": 1}, {}],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "nullPointMode": "null",
+        "alert": {
+          "name": "Low Cache Hit Rate",
+          "conditions": [
+            {
+              "evaluator": {"type": "lt", "params": [0.7]},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "10m", "now"]},
+              "reducer": {"type": "avg"}
+            }
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "title": "Error Rate by Service",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+            "legendFormat": "{{service}} - {{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"label": "Errors/sec"}, {}],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "nullPointMode": "null",
+        "alert": {
+          "name": "High Error Rate",
+          "conditions": [
+            {
+              "evaluator": {"type": "gt", "params": [0.01]},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"type": "avg"}
+            }
+          ]
+        }
+      },
+      {
+        "id": 11,
+        "title": "ClickHouse Query Performance",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 36, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(clickhouse_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{table}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"label": "Query Time (ms)", "format": "ms"}, {}],
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "nullPointMode": "null"
+      },
+      {
+        "id": 12,
+        "title": "New Connector Data Freshness",
+        "type": "table",
+        "gridPos": {"x": 12, "y": 36, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "time() - max(connector_last_run_timestamp{connector=~\"ieso|nem|brazil_ons\"}) by (connector)",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"Time": true},
+              "indexByName": {},
+              "renameByName": {
+                "connector": "Connector",
+                "Value": "Seconds Since Last Run"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "label": "Service",
+          "type": "query",
+          "query": "label_values(http_requests_total, service)",
+          "multi": true,
+          "includeAll": true
+        }
+      ]
+    },
+    "time": {"from": "now-6h", "to": "now"},
+    "timepicker": {
+      "refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m"],
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+    }
+  }
+}
+

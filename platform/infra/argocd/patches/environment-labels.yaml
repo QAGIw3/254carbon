@@ -26,4 +26,4 @@
       path: /metadata/labels
       value:
         environment: production
-
+# Patch template to inject environment labels/annotations across ArgoCD apps

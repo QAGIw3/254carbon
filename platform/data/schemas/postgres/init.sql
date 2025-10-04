@@ -189,4 +189,5 @@ ON CONFLICT (tenant_id, product, market) DO NOTHING;
 INSERT INTO pg.entitlement_product (tenant_id, market, product, channels, seats) VALUES
     ('pilot_caiso', 'power', 'lmp', '{"hub": true, "api": false, "downloads": true}'::jsonb, 3)
 ON CONFLICT (tenant_id, product, market) DO NOTHING;
-
+-- PostgreSQL initialization script for market_intelligence database
+-- Creates core schemas, tables, and indexes used by platform services

@@ -38,4 +38,5 @@ WHERE tenant_id = 'pilot_caiso';
 
 -- Create sample CAISO users for UAT
 -- NOTE: Actual users will be created in Keycloak and mapped to tenant_id
-
+-- CAISO entitlement support tables and views
+-- Restricts data subsets by trading hubs and pilots

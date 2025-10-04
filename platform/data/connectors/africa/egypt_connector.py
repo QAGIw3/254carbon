@@ -5,6 +5,10 @@ Egyptian Electricity Holding Company (EEHC) unified grid:
 - Suez wind corridor
 - Natural gas dependency
 - Growing solar capacity
+
+Data Flow
+---------
+EEHC feeds (or mocks) → normalize (EGP/MWh, EET→UTC) → canonical schema → Kafka
 """
 import logging
 from datetime import datetime, timedelta
@@ -112,6 +116,5 @@ class EgyptConnector(Ingestor):
 if __name__ == "__main__":
     connector = EgyptConnector({"source_id": "egypt_eehc"})
     connector.run()
-
 
 

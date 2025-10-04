@@ -19,4 +19,4 @@ CREATE TABLE IF NOT EXISTS pg.backtest_results (
 CREATE INDEX IF NOT EXISTS idx_backtest_instrument ON pg.backtest_results(instrument_id, forecast_date DESC);
 CREATE INDEX IF NOT EXISTS idx_backtest_created ON pg.backtest_results(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_backtest_scenario ON pg.backtest_results(scenario_id, forecast_date DESC);
-
+-- Backtesting schema objects for storing results and metrics

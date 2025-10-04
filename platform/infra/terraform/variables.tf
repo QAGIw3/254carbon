@@ -109,4 +109,6 @@ variable "ssl_certificate_arn" {
   type        = string
   default     = ""
 }
-
+# Shared input variables for the root Terraform module
+#
+# Environment-specific defaults live under environments/<env>/main.tf

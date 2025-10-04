@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signals-service
+  namespace: market-intelligence
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: signals-service
+  template:
+    metadata:
+      labels:
+        app: signals-service
+    spec:
+      containers:
+      - name: signals-service
+        image: 254carbon/signals-service:latest
+        ports:
+        - containerPort: 8016
+        env:
+        - name: CLICKHOUSE_HOST
+          value: "clickhouse"
+        - name: CLICKHOUSE_PORT
+          value: "9000"
+        - name: POSTGRES_HOST
+          value: "postgresql"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "market_intelligence"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: password
+        - name: REDIS_HOST
+          value: "redis"
+        - name: REDIS_PORT
+          value: "6379"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8016
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8016
+          initialDelaySeconds: 60
+          periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: signals-service
+  namespace: market-intelligence
+spec:
+  selector:
+    app: signals-service
+  ports:
+  - port: 8016
+    targetPort: 8016
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: signals-service-hpa
+  namespace: market-intelligence
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: signals-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+

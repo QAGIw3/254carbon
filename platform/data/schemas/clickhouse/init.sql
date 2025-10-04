@@ -150,4 +150,5 @@ FROM (
 )
 WHERE predicted_price IS NOT NULL
 GROUP BY date, market;
-
+-- ClickHouse initialization script for analytics tables
+-- Defines engines, partitions, ordering keys for performance

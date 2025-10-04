@@ -14,3 +14,6 @@ stripe==7.9.0
 
 # ORM/DB toolkit for future migration from in‑memory storage to PostgreSQL
 sqlalchemy==2.0.25
+
+# Prometheus metrics export for observability
+prometheus-client==0.19.0

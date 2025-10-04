@@ -54,3 +54,5 @@ spec:
   - port: 8080
     targetPort: 8080
   type: ClusterIP
+# Keycloak identity provider deployment
+# - Manages authentication/authorization for the platform

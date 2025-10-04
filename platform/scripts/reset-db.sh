@@ -1,4 +1,5 @@
 #!/bin/bash
+# Reset local databases (PostgreSQL and ClickHouse) for a clean slate
 
 # 254Carbon Platform - Database Reset Script
 # WARNING: This will delete all data and reinitialize the databases

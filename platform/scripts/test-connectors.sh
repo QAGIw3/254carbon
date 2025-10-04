@@ -1,4 +1,5 @@
 #!/bin/bash
+# Smoke test selected connectors in local/dev mode
 
 # 254Carbon Platform - Connector Testing Script
 # Validates that data connectors are working correctly

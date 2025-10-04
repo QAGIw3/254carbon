@@ -7,6 +7,10 @@ Portal: https://cds.climate.copernicus.eu/
 Live mode uses cdsapi to download NetCDF (e.g., ERA5 single levels) and parse
 hourly series for canonical variables such as t2m (C), 10m wind (m/s), and
 precipitation (mm). Falls back to safe mocks when cdsapi/netCDF4 are missing.
+
+Data Flow
+---------
+CDS API → NetCDF download → parse variables → canonical series → Kafka
 """
 import logging
 import time

@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fundamental-models
+  namespace: market-intelligence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fundamental-models
+  template:
+    metadata:
+      labels:
+        app: fundamental-models
+    spec:
+      containers:
+      - name: fundamental-models
+        image: 254carbon/fundamental-models:latest
+        ports:
+        - containerPort: 8031
+        env:
+        - name: CLICKHOUSE_HOST
+          value: "clickhouse"
+        - name: CLICKHOUSE_PORT
+          value: "9000"
+        - name: POSTGRES_HOST
+          value: "postgresql"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "market_intelligence"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: password
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8031
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8031
+          initialDelaySeconds: 60
+          periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fundamental-models
+  namespace: market-intelligence
+spec:
+  selector:
+    app: fundamental-models
+  ports:
+  - port: 8031
+    targetPort: 8031
+  type: ClusterIP
+

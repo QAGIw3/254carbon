@@ -6,6 +6,10 @@ Portal: https://power.larc.nasa.gov/
 
 Production: Use the REST API with community parameters; this scaffold emits
 representative solar GHI, wind speed, and ambient temperature observations.
+
+Data Flow
+---------
+NASA POWER API (or mocks) → parse hourly/daily point data → canonical series → Kafka
 """
 import logging
 import time

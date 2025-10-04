@@ -34,4 +34,6 @@ inputs = {
   # Domain
   domain_name = "254carbon-staging.local"
 }
-
+# Staging environment stack
+# - Parity with production for integration testing
+# - Cost-optimized but representative

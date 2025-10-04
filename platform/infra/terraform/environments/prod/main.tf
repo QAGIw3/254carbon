@@ -35,4 +35,6 @@ inputs = {
   # Domain
   domain_name = "254carbon.com"
 }
-
+# Production environment stack
+# - High availability and stricter security defaults
+# - Larger instance sizes and multi-AZ where applicable

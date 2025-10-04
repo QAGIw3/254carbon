@@ -2,10 +2,14 @@
 Ghana Power Market Connector
 
 Ghana Grid Company (GRIDCo) wholesale market:
-- Hydro-thermal mix
+- Hydro‑thermal mix
 - Akosombo Dam dependency
 - Natural gas from offshore fields
 - West Africa Power Pool integration
+
+Data Flow
+---------
+GRIDCo feeds (or mocks) → normalize (GHS/MWh, GMT→UTC) → canonical schema → Kafka
 """
 import logging
 from datetime import datetime, timedelta
@@ -112,6 +116,5 @@ class GhanaConnector(Ingestor):
 if __name__ == "__main__":
     connector = GhanaConnector({"source_id": "ghana_gridco"})
     connector.run()
-
 
 

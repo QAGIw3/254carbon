@@ -6,6 +6,10 @@ Portal: https://data.imf.org/
 
 Production: Use IMF SDMX API as available; this scaffold emits generic macro
 indicators.
+
+Data Flow
+---------
+IMF SDMX API/CSV → indicator series → canonical economics → Kafka
 """
 import logging
 import time

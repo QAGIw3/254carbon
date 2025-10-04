@@ -1,3 +1,4 @@
+# Minimal JVM base image for running Apache Kafka (KRaft mode)
 FROM eclipse-temurin:17-jre-jammy
 
 ENV KAFKA_VERSION=3.7.1 \
@@ -9,6 +10,7 @@ ENV KAFKA_VERSION=3.7.1 \
 WORKDIR /opt
 
 # Download Kafka from Apache archive for deterministic availability
+# (Using archive avoids mirror flakiness for CI/reproducibility.)
 RUN set -eux; \
     curl -fsSL https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz -o kafka.tgz; \
     tar -xzf kafka.tgz; \
@@ -24,4 +26,3 @@ EXPOSE 9092 9093
 VOLUME ["/var/lib/kafka/data"]
 
 ENTRYPOINT ["/usr/local/bin/start-kafka.sh"]
-

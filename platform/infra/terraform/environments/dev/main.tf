@@ -33,4 +33,6 @@ inputs = {
   # Domain
   domain_name = "254carbon-dev.local"
 }
-
+# Development environment stack
+# - Lower resource sizes and costs
+# - Enables rapid iteration and sandboxing

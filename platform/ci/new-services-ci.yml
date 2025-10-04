@@ -1,0 +1,215 @@
+# GitLab CI/CD Pipeline for New Services
+# Add this to .gitlab-ci.yml or include from main pipeline
+
+# Stage definitions
+stages:
+  - test
+  - build
+  - security-scan
+  - deploy
+
+variables:
+  DOCKER_REGISTRY: "254carbon"
+  DOCKER_TLS_CERTDIR: "/certs"
+
+# ==============================================================================
+# TEST STAGE
+# ==============================================================================
+
+test:marketplace:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - cd platform/apps/marketplace
+    - pip install -r requirements.txt
+    - pip install pytest pytest-asyncio httpx
+    - pytest tests/ -v --junitxml=report.xml --cov=. --cov-report=xml
+  artifacts:
+    reports:
+      junit: platform/apps/marketplace/report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: platform/apps/marketplace/coverage.xml
+  only:
+    changes:
+      - platform/apps/marketplace/**/*
+
+test:signals-service:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - cd platform/apps/signals-service
+    - pip install -r requirements.txt
+    - pip install pytest pytest-asyncio httpx
+    - pytest tests/ -v --junitxml=report.xml --cov=. --cov-report=xml
+  artifacts:
+    reports:
+      junit: platform/apps/signals-service/report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: platform/apps/signals-service/coverage.xml
+  only:
+    changes:
+      - platform/apps/signals-service/**/*
+
+test:fundamental-models:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - cd platform/apps/fundamental-models
+    - pip install -r requirements.txt
+    - pip install pytest pytest-asyncio httpx
+    - python -m pytest --version || echo "Skipping tests - no test directory"
+  only:
+    changes:
+      - platform/apps/fundamental-models/**/*
+
+test:lmp-decomposition:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - cd platform/apps/lmp-decomposition-service
+    - pip install -r requirements.txt
+    - pip install pytest pytest-asyncio httpx
+    - pytest tests/ -v --junitxml=report.xml --cov=. --cov-report=xml
+  artifacts:
+    reports:
+      junit: platform/apps/lmp-decomposition-service/report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: platform/apps/lmp-decomposition-service/coverage.xml
+  only:
+    changes:
+      - platform/apps/lmp-decomposition-service/**/*
+
+# ==============================================================================
+# BUILD STAGE
+# ==============================================================================
+
+build:marketplace:
+  stage: build
+  image: docker:24.0
+  services:
+    - docker:24.0-dind
+  script:
+    - cd platform/apps/marketplace
+    - docker build -t ${DOCKER_REGISTRY}/marketplace:${CI_COMMIT_SHORT_SHA} .
+    - docker tag ${DOCKER_REGISTRY}/marketplace:${CI_COMMIT_SHORT_SHA} ${DOCKER_REGISTRY}/marketplace:latest
+    - docker push ${DOCKER_REGISTRY}/marketplace:${CI_COMMIT_SHORT_SHA}
+    - docker push ${DOCKER_REGISTRY}/marketplace:latest
+  only:
+    refs:
+      - main
+      - develop
+    changes:
+      - platform/apps/marketplace/**/*
+
+build:signals-service:
+  stage: build
+  image: docker:24.0
+  services:
+    - docker:24.0-dind
+  script:
+    - cd platform/apps/signals-service
+    - docker build -t ${DOCKER_REGISTRY}/signals-service:${CI_COMMIT_SHORT_SHA} .
+    - docker tag ${DOCKER_REGISTRY}/signals-service:${CI_COMMIT_SHORT_SHA} ${DOCKER_REGISTRY}/signals-service:latest
+    - docker push ${DOCKER_REGISTRY}/signals-service:${CI_COMMIT_SHORT_SHA}
+    - docker push ${DOCKER_REGISTRY}/signals-service:latest
+  only:
+    refs:
+      - main
+      - develop
+    changes:
+      - platform/apps/signals-service/**/*
+
+build:fundamental-models:
+  stage: build
+  image: docker:24.0
+  services:
+    - docker:24.0-dind
+  script:
+    - cd platform/apps/fundamental-models
+    - docker build -t ${DOCKER_REGISTRY}/fundamental-models:${CI_COMMIT_SHORT_SHA} .
+    - docker tag ${DOCKER_REGISTRY}/fundamental-models:${CI_COMMIT_SHORT_SHA} ${DOCKER_REGISTRY}/fundamental-models:latest
+    - docker push ${DOCKER_REGISTRY}/fundamental-models:${CI_COMMIT_SHORT_SHA}
+    - docker push ${DOCKER_REGISTRY}/fundamental-models:latest
+  only:
+    refs:
+      - main
+      - develop
+    changes:
+      - platform/apps/fundamental-models/**/*
+
+# ==============================================================================
+# SECURITY SCAN STAGE
+# ==============================================================================
+
+security-scan:new-services:
+  stage: security-scan
+  image: aquasec/trivy:latest
+  script:
+    - trivy image --severity CRITICAL,HIGH --exit-code 1 ${DOCKER_REGISTRY}/marketplace:latest
+    - trivy image --severity CRITICAL,HIGH --exit-code 1 ${DOCKER_REGISTRY}/signals-service:latest
+    - trivy image --severity CRITICAL,HIGH --exit-code 1 ${DOCKER_REGISTRY}/fundamental-models:latest
+    - trivy image --severity CRITICAL,HIGH --exit-code 1 ${DOCKER_REGISTRY}/lmp-decomposition-service:latest
+  allow_failure: false
+  only:
+    refs:
+      - main
+      - develop
+
+sast:new-services:
+  stage: security-scan
+  image: python:3.11-slim
+  script:
+    - pip install bandit safety
+    - bandit -r platform/apps/marketplace platform/apps/signals-service platform/apps/fundamental-models platform/apps/lmp-decomposition-service -f json -o bandit-report.json
+    - safety check --json --file platform/apps/marketplace/requirements.txt
+    - safety check --json --file platform/apps/signals-service/requirements.txt
+    - safety check --json --file platform/apps/fundamental-models/requirements.txt
+  artifacts:
+    reports:
+      sast: bandit-report.json
+  allow_failure: true
+
+# ==============================================================================
+# DEPLOY STAGE
+# ==============================================================================
+
+deploy:new-services:staging:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    - kubectl apply -f platform/apps/marketplace/k8s/deployment.yaml
+    - kubectl apply -f platform/apps/signals-service/k8s/deployment.yaml
+    - kubectl apply -f platform/apps/fundamental-models/k8s/deployment.yaml
+    - kubectl rollout status deployment/marketplace -n market-intelligence
+    - kubectl rollout status deployment/signals-service -n market-intelligence
+    - kubectl rollout status deployment/fundamental-models -n market-intelligence
+  environment:
+    name: staging
+    kubernetes:
+      namespace: market-intelligence
+  only:
+    refs:
+      - develop
+
+deploy:new-services:production:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    - kubectl apply -f platform/apps/marketplace/k8s/deployment.yaml
+    - kubectl apply -f platform/apps/signals-service/k8s/deployment.yaml
+    - kubectl apply -f platform/apps/fundamental-models/k8s/deployment.yaml
+    - kubectl rollout status deployment/marketplace -n market-intelligence
+    - kubectl rollout status deployment/signals-service -n market-intelligence
+    - kubectl rollout status deployment/fundamental-models -n market-intelligence
+  environment:
+    name: production
+    kubernetes:
+      namespace: market-intelligence
+  when: manual
+  only:
+    refs:
+      - main
+

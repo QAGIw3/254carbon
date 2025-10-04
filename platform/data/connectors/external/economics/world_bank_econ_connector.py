@@ -6,6 +6,10 @@ Portal: https://data.worldbank.org/
 
 Production: Integrate with World Bank API using indicator codes.
 This scaffold emits GDP per capita and inflation for a selected country.
+
+Data Flow
+---------
+World Bank API → indicator series → canonical economics → Kafka
 """
 import logging
 import time

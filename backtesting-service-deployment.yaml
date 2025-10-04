@@ -45,3 +45,6 @@ spec:
   - port: 8005
     targetPort: 8005
   type: ClusterIP
+# Kubernetes Deployment for Backtesting Service
+# - Exposes REST endpoints for running and evaluating backtests
+# - Tune resources/replicas based on workload

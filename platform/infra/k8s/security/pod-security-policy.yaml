@@ -242,3 +242,5 @@ spec:
       cpu: 50m
       memory: 100Mi
     type: Container
+# Pod security configurations (Baseline/Restricted)
+# - Prefer PodSecurity admission over legacy PSPs in new clusters

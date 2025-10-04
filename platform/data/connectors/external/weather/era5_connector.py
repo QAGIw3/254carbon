@@ -6,6 +6,10 @@ Docs: https://www.ecmwf.int/en/forecasts/datasets/reanalysis-datasets/era5
 
 Production: Integrate via CDS API (cdsapi) with the ERA5 dataset; this scaffold
 emits representative variables for integration testing.
+
+Data Flow
+---------
+CDS API → NetCDF download → parse variables → canonical weather series → Kafka
 """
 import logging
 import time
