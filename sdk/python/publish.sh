@@ -1,16 +1,18 @@
 #!/bin/bash
-# Build and (optionally) publish the 254Carbon Python SDK to PyPI
-# Usage:
-#   ./publish.sh               # build and print next steps
+# Build and (optionally) publish the 254Carbon Python SDK to PyPI.
+#
+# Usage
+# -----
+#   ./publish.sh               # Build artifacts and print next steps
 #   TWINE_USERNAME=... \
 #   TWINE_PASSWORD=... \
-#     twine upload dist/*     # publish artifacts
+#     twine upload dist/*     # Publish artifacts (manual or uncomment below)
 
 set -euo pipefail
 
 echo "🚀 Building 254Carbon Python SDK for PyPI..."
 
-# Clean previous builds
+# Clean previous builds to ensure a reproducible artifact set
 rm -rf build/
 rm -rf dist/
 rm -rf *.egg-info/
@@ -18,7 +20,7 @@ rm -rf *.egg-info/
 # Build the package (sdist + wheel)
 python setup.py sdist bdist_wheel
 
-# Check the built files
+# Check the built files for sanity
 echo "📦 Built files:"
 ls -la dist/
 
@@ -37,4 +39,3 @@ echo "   - Or use 'twine upload dist/*' manually"
 
 echo "✅ Build complete! Ready for PyPI publishing."
 echo "   To publish: twine upload dist/*"
-

@@ -1,16 +1,21 @@
 """
 AESO (Alberta Electric System Operator) Connector
 
-Ingests Alberta electricity market data including Pool Price,
-Alberta Internal Load (AIL), and intertie flows.
+Overview
+--------
+Ingests Alberta electricity market data including Pool Price (SMP), Alberta
+Internal Load (AIL), and intertie flows. Supports live AESO API integration
+with configurable auth or generates mock data for development.
 
-Supports live AESO API integration with configurable auth:
-- Authorization: Bearer <token> (preferred if you have a JWT/token)
-- x-api-key: <key> (alternative header, if your key is not a bearer token)
+Auth Options
+------------
+- Authorization: ``Bearer <token>`` (preferred JWT/token)
+- ``x-api-key: <key>`` (alternative header if key is not a bearer token)
 
-You can enable live calls per-endpoint via config flags while keeping
-safe mocks as fallback when endpoints are not provided or upstream is
-unavailable.
+Operational Notes
+-----------------
+- Enable live calls per‑endpoint via config flags (e.g., ``use_live_pool``) and
+  fall back to mocks if upstream is unavailable.
 """
 import logging
 from datetime import datetime, timedelta, timezone

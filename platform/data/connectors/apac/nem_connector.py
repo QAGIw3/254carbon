@@ -1,7 +1,15 @@
 """
 NEM (National Electricity Market) Connector
 
-Ingests spot prices and FCAS data from Australia's NEM.
+Overview
+--------
+Ingests 5‑minute dispatch spot prices, FCAS, and pre‑dispatch data for
+Australia’s NEM regions (NSW1, QLD1, SA1, TAS1, VIC1). Maps to canonical schema
+with AUD currency and UTC timestamps.
+
+Data Flow
+---------
+AEMO API (or mocks) → normalize region series → canonical events → Kafka
 """
 import logging
 from datetime import datetime, timedelta
@@ -252,4 +260,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = NEMConnector(config)
         connector.run()
-

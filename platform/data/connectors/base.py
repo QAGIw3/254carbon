@@ -1,7 +1,23 @@
 """
 Base connector SDK for data ingestion.
 
-All data source connectors implement the Ingestor interface.
+Overview
+--------
+Defines the ``Ingestor`` abstract base class that all data source connectors
+must implement. A connector is responsible for:
+- Discovering available streams/collections at the source
+- Pulling or subscribing to source data
+- Mapping records to a canonical schema
+- Emitting records to downstream systems (e.g., Kafka)
+- Persisting checkpoints for reliable resumption
+
+Safety & Operations
+-------------------
+- Checkpointing is rate‑limited to reduce DB churn.
+- Database errors in checkpointing are surfaced, but the outer run() tries to
+  persist error state and always closes the pool.
+- The DB schema is created lazily on startup for convenience; in production,
+  manage this via migrations.
 """
 from abc import ABC, abstractmethod
 from typing import Iterator, Dict, Any, Optional
@@ -35,7 +51,7 @@ class Ingestor(ABC):
         self.source_id = config.get("source_id")
         self.checkpoint_state: Dict[str, Any] = {}
 
-        # PostgreSQL connection for checkpoints
+        # PostgreSQL connection configuration for checkpoints
         self.db_config = config.get("database", {})
         self.db_host = self.db_config.get("host", "postgresql")
         self.db_port = self.db_config.get("port", 5432)
@@ -51,7 +67,7 @@ class Ingestor(ABC):
         self._loop = asyncio.new_event_loop()
         self._db_pool: Optional[asyncpg.pool.Pool] = None
 
-        # Initialize database connection
+        # Initialize database connection (creates tables if missing)
         self._loop.run_until_complete(self._init_db())
     
     @abstractmethod
@@ -137,7 +153,7 @@ class Ingestor(ABC):
         Returns:
             True if valid, False otherwise
         """
-        # Basic validation
+        # Basic validation (extend per-connector if stricter rules are needed)
         required_fields = [
             "event_time_utc",
             "market",
@@ -160,7 +176,7 @@ class Ingestor(ABC):
         return True
 
     async def _init_db(self) -> None:
-        """Initialize database connection and create checkpoint table if needed."""
+        """Initialize database connection and create checkpoint tables if needed."""
         try:
             pool = await self._get_pool()
             async with pool.acquire() as conn:
@@ -224,7 +240,7 @@ class Ingestor(ABC):
         """
         logger.info(f"Starting connector: {self.source_id}")
         
-        # Load checkpoint
+        # Load checkpoint (best-effort; proceeds even if none exists)
         last_state = self.load_checkpoint()
         if last_state:
             logger.info(f"Resuming from checkpoint: {last_state}")
@@ -250,12 +266,12 @@ class Ingestor(ABC):
                 last_event_time_ms = canonical.get("event_time_utc")
                 batch.append(canonical)
                 
-                # Emit batch
+                # Emit batch when threshold reached
                 if len(batch) >= batch_size:
                     count = self.emit(iter(batch))
                     processed += count
                     
-                    # Checkpoint
+                    # Checkpoint progress
                     checkpoint_payload = {
                         "last_event_time": canonical["event_time_utc"],
                         "status": "success",
@@ -268,7 +284,7 @@ class Ingestor(ABC):
                     
                     batch = []
             
-            # Emit remaining
+            # Emit remaining records (final flush)
             if batch:
                 count = self.emit(iter(batch))
                 processed += count
@@ -448,4 +464,3 @@ class Ingestor(ABC):
         if self._db_pool is not None:
             await self._db_pool.close()
             self._db_pool = None
-

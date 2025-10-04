@@ -3,9 +3,13 @@ Colombia XM Connector
 
 Integrates with Colombian wholesale electricity market:
 - Spot market (Bolsa de Energía)
-- Hydro-thermal optimization
+- Hydro‑thermal optimization
 - El Niño/La Niña impacts
 - Reliability charge
+
+Data Flow
+---------
+XM feeds (or mocks) → normalize to canonical tick schema → Kafka topic(s)
 """
 import logging
 from datetime import datetime, timedelta
@@ -159,4 +163,3 @@ class ColombiaXMConnector(Ingestor):
 if __name__ == "__main__":
     connector = ColombiaXMConnector({"source_id": "colombia_xm"})
     connector.run()
-

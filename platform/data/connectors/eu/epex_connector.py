@@ -1,8 +1,20 @@
 """
 EPEX SPOT Connector
 
-Ingests day-ahead and intraday auction prices from EPEX SPOT
-(Germany, France, Austria, Switzerland, Belgium, Netherlands).
+Overview
+--------
+Ingests day‑ahead and intraday auction prices from EPEX SPOT for key regions
+(Germany, France, Austria, Switzerland, Belgium, Netherlands) and maps them to
+the platform’s canonical schema with timezone normalization and EUR handling.
+
+Data Flow
+---------
+EPEX API → parse auction results → canonical tick schema → Kafka topic
+
+Production Notes
+----------------
+- Align timestamps to the appropriate local timezone and convert to UTC.
+- Currency is EUR; conversions, if any, should occur downstream consistently.
 """
 import logging
 from datetime import datetime, timedelta
@@ -228,4 +240,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = EPEXConnector(config)
         connector.run()
-

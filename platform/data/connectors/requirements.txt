@@ -1,11 +1,24 @@
+## Runtime dependencies for connector implementations
+
+# Kafka producer client for emitting canonical events
 kafka-python==2.0.2
+
+# HTTP client for pulling from external data sources
 requests==2.31.0
+
+# Avro support (when serializing to Avro schemas)
 avro-python3==1.10.2
+
+# PostgreSQL async driver used for checkpointing
 asyncpg==0.29.0
+
+# Configuration parsing utilities
 pyyaml==6.0.1
+
+# Optional psycopg2 binary for non-async DB tasks
 psycopg2-binary==2.9.7
 
-# ERA5 live mode parsing
+# ERA5 live mode parsing (weather reanalysis)
 cdsapi==0.6.1
 netCDF4==1.6.5
 numpy==1.26.4

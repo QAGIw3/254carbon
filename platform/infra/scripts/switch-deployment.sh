@@ -1,7 +1,18 @@
 #!/bin/bash
 
 # 254Carbon Blue-Green Deployment Switcher
-# This script switches traffic between blue and green deployments
+#
+# Purpose
+# - Safely switch service traffic between blue and green Kubernetes deployments.
+#
+# Usage
+#   ./switch-deployment.sh <namespace> <service_name> <blue|green>
+#   e.g., ./switch-deployment.sh market-intelligence api-gateway blue
+#
+# Behavior
+# - Validates inputs and current context, scales up target color, waits ready,
+#   flips service selector, then scales down previous color. Rolls back on
+#   failure if health checks do not pass.
 
 set -euo pipefail
 
@@ -214,4 +225,3 @@ main() {
 }
 
 main "$@"
-

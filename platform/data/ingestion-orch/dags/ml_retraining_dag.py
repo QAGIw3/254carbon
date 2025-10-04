@@ -1,4 +1,27 @@
-"""Automated ML retraining DAG for monitoring and model refresh."""
+"""
+Automated ML Retraining DAG
+
+Overview
+--------
+Monitors production model performance and triggers retraining when degradation
+is detected. After retraining, performs lightweight verification and exports a
+success metric for observability.
+
+Schedule
+- Every 6 hours (tunable via ``schedule_interval``)
+
+Services
+- ML Service: ``/models/active``, ``/models/{id}/performance``, ``/retrain``
+- Pushgateway/Prometheus (optional) for metrics export
+
+Operational Notes
+-----------------
+- Degradation criteria are based on ML service signals; consider extending
+  with thresholds per market/instrument.
+- Retraining is invoked with a fixed window; adapt to model class needs.
+- Failures during monitoring/retrain should not crash the scheduler; retries
+  are configured at the DAG level.
+"""
 
 from __future__ import annotations
 
@@ -136,4 +159,3 @@ with DAG(
     )
 
     monitor >> retrain >> evaluate
-

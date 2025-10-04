@@ -2,17 +2,35 @@
 """
 Production Deployment Orchestrator for 254Carbon Market Intelligence Platform
 
-This script orchestrates the complete production deployment process including:
+Overview
+--------
+Automates the end‑to‑end production rollout:
 - Infrastructure provisioning and validation
 - Security hardening and compliance checks
-- Service deployment with blue-green strategy
+- Service deployment with blue‑green strategy
 - Database initialization and data seeding
 - Pilot user onboarding and UAT execution
 - Monitoring and alerting setup
 - Production readiness validation
 
-Usage:
+Usage
+-----
     python production-deployment-orchestrator.py --environment prod --pilot-customers
+
+Prerequisites
+-------------
+- Terraform, AWS CLI, kubectl, Helm, and required CLIs in PATH
+- Authenticated environment for cloud and cluster access
+- Configuration file at ``platform/infra/config/<env>.yaml`` (auto‑generated if absent)
+
+Outputs
+-------
+- Deployment log: ``deployment.log`` and in‑memory JSON structure for step tracking
+
+Failure Handling & Idempotency
+------------------------------
+- Each step logs STARTED/COMPLETED/FAILED states; failures abort further phases.
+- Re‑running is safe for most steps; Terraform plans guard infra drift.
 """
 
 import argparse

@@ -1,8 +1,21 @@
 """
 PJM Interconnection Connector
 
-Ingests real-time and day-ahead LMP data, capacity market data,
-and ancillary services from PJM.
+Overview
+--------
+Ingests Real‑Time and Day‑Ahead LMPs, Capacity Market results, and Ancillary
+Services from PJM. In this scaffolding, data sources are mocked unless an API
+key is supplied and live endpoints are enabled deliberately.
+
+Data Flow
+---------
+PJM API (or mocks) → mapping to canonical schema → Kafka topic(s)
+
+Production wiring
+-----------------
+- API base: https://api.pjm.com/api/v1
+- Header: Ocp‑Apim‑Subscription‑Key: <key>
+- Endpoints: rt_hrl_lmps, da_hrl_lmps, capacity_market_results, ancillary
 """
 import logging
 from datetime import datetime, timedelta, timezone
@@ -36,6 +49,7 @@ class PJMConnector(Ingestor):
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
+        # API and product selection
         self.api_base = config.get("api_base", "https://api.pjm.com/api/v1")
         self.api_key = config.get("api_key")
         self.market_type = config.get("market_type", "RT")  # RT, DA, CAPACITY, AS
@@ -286,7 +300,7 @@ class PJMConnector(Ingestor):
         return datetime.now(timezone.utc) - timedelta(hours=1)
     
     def emit(self, events: Iterator[Dict[str, Any]]) -> int:
-        """Emit events to Kafka."""
+        """Emit events to Kafka with a lazily initialized producer and flush."""
         if self.producer is None:
             self.producer = KafkaProducer(
                 bootstrap_servers=self.kafka_bootstrap,

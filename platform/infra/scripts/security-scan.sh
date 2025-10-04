@@ -1,6 +1,19 @@
 #!/bin/bash
 # Security Scanning Script for Production Deployment
-# Performs SAST, DAST, and container security scanning
+#
+# Purpose
+# - Perform SAST (Semgrep), container image scanning (Trivy), basic network
+#   probing (nmap), and Kubernetes posture checks to catch issues before prod.
+#
+# Usage
+#   MIN_SEVERITY=HIGH ./security-scan.sh
+#
+# Prerequisites
+# - kubectl, trivy, semgrep, nmap, jq
+# - Cluster context set for target namespace
+#
+# Outputs
+# - JSON scan outputs and Markdown summary under ./security-results
 
 set -euo pipefail
 

@@ -1,7 +1,23 @@
 #!/bin/bash
 
 # 254Carbon ArgoCD GitOps Deployment Script
-# This script sets up ArgoCD for continuous deployment
+#
+# Purpose
+# - Install and bootstrap ArgoCD for GitOps‑driven application delivery.
+#
+# Usage
+#   ./deploy-argocd.sh [namespace] [environment]
+#   e.g., ./deploy-argocd.sh argocd dev
+#
+# Prerequisites
+# - kubectl configured to the target cluster/context
+# - helm installed and authenticated as needed
+# - Optional: argocd CLI installed for initial admin login steps
+#
+# Notes
+# - Admin password is sourced from the initial secret; rotate post‑install.
+# - The server service is exposed via LoadBalancer by default; adjust for your
+#   environment (Ingress, NodePort) as needed.
 
 set -euo pipefail
 
@@ -209,4 +225,3 @@ main() {
 
 # Run main function
 main "$@"
-

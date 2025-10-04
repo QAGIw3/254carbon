@@ -1,6 +1,22 @@
 #!/bin/bash
 # Automated Secrets Rotation Script
-# This script rotates database passwords and API keys
+#
+# Purpose
+# - Rotate credentials for PostgreSQL, ClickHouse, Keycloak, and MinIO, update
+#   the configured secrets backend (AWS Secrets Manager or Vault), and bounce
+#   deployments to pick up changes.
+#
+# Usage
+#   NAMESPACE=market-intelligence SECRETS_BACKEND=aws-secrets-manager REGION=us-east-1 \
+#     ./rotate-secrets.sh
+#
+# Prerequisites
+# - kubectl configured for the target cluster/namespace
+# - jq, openssl; plus aws or vault CLI depending on backend
+#
+# Safety
+# - The script restarts key deployments after rotation and verifies health.
+#   Ensure appropriate maintenance windows and backups are in place.
 
 set -euo pipefail
 
@@ -224,6 +240,5 @@ main() {
 
 # Run main function
 main "$@"
-
 
 

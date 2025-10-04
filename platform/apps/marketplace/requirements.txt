@@ -1,6 +1,16 @@
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic[email]==2.5.3
-stripe==7.9.0
-sqlalchemy==2.0.25
+## Runtime dependencies for the Marketplace app
 
+# Web framework used to define the API surface and OpenAPI docs
+fastapi==0.109.0
+
+# ASGI server for local development and production hosting
+uvicorn[standard]==0.27.0
+
+# Data validation, settings management, and EmailStr type support
+pydantic[email]==2.5.3
+
+# Planned payment processing integration (not used in demo handlers yet)
+stripe==7.9.0
+
+# ORM/DB toolkit for future migration from in‑memory storage to PostgreSQL
+sqlalchemy==2.0.25

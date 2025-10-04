@@ -1,8 +1,19 @@
+"""
+Setup script for the 254Carbon Python SDK.
+
+Notes
+-----
+- Reads long description and requirements from adjacent files for clarity.
+- Declares optional extras for development and examples.
+- Packages typed hints via ``py.typed`` (ensure the marker file exists).
+"""
 from setuptools import setup, find_packages
 
+# Long description for PyPI project page
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+# Base runtime requirements
 with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
@@ -21,7 +32,7 @@ setup(
         "Source": "https://github.com/254carbon/python-sdk",
         "Tracker": "https://github.com/254carbon/python-sdk/issues",
     },
-    packages=find_packages(),
+    packages=find_packages(),  # discovers "carbon254" package
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
@@ -60,6 +71,7 @@ setup(
         ],
     },
     package_data={
+        # Include typing marker for PEP 561 and any markdown metadata
         "carbon254": ["py.typed", "*.md"],
     },
     include_package_data=True,

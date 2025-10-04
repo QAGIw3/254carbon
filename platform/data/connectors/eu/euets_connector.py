@@ -1,7 +1,14 @@
 """
 EU ETS (Emissions Trading System) Connector
 
-Ingests EU carbon allowance (EUA) prices and market data.
+Overview
+--------
+Ingests EU carbon allowance (EUA) prices (e.g., ICE/EEX futures) and primary
+auction results, mapping to canonical schema with EUR currency and tCO2 units.
+
+Data Flow
+---------
+Exchange/API → normalize instruments/tenors → canonical events → Kafka
 """
 import logging
 from datetime import datetime, timedelta
@@ -223,4 +230,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = EUETSConnector(config)
         connector.run()
-

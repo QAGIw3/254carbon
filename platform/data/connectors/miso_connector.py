@@ -1,19 +1,25 @@
 """
 MISO LMP Connector
 
-Pulls real-time 5-minute nodal LMPs and day-ahead (ex-ante) hub LMPs
-from the public MISO Real-Time Web Displays Data Broker (MISORTWD).
+Overview
+--------
+Pulls Real‑Time (5‑minute nodal) and Day‑Ahead (ex‑ante hub) LMPs from the
+public MISO Real‑Time Web Displays Data Broker (MISORTWD). Normalizes New York
+local timestamps to UTC and emits canonical events to Kafka.
 
-Docs and endpoints (public):
+Docs and endpoints (public)
 - Index of JSON/CSV/XML endpoints:
   https://api.misoenergy.org/MISORTWDDataBroker/
-- Real-time consolidated LMP table (5-minute RT):
+- Real‑time consolidated LMP table (5‑minute RT):
   https://api.misoenergy.org/MISORTWDDataBroker/DataBrokerServices.asmx?messageType=getlmpconsolidatedtable&returnType=json
-- Ex-ante LMP (hub-level DA):
+- Ex‑ante LMP (hub‑level DA):
   https://api.misoenergy.org/MISORTWDDataBroker/DataBrokerServices.asmx?messageType=getexantelmp&returnType=json
 
-Note: The consolidated table response includes a reference date and the
-HourAndMin for the interval. We normalize that Eastern time to UTC.
+Notes
+-----
+- The consolidated table response provides a ref date and `HourAndMin` field
+  in America/New_York; we convert to UTC.
+- MISORTWD fields `MCC`/`MLC` map to congestion/loss components.
 """
 import logging
 from datetime import datetime, timedelta, timezone
@@ -50,6 +56,7 @@ class MISOConnector(Ingestor):
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
+        # API and emission configuration
         self.api_base = config.get("api_base", "https://api.misoenergy.org/MISORTWDDataBroker")
         self.market_type = config.get("market_type", "RT")  # RT or DA (DA uses ExAnte hubs)
         self.kafka_topic = config.get("kafka_topic", "power.ticks.v1")
@@ -93,7 +100,7 @@ class MISOConnector(Ingestor):
     
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
         """
-        Pull LMP data from MISO OASIS.
+        Pull LMP data from MISO MISORTWD.
         
         For RT: polls every 5 minutes
         For DA: polls hourly for next day
@@ -290,7 +297,7 @@ class MISOConnector(Ingestor):
         return datetime.now(timezone.utc) - timedelta(hours=1)
     
     def emit(self, events: Iterator[Dict[str, Any]]) -> int:
-        """Emit events to Kafka."""
+        """Emit events to Kafka (lazy producer + flush for delivery)."""
         if self.producer is None:
             self.producer = KafkaProducer(
                 bootstrap_servers=self.kafka_bootstrap,

@@ -1,6 +1,25 @@
 """
 Automated Backtesting Pipeline DAG
-Runs periodic backtests for all instruments and scenarios to validate forecast accuracy.
+
+Overview
+--------
+Runs periodic backtests across active instruments and scenarios to quantify
+forecast accuracy. Executes concurrent backtest jobs via the Backtesting
+Service and aggregates quality metrics.
+
+Schedule
+- See DAG definition; defaults to periodic execution with catchup disabled.
+
+Data Flow
+---------
+PostgreSQL (instruments + scenarios) → Backtesting Service ``/backtest/run`` →
+results via XCom → quality checks (MAPE/WAPE/RMSE) → reporting
+
+Operational Notes
+-----------------
+- Concurrency: async batch of backtests is bounded by Python process/HTTP limits.
+- Quality gates: returns a branch label when thresholds fail.
+- Observability: consider persisting metrics to a TSDB for historical trends.
 """
 from datetime import datetime, timedelta, date
 from airflow import DAG

@@ -1,11 +1,15 @@
 """
 Uruguay ADME (Administración del Mercado Eléctrico) Connector
 
-Uruguay's renewable-dominant market:
+Uruguay's renewable‑dominant market:
 - 98% renewable electricity
 - Wind power leadership
-- Cross-border with Argentina and Brazil
-- Real-time market
+- Cross‑border with Argentina and Brazil
+- Real‑time market
+
+Data Flow
+---------
+ADME feeds (or mocks) → normalize to canonical tick schema → Kafka topic(s)
 """
 import logging
 from datetime import datetime, timedelta
@@ -117,6 +121,5 @@ class UruguayADMEConnector(Ingestor):
 if __name__ == "__main__":
     connector = UruguayADMEConnector({"source_id": "uruguay_adme"})
     connector.run()
-
 
 

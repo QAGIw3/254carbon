@@ -1,5 +1,21 @@
 """
-Main client class for 254Carbon API with enhanced async support and retry logic.
+254Carbon Python API Client
+
+Overview
+--------
+This module implements the main client for the 254Carbon API, including:
+- Synchronous HTTP methods for core resources
+- Async counterparts with retry/backoff for resiliency
+- WebSocket streaming with auto‑reconnect for real‑time prices
+- Convenience helpers to convert responses to pandas DataFrames
+
+Design Notes
+------------
+- Network: Uses httpx for HTTP and websockets for streaming.
+- Resiliency: A simple exponential backoff decorator wraps async methods that
+  interact with the network.
+- Local development: ``local_dev=True`` enables mock fallbacks and localhost
+  defaults to simplify example usage without external dependencies.
 """
 import asyncio
 import json
@@ -24,7 +40,12 @@ def retry_with_backoff(
     backoff_factor: float = 2.0,
     jitter: bool = True
 ):
-    """Decorator for retrying async functions with exponential backoff."""
+    """Decorator for retrying async functions with exponential backoff.
+
+    The wrapper retries common transient network exceptions from httpx using
+    ``backoff_factor`` to calculate delays up to ``max_delay``. Optionally,
+    applies jitter to avoid stampeding herds on reconnect.
+    """
     def decorator(func):
         async def wrapper(*args, **kwargs):
             last_exception = None
@@ -82,7 +103,8 @@ class CarbonClient:
             timeout: Request timeout in seconds
             local_dev: Enable local development mode with mock data fallbacks
         """
-        # Auto-detect environment
+        # Auto‑detect environment and defaults. In production, prefer explicit
+        # configuration and do not rely on local_dev defaults.
         if base_url is None:
             if local_dev:
                 base_url = "http://localhost:8000"
@@ -95,7 +117,7 @@ class CarbonClient:
         self.timeout = timeout
         self.local_dev = local_dev
 
-        # WebSocket URL for streaming
+        # Derive WebSocket URL from HTTP base for streaming endpoints.
         self.ws_url = self.base_url.replace("http", "ws")
 
         self._client = httpx.Client(
@@ -108,7 +130,7 @@ class CarbonClient:
         self._ws_client = None
     
     def _get_headers(self) -> Dict[str, str]:
-        """Get request headers including authentication."""
+        """Build default request headers including authentication (if present)."""
         headers = {
             "User-Agent": f"carbon254-python-sdk/1.0.0",
             "Content-Type": "application/json",
@@ -120,7 +142,7 @@ class CarbonClient:
         return headers
     
     def _handle_response(self, response: httpx.Response) -> Any:
-        """Handle API response and raise appropriate exceptions."""
+        """Normalize API responses and raise rich exceptions on errors."""
         if response.status_code == 200:
             return response.json()
         elif response.status_code == 401:
@@ -147,8 +169,7 @@ class CarbonClient:
         market: Optional[str] = None,
         product: Optional[str] = None,
     ) -> List[Instrument]:
-        """
-        Get available instruments.
+        """Get available instruments.
 
         Args:
             market: Filter by market (power, gas, env, lng)
@@ -177,8 +198,7 @@ class CarbonClient:
         end_time: datetime,
         price_type: str = "mid",
     ) -> List[PriceTick]:
-        """
-        Get historical price ticks.
+        """Get historical price ticks.
 
         Args:
             instrument_id: Instrument identifier
@@ -208,8 +228,7 @@ class CarbonClient:
         end_time: datetime,
         price_type: str = "mid",
     ) -> pd.DataFrame:
-        """
-        Get historical prices as pandas DataFrame.
+        """Get historical prices as a pandas DataFrame.
         
         Args:
             instrument_id: Instrument identifier
@@ -250,8 +269,7 @@ class CarbonClient:
         as_of_date: date,
         scenario_id: str = "BASE",
     ) -> ForwardCurve:
-        """
-        Get forward curve.
+        """Get forward curve for an instrument at an as‑of date.
         
         Args:
             instrument_id: Instrument identifier
@@ -283,8 +301,7 @@ class CarbonClient:
         as_of_date: date,
         scenario_id: str = "BASE",
     ) -> pd.DataFrame:
-        """
-        Get forward curve as pandas DataFrame.
+        """Get forward curve as a pandas DataFrame.
         
         Args:
             instrument_id: Instrument identifier
@@ -311,8 +328,7 @@ class CarbonClient:
         description: str,
         assumptions: Dict[str, Any],
     ) -> str:
-        """
-        Create new scenario.
+        """Create new scenario.
         
         Args:
             title: Scenario title
@@ -337,8 +353,7 @@ class CarbonClient:
         self,
         scenario_id: str,
     ) -> str:
-        """
-        Execute scenario run.
+        """Execute scenario run for a given scenario.
         
         Args:
             scenario_id: Scenario ID
@@ -356,8 +371,7 @@ class CarbonClient:
         scenario_id: str,
         run_id: str,
     ) -> Dict[str, Any]:
-        """
-        Get scenario run status.
+        """Get scenario run status.
 
         Args:
             scenario_id: Scenario ID
@@ -485,7 +499,11 @@ class CarbonClient:
         self.close()
     
     def close(self):
-        """Close HTTP and WebSocket clients."""
+        """Close HTTP and WebSocket clients.
+
+        Safe to call multiple times. Intended for use with the context manager
+        protocol or manual lifecycle management in long‑running processes.
+        """
         if self._client:
             self._client.close()
         if self._async_client:
@@ -503,8 +521,7 @@ class CarbonClient:
         reconnect_delay: float = 5.0,
         max_reconnect_attempts: int = 10,
     ) -> AsyncGenerator[PriceTick, None]:
-        """
-        Stream real-time price updates via WebSocket with enhanced connection management.
+        """Stream real‑time price updates via WebSocket.
 
         Args:
             instrument_ids: List of instrument IDs to subscribe to
@@ -584,8 +601,7 @@ class CarbonClient:
         reconnect_delay: float = 5.0,
         max_reconnect_attempts: int = 10,
     ) -> AsyncGenerator[PriceTick, None]:
-        """
-        Modern async generator interface for price streaming.
+        """Modern async generator interface for price streaming.
 
         Args:
             instrument_ids: List of instrument IDs to subscribe to
@@ -838,4 +854,3 @@ class CarbonClient:
             "upper_bound": [p * 1.1 for p in prices],
             "confidence": 0.8
         })
-

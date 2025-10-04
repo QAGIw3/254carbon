@@ -1,8 +1,21 @@
 """
 NYISO (New York Independent System Operator) Connector
 
-Ingests Real-Time and Day-Ahead LBMP (Location-Based Marginal Price),
-Capacity Market (ICAP), and Ancillary Services data from NYISO.
+Overview
+--------
+Ingests Real‑Time and Day‑Ahead LBMP (Location‑Based Marginal Price), Capacity
+Market (ICAP), Ancillary Services, and TCCs. This scaffold generates mock data
+unless wired to NYISO feeds explicitly.
+
+Data Flow
+---------
+NYISO feeds (or mocks) → canonical mapping → Kafka topic(s)
+
+Production Notes
+----------------
+- NYISO public data often ships as daily CSVs with date‑partitioned paths.
+- Robust ingestion would iterate day directories, parse CSVs, and normalize to
+  UTC.
 """
 import logging
 from datetime import datetime, timedelta

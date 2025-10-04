@@ -68,7 +68,7 @@ class TrainingRequest(BaseModel):
     instrument_ids: List[str]
     start_date: date
     end_date: date
-    model_type: str = "xgboost"  # xgboost, lightgbm, ensemble
+    model_type: str = "xgboost"  # xgboost, lightgbm, transformer, ensemble
     hyperparameters: Optional[Dict[str, Any]] = None
 
 

@@ -6,6 +6,10 @@ Integrates with Peruvian power market:
 - Mining sector demand (30%)
 - Hydro seasonal variations
 - Natural gas from Camisea
+
+Data Flow
+---------
+COES feeds (or mocks) → normalize to canonical tick schema → Kafka topic(s)
 """
 import logging
 from datetime import datetime, timedelta
@@ -150,4 +154,3 @@ class PeruCOESConnector(Ingestor):
 if __name__ == "__main__":
     connector = PeruCOESConnector({"source_id": "peru_coes"})
     connector.run()
-

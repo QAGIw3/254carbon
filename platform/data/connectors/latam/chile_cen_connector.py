@@ -5,7 +5,11 @@ Chilean power market with unified national system:
 - Marginal cost pricing
 - Copper mining demand (30%)
 - Solar Atacama Desert
-- Hydro-thermal coordination
+- Hydro‑thermal coordination
+
+Data Flow
+---------
+CEN feeds (or mocks) → normalize to canonical tick schema → Kafka topic(s)
 """
 import logging
 from datetime import datetime, timedelta
@@ -113,6 +117,5 @@ class ChileCENConnector(Ingestor):
 if __name__ == "__main__":
     connector = ChileCENConnector({"source_id": "chile_cen"})
     connector.run()
-
 
 

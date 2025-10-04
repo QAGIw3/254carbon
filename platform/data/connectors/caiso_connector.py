@@ -1,12 +1,31 @@
 """
 CAISO Nodal LMP Connector
 
-Pulls real-time and day-ahead LMP data from CAISO OASIS API.
-Implements entitlement restrictions per pilot requirements.
+Overview
+--------
+Pulls Real‑Time (RTM) and Day‑Ahead (DAM) LMP data from CAISO OASIS using the
+SingleZip endpoint (CSV‑in‑ZIP) for reliable parsing. Enforces entitlement
+restrictions (hub‑only access) for pilot customers. Emits canonical events to
+Kafka for downstream persistence and analytics.
 
-Production path uses the OASIS SingleZip endpoint with CSV-in-ZIP (resultformat=6)
-for reliable parsing. Falls back to minimal mock data only in development or
-when OASIS is unavailable.
+Data Flow
+---------
+CAISO OASIS SingleZip → CSV parser → canonical tick schema → Kafka topic
+
+Configuration
+-------------
+- ``api_base``: OASIS base URL (SingleZip)
+- ``market_type``: ``RTM`` or ``DAM``
+- ``hub_only`` / ``allowed_hubs`` / ``allowed_nodes``: entitlement controls
+- ``timeout_seconds`` / ``max_retries`` / ``retry_backoff_base``: network tuning
+- ``override_start`` / ``override_end``: optional backfill window
+
+Operational Notes
+-----------------
+- Timestamps are normalized from OASIS fields to UTC.
+- CSV shape varies slightly by report; column aliases are handled defensively.
+- Retries use exponential backoff with a base factor; client errors (4xx)
+  terminate early to avoid waste.
 """
 import logging
 from datetime import datetime, timedelta, timezone
@@ -44,6 +63,7 @@ class CAISOConnector(Ingestor):
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
+        # Network and API configuration
         self.api_base = config.get("api_base", "https://oasis.caiso.com/oasisapi/SingleZip")
         self.market_type = config.get("market_type", "RTM")  # RTM (Real-Time) or DAM (Day-Ahead)
         self.kafka_topic = config.get("kafka_topic", "power.ticks.v1")
@@ -223,6 +243,7 @@ class CAISOConnector(Ingestor):
             backoff = self.retry_backoff_base * (2 ** (attempt - 1))
             time.sleep(backoff)
 
+        # Parse CSV inside ZIP (OASIS SingleZip response)
         with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
             csv_name = next((n for n in zf.namelist() if n.lower().endswith('.csv')), None)
             if not csv_name:
@@ -318,7 +339,14 @@ class CAISOConnector(Ingestor):
         return datetime.now(timezone.utc) - timedelta(hours=1)
     
     def emit(self, events: Iterator[Dict[str, Any]]) -> int:
-        """Emit events to Kafka."""
+        """Emit events to Kafka.
+
+        Notes
+        -----
+        - Producer is lazily initialized to avoid repeated connections.
+        - Events are filtered by entitlement when enabled.
+        - Flush ensures delivery before checkpointing.
+        """
         if self.producer is None:
             self.producer = KafkaProducer(
                 bootstrap_servers=self.kafka_bootstrap,

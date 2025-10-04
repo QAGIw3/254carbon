@@ -1,4 +1,13 @@
+## Runtime dependencies for the 254Carbon Python SDK
+
+# HTTP client for sync/async requests with timeouts and retries handled in SDK
 httpx>=0.25.0
+
+# Data analysis integration (DataFrame conversions and analytics helpers)
 pandas>=2.0.0
+
+# WebSocket client for real-time streaming APIs
 websockets>=12.0
+
+# Numerical routines for analytics and mock data generation
 numpy>=1.24.0

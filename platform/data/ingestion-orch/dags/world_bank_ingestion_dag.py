@@ -1,8 +1,25 @@
 """
 World Bank Ingestion DAG
 
-Runs World Bank connectors (energy + economics) in live mode to publish
-indicators to Kafka fundamentals for downstream persistence.
+Overview
+--------
+Runs World Bank connectors (energy + economics) in live mode and publishes
+selected indicators to Kafka fundamentals for downstream persistence.
+
+Configuration
+-------------
+Environment variables or Airflow Variables control scope:
+- ``WB_COUNTRY``: Country code (e.g., WLD)
+- ``WB_ENERGY_INDICATORS``: Comma‑separated list of energy indicators
+- ``WB_ECON_INDICATORS``: Comma‑separated list of economics indicators
+- ``WB_START_YEAR`` / ``WB_END_YEAR``: Year range
+- ``WB_API_BASE``: API base URL
+- ``KAFKA_BOOTSTRAP``: Kafka brokers
+
+Backfill Strategy
+-----------------
+The ``backfill_world_bank`` task performs chunked requests over year ranges to
+avoid oversized payloads and API rate limits.
 """
 from datetime import timedelta
 from airflow import DAG

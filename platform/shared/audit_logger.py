@@ -1,7 +1,18 @@
 """
 Centralized Audit Logging Library for 254Carbon Platform
 
-Provides structured logging with distributed tracing for SOC2 compliance.
+Overview
+--------
+Provides structured JSON logging and basic anomaly detection utilities with
+distributed tracing context. Intended to support SOC 2 controls around audit
+trails, security monitoring, and incident investigation.
+
+Notes
+-----
+- Storage: includes a database logger that writes to PostgreSQL (via asyncpg).
+- Context: uses contextvars to propagate request/trace IDs across coroutines.
+- Safety: audit logging must never break business logic; failures are caught
+  and logged but not re‑raised.
 """
 import logging
 import json
@@ -13,13 +24,17 @@ import asyncpg
 
 logger = logging.getLogger(__name__)
 
-# Context variables for distributed tracing
+# Context variables for distributed tracing propagated implicitly in async tasks
 request_id_ctx: ContextVar[str] = ContextVar('request_id', default='')
 trace_id_ctx: ContextVar[str] = ContextVar('trace_id', default='')
 
 
 class StructuredLogger:
-    """Structured JSON logging for audit and security events."""
+    """Structured JSON logging for audit and security events.
+
+    Emits JSON lines that can be shipped to centralized logging backends
+    (e.g., Loki, ELK) and correlated via request/trace IDs.
+    """
     
     def __init__(self, service_name: str):
         self.service_name = service_name
@@ -32,7 +47,7 @@ class StructuredLogger:
         message: str,
         **kwargs
     ):
-        """Log structured JSON event."""
+        """Log a structured JSON event to the configured logger."""
         log_entry = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "service": self.service_name,
@@ -59,7 +74,7 @@ class StructuredLogger:
         success: bool,
         **details
     ):
-        """Log audit event."""
+        """Log an audit event describing a user action on a resource."""
         self._log_structured(
             level="INFO",
             event_type="audit",
@@ -79,7 +94,7 @@ class StructuredLogger:
         user_id: Optional[str] = None,
         **details
     ):
-        """Log security event."""
+        """Log a security event with severity label (low/medium/high/critical)."""
         self._log_structured(
             level="WARNING" if severity in ["medium", "high", "critical"] else "INFO",
             event_type="security",
@@ -95,7 +110,7 @@ class StructuredLogger:
         duration_ms: float,
         **details
     ):
-        """Log performance metric."""
+        """Log a performance metric for the given operation."""
         self._log_structured(
             level="INFO",
             event_type="performance",
@@ -111,7 +126,7 @@ class StructuredLogger:
         message: str,
         **details
     ):
-        """Log error event."""
+        """Log an error event without raising exceptions."""
         self._log_structured(
             level="ERROR",
             event_type="error",
@@ -122,7 +137,12 @@ class StructuredLogger:
 
 
 class DatabaseAuditLogger:
-    """Database-backed audit logger for compliance and investigation."""
+    """Database-backed audit logger for compliance and investigation.
+
+    Persists events to PostgreSQL (schema/table assumed as ``pg.audit_log``)
+    and mirrors them to structured logs for aggregation. The database writes are
+    best‑effort; failures are recorded but do not propagate to callers.
+    """
     
     def __init__(self, db_pool: asyncpg.Pool):
         self.pool = db_pool
@@ -141,9 +161,12 @@ class DatabaseAuditLogger:
         details: Optional[Dict[str, Any]] = None,
     ):
         """
-        Log audit event to database.
-        
-        This provides immutable audit trail for SOC2 compliance.
+        Log a single audit event to the database and structured logs.
+
+        Notes
+        -----
+        - The SQL uses parameter binding to avoid injection risks.
+        - Consider partitioning/TTL strategies for large audit tables.
         """
         try:
             async with self.pool.acquire() as conn:
@@ -166,7 +189,7 @@ class DatabaseAuditLogger:
                     json.dumps(details) if details else None,
                 )
             
-            # Also log structured event
+            # Also log structured event for immediate visibility in logs
             self.structured_logger.audit(
                 action=action,
                 user_id=user_id,
@@ -178,7 +201,7 @@ class DatabaseAuditLogger:
             )
             
         except Exception as e:
-            # Never fail operations due to audit logging
+            # Never fail caller operations due to audit logging
             logger.error(f"Failed to log audit event: {e}")
             self.structured_logger.error(
                 error_type="audit_logging_failure",
@@ -196,7 +219,7 @@ class DatabaseAuditLogger:
         success: bool,
         failure_reason: Optional[str] = None,
     ):
-        """Log authentication attempt."""
+        """Log authentication attempt and flag failures as security events."""
         details = {
             "failure_reason": failure_reason,
             "request_id": request_id_ctx.get(),
@@ -314,17 +337,17 @@ class DatabaseAuditLogger:
 
 
 def generate_request_id() -> str:
-    """Generate unique request ID for tracing."""
+    """Generate a unique request ID for tracing."""
     return str(uuid.uuid4())
 
 
 def generate_trace_id() -> str:
-    """Generate unique trace ID for distributed tracing."""
+    """Generate a unique trace ID for distributed tracing."""
     return str(uuid.uuid4())
 
 
 def set_request_context(request_id: str, trace_id: Optional[str] = None):
-    """Set request context for logging."""
+    """Set request context for logging (idempotent for missing trace IDs)."""
     request_id_ctx.set(request_id)
     if trace_id:
         trace_id_ctx.set(trace_id)
@@ -333,7 +356,7 @@ def set_request_context(request_id: str, trace_id: Optional[str] = None):
 
 
 def get_request_context() -> Dict[str, str]:
-    """Get current request context."""
+    """Get the current request/trace context as a dict."""
     return {
         "request_id": request_id_ctx.get(),
         "trace_id": trace_id_ctx.get(),
@@ -351,14 +374,18 @@ SECURITY_PATTERNS = {
 
 
 class SecurityEventDetector:
-    """Detect suspicious patterns in audit logs."""
+    """Detect suspicious patterns in audit logs using simple heuristics.
+
+    This is not a full SIEM; it provides lightweight checks that can be
+    scheduled periodically or invoked on specific triggers.
+    """
     
     def __init__(self, db_pool: asyncpg.Pool):
         self.pool = db_pool
         self.logger = StructuredLogger("security_detector")
     
     async def check_brute_force(self, user_id: str, window_minutes: int = 15) -> bool:
-        """Check for brute force authentication attempts."""
+        """Check for brute force authentication attempts over a time window."""
         async with self.pool.acquire() as conn:
             result = await conn.fetchval(
                 """
@@ -422,6 +449,5 @@ class SecurityEventDetector:
                     return True
         
         return False
-
 
 

@@ -1,8 +1,21 @@
 """
 ERCOT Connector
 
-Ingests Settlement Point Prices (SPP), hub prices, ORDC adders,
-and resource-specific data from ERCOT.
+Overview
+--------
+Ingests Settlement Point Prices (SPP), hub prices, ORDC adders, and
+resource‑specific telemetry from ERCOT. This scaffold uses mocked generators
+for predictable dev/test behavior; wire to ERCOT public datasets for live mode.
+
+Data Flow
+---------
+ERCOT API (or mocks) → canonical mapping → Kafka topic(s)
+
+Operational Notes
+-----------------
+- SPP cadence is 15 minutes; timestamps here normalize to interval‑ending.
+- ORDC scarcity adders are simplified; production should compute from ERCOT’s
+  reserve curves and LOLP inputs.
 """
 import logging
 from datetime import datetime, timedelta

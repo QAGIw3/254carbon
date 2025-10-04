@@ -1,6 +1,8 @@
 """
 AESO Ingestion DAGs
 
+Overview
+--------
 Schedules ingestion for:
 - Pool Price (hourly)
 - Alberta Internal Load (every 5 minutes)
@@ -8,15 +10,23 @@ Schedules ingestion for:
 - Generation mix (every 5 minutes)
 
 Design
-- Each DAG wraps a simple PythonOperator task that instantiates AESOConnector
-  with the appropriate data_type and configuration, then runs the connector.
-- Basic quality checks ensure we process at least some events and assert data
-  freshness in ClickHouse by comparing now to the max event_time.
+------
+- Each DAG wraps a PythonOperator that instantiates ``AESOConnector`` with the
+  appropriate ``data_type`` and configuration, then runs the connector.
+- Basic quality checks assert minimum records processed and staleness bounds in
+  ClickHouse by inspecting the latest ``event_time``.
 
-Auth & runtime configuration
+Auth & Runtime Configuration
+----------------------------
 - Live AESO API calls can be enabled per connector (POOL/AIL) via flags
-  use_live_pool and use_live_ail; secrets are read from environment:
-  AESO_BEARER_TOKEN or AESO_API_KEY.
+  ``use_live_pool`` and ``use_live_ail``.
+- Secrets are sourced from environment or Airflow Variables:
+  ``AESO_BEARER_TOKEN`` or ``AESO_API_KEY``.
+
+Data Lineage
+------------
+AESO API → Connector → Kafka (e.g., ``power.ticks.v1``/``power.load.v1``) →
+ClickHouse downstream tables for analytics.
 """
 from datetime import datetime, timedelta
 from airflow import DAG

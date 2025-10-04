@@ -1,13 +1,33 @@
 """
 CAISO Real-Time and Day-Ahead LMP Ingestion DAGs
 
-Schedules
-- RTM: every 5 minutes
-- DAM: hourly
+Overview
+--------
+Ingests CAISO Real‑Time (RTM) and Day‑Ahead (DAM) LMPs at hub level using the
+``CAISOConnector``. Data is normalized to the canonical tick schema and
+published to Kafka for downstream storage and analytics.
 
-Design
-- Uses CAISOConnector which fetches OASIS SingleZip CSV-in-ZIP payloads,
-  parses to canonical schema, and enforces hub-only pilot restrictions.
+Schedules
+- RTM: every 5 minutes (near real‑time)
+- DAM: hourly (day‑ahead publication windows)
+
+Data Flow
+---------
+CAISO OASIS → Connector (CSV‑in‑ZIP parsing) → Kafka ``power.ticks.v1`` →
+ClickHouse ``ch.market_price_ticks`` (downstream)
+
+Operational Notes
+-----------------
+- Entitlements: Pilot restriction enforces hub‑only ingestion; see
+  ``verify_entitlement_restrictions`` task.
+- Quality checks: Validates minimum processed events and staleness against DB.
+- Retries/backoff: Controlled by DAG default args and connector settings.
+- Timeouts: Connector receives a per‑request timeout; tune for OASIS behavior.
+
+Configuration
+-------------
+This DAG is mostly self‑contained; consider wiring secrets/env vars via Airflow
+Connections/Variables if expanding beyond pilot scope.
 """
 from datetime import datetime, timedelta
 from airflow import DAG

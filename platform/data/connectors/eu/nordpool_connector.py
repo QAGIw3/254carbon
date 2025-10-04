@@ -1,8 +1,15 @@
 """
 Nord Pool Connector
 
-Ingests day-ahead and intraday prices from Nord Pool
-(Nordic and Baltic electricity markets).
+Overview
+--------
+Ingests day‑ahead (Elspot) and intraday (Elbas) prices for Nordic and Baltic
+regions. Maps to canonical schema, handling area‑specific currencies (NOK, SEK,
+DKK, EUR) and timezone normalization.
+
+Data Flow
+---------
+Nord Pool API → parse area prices → canonical tick schema → Kafka topic
 """
 import logging
 from datetime import datetime, timedelta
@@ -209,4 +216,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = NordPoolConnector(config)
         connector.run()
-

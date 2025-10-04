@@ -12,3 +12,9 @@ asyncpg==0.29.0
 clickhouse-driver==0.2.6
 websockets==12.0
 requests==2.31.0
+
+# PyTorch and related libraries for transformer models
+torch==2.1.0
+torchvision==0.16.0
+torchaudio==2.1.0
+pytorch-lightning==2.1.0

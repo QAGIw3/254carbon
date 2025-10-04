@@ -1,10 +1,14 @@
 """
 Nigeria Power Market Connector
 
-Integrates with Nigerian Electricity Supply Industry (NESI):
-- Day-ahead market
-- Real-time dispatch
-- West Africa Power Pool integration
+Overview
+--------
+Integrates with Nigerian Electricity Supply Industry (NESI) for day‑ahead and
+real‑time dispatch, including West Africa Power Pool interconnections.
+
+Data Flow
+---------
+NESI feeds (or mocks) → canonical mapping → Kafka topic(s)
 """
 import logging
 from datetime import datetime, timedelta
@@ -142,4 +146,3 @@ class NigeriaConnector(Ingestor):
 if __name__ == "__main__":
     connector = NigeriaConnector({"source_id": "nigeria_nesi"})
     connector.run()
-

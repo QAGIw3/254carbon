@@ -1,6 +1,25 @@
 """
 Forward Curve Generation DAG
-Scheduled to run daily at 6 AM UTC for baseline scenario.
+
+Overview
+--------
+Prepares targets and triggers the Curve Service to generate baseline forward
+curves for selected instruments. Validates outputs with lightweight checks.
+
+Schedule
+- Daily at 06:00 UTC for the baseline (``BASE``) scenario.
+
+Data Flow
+---------
+ClickHouse fundamentals → targets (μ_t) → Curve Service REST ``/curves/generate``
+→ persisted curves (downstream by service) → validation checks
+
+Operational Notes
+-----------------
+- Inputs are mocked in this DAG for demonstration; replace with real queries.
+- Validate generated curves for domain constraints (e.g., non‑negative,
+  tenor‑consistent monotonicity where applicable).
+- Consider idempotency if re‑running for the same as‑of date.
 """
 from datetime import datetime, timedelta
 from airflow import DAG
@@ -116,4 +135,3 @@ with DAG(
     )
     
     prepare >> generate >> validate
-

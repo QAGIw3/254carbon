@@ -141,20 +141,20 @@ class AlertManager:
                 if alert.alert_type == "price_threshold":
                     if alert.direction == "above" and current_price > alert.threshold:
                         triggered = True
-                        alert_reason = f"Price ${current_price".2f"} exceeded threshold ${alert.threshold".2f"}"
+                        alert_reason = f"Price ${current_price:.2f} exceeded threshold ${alert.threshold:.2f}"
                     elif alert.direction == "below" and current_price < alert.threshold:
                         triggered = True
-                        alert_reason = f"Price ${current_price".2f"} fell below threshold ${alert.threshold".2f"}"
+                        alert_reason = f"Price ${current_price:.2f} fell below threshold ${alert.threshold:.2f}"
                     elif alert.direction == "both":
                         if current_price > alert.threshold or current_price < alert.threshold:
                             triggered = True
-                            alert_reason = f"Price ${current_price".2f"} outside threshold ${alert.threshold".2f"}"
+                            alert_reason = f"Price ${current_price:.2f} outside threshold ${alert.threshold:.2f}"
 
                 elif alert.alert_type == "volatility":
                     # Alert if volatility exceeds threshold
                     if current_volatility > alert.threshold:
                         triggered = True
-                        alert_reason = f"Price volatility {current_volatility".2f"} exceeded threshold {alert.threshold".2f"}"
+                        alert_reason = f"Price volatility {current_volatility:.2f} exceeded threshold {alert.threshold:.2f}"
 
                 elif alert.alert_type == "spike":
                     # Check for price spikes (sudden large changes)
@@ -162,7 +162,7 @@ class AlertManager:
                         price_change = abs(node_prices[0]['price'] - node_prices[1]['price'])
                         if price_change > alert.threshold:
                             triggered = True
-                            alert_reason = f"Price spike detected: ${price_change".2f"} change"
+                            alert_reason = f"Price spike detected: ${price_change:.2f} change"
 
                 if triggered:
                     alert_trigger = {

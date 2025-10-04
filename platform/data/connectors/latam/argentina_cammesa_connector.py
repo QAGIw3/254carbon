@@ -1,11 +1,15 @@
 """
 Argentina CAMMESA (Compañía Administradora del Mercado Mayorista Eléctrico) Connector
 
-Integrates with Argentine wholesale electricity market:
-- Seasonal spot market
-- Currency volatility (ARS)
-- Vaca Muerta gas influence
-- Hydro-thermal-renewable mix
+Overview
+--------
+Integrates with Argentina's wholesale electricity market, capturing seasonal
+spot dynamics, currency volatility (ARS), hydro‑thermal‑renewable interplay,
+and gas influences (e.g., Vaca Muerta).
+
+Data Flow
+---------
+CAMMESA feeds (or mocks) → canonical mapping → Kafka topic(s)
 """
 import logging
 from datetime import datetime, timedelta
@@ -151,4 +155,3 @@ class ArgentinaCAMMESAConnector(Ingestor):
 if __name__ == "__main__":
     connector = ArgentinaCAMMESAConnector({"source_id": "argentina_cammesa"})
     connector.run()
-

@@ -1,8 +1,15 @@
 """
 IESO (Independent Electricity System Operator) Connector
 
-Ingests Ontario electricity market data including HOEP (Hourly Ontario Energy Price),
-pre-dispatch forecasts, and intertie flows.
+Overview
+--------
+Ingests Ontario electricity market data including HOEP (Hourly Ontario Energy
+Price), pre‑dispatch price forecasts, intertie flows, and Ontario demand. This
+scaffold emits mock data until wired to IESO Data Directory endpoints.
+
+Data Flow
+---------
+IESO feeds (or mocks) → canonical mapping → Kafka topic(s)
 """
 import logging
 from datetime import datetime, timedelta

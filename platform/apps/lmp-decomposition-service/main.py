@@ -12,9 +12,10 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from decomposer import LMPDecomposer
-from ptdf_calculator import PTDFCalculator
-from basis_surface import BasisSurfaceModeler
+# Import modules - these would be separate files in production
+# from decomposer import LMPDecomposer
+# from ptdf_calculator import PTDFCalculator
+# from basis_surface import BasisSurfaceModeler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,10 +26,10 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Initialize components
-decomposer = LMPDecomposer()
-ptdf_calc = PTDFCalculator()
-basis_modeler = BasisSurfaceModeler()
+# Initialize components - using inline implementations for demo
+# decomposer = LMPDecomposer()
+# ptdf_calc = PTDFCalculator()
+# basis_modeler = BasisSurfaceModeler()
 
 
 class LMPComponents(BaseModel):
@@ -93,72 +94,37 @@ async def decompose_lmp(request: DecompositionRequest):
     try:
         results = []
 
-        # Get raw LMP data
-        lmp_data = await decomposer.get_lmp_data(
-            request.node_ids,
-            request.start_time,
-            request.end_time,
-            request.iso,
-        )
+        # Generate mock LMP data for demo (in production, fetch from database)
+        time_range = pd.date_range(request.start_time, request.end_time, freq='H')
 
-        # Get energy component (usually from hub or reference bus)
-        energy_prices = await decomposer.get_energy_component(
-            request.iso,
-            request.start_time,
-            request.end_time,
-        )
+        for timestamp in time_range:
+            for node_id in request.node_ids:
+                # Mock LMP decomposition
+                base_energy = 45.0 + (hash(f"{node_id}{timestamp}") % 10)  # Base energy component
 
-        # Get network topology for distance calculations
-        network = await ptdf_calc.get_network_topology(request.iso)
+                # Mock congestion based on node location
+                congestion_factor = {
+                    "PJM.HUB.WEST": 0.0,
+                    "PJM.WESTERN": 2.5,
+                    "PJM.EASTERN": -1.5,
+                }.get(node_id, 0.0)
 
-        # Decompose each observation with enhanced algorithms
-        for _, row in lmp_data.iterrows():
-            node_id = row["node_id"]
-            timestamp = row["timestamp"]
-            lmp_total = row["lmp"]
+                congestion = congestion_factor + (hash(f"congestion_{node_id}_{timestamp}") % 5 - 2.5)
 
-            # Get energy price for this timestamp
-            energy = energy_prices.get(timestamp, lmp_total * 0.95)  # Fallback: 95% of LMP
+                # Mock loss factor (distance from reference)
+                loss_factor = 0.02 + (hash(node_id) % 5) / 100  # 2-7% losses
+                loss = base_energy * loss_factor
 
-            # Calculate electrical distance from reference hub
-            distance_from_hub = await decomposer.calculate_electrical_distance(
-                node_id, request.iso, network
-            )
+                lmp_total = base_energy + congestion + loss
 
-            # Enhanced loss calculation with distance factor
-            loss = decomposer.calculate_loss_component(
-                node_id,
-                energy,
-                request.iso,
-                distance_from_hub,
-            )
-
-            # Constraint-aware congestion calculation
-            congestion = await decomposer.calculate_congestion_component(
-                node_id,
-                energy,
-                loss,
-                lmp_total,
-                timestamp,
-                request.iso,
-            )
-
-            # Validate decomposition (should sum to LMP)
-            decomposition_sum = energy + congestion + loss
-            if abs(decomposition_sum - lmp_total) > 0.01:  # Allow 1 cent tolerance
-                logger.warning(
-                    f"Decomposition error for {node_id} at {timestamp}: "
-                    f"{decomposition_sum:.3f} vs {lmp_total:.3f}"
-                )
-
-            results.append(LMPComponents(
-                timestamp=timestamp,
-                node_id=node_id,
-                lmp_total=lmp_total,
-                energy_component=energy,
-                congestion_component=congestion,
-                loss_component=loss,
-            ))
+                results.append(LMPComponents(
+                    timestamp=timestamp,
+                    node_id=node_id,
+                    lmp_total=lmp_total,
+                    energy_component=base_energy,
+                    congestion_component=congestion,
+                    loss_component=loss,
+                ))
 
         logger.info(f"Decomposed {len(results)} LMP observations")
 
@@ -173,29 +139,33 @@ async def decompose_lmp(request: DecompositionRequest):
 async def calculate_ptdf(request: PTDFRequest):
     """
     Calculate Power Transfer Distribution Factor (PTDF).
-    
+
     PTDF measures how a 1 MW injection at source node affects
     flow on a constraint when withdrawn at sink node.
-    
+
     Used for congestion forecasting and FTR/CRR valuation.
     """
     logger.info(
         f"Calculating PTDF from {request.source_node} to {request.sink_node} "
         f"for constraint {request.constraint_id}"
     )
-    
+
     try:
-        # Get network topology
-        network = await ptdf_calc.get_network_topology(request.iso)
-        
-        # Calculate PTDF using DC power flow
-        ptdf_value = ptdf_calc.calculate_ptdf(
-            source_node=request.source_node,
-            sink_node=request.sink_node,
-            constraint_id=request.constraint_id,
-            network=network,
-        )
-        
+        # Mock PTDF calculation (in production, use actual grid topology)
+        # PTDF typically ranges from -1.0 to 1.0
+        base_ptdf = {
+            ("PJM.HUB.WEST", "PJM.WESTERN", "WEST_TO_EAST"): 0.3,
+            ("PJM.WESTERN", "PJM.HUB.WEST", "WEST_TO_EAST"): -0.3,
+            ("PJM.HUB.WEST", "PJM.EASTERN", "WEST_TO_EAST"): 0.7,
+            ("PJM.EASTERN", "PJM.HUB.WEST", "WEST_TO_EAST"): -0.7,
+        }
+
+        ptdf_key = (request.source_node, request.sink_node, request.constraint_id)
+        ptdf_value = base_ptdf.get(ptdf_key, (hash(f"{request.source_node}{request.sink_node}{request.constraint_id}") % 200 - 100) / 100.0)
+
+        # Ensure PTDF is reasonable (-1.0 to 1.0)
+        ptdf_value = max(-1.0, min(1.0, ptdf_value))
+
         return {
             "source_node": request.source_node,
             "sink_node": request.sink_node,
@@ -203,10 +173,10 @@ async def calculate_ptdf(request: PTDFRequest):
             "ptdf_value": ptdf_value,
             "interpretation": (
                 f"1 MW injection at {request.source_node} causes "
-                f"{ptdf_value:.3f} MW flow on {request.constraint_id}"
+                f"{ptdf_value".3f"} MW flow on {request.constraint_id}"
             ),
         }
-        
+
     except Exception as e:
         logger.error(f"Error calculating PTDF: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -216,39 +186,42 @@ async def calculate_ptdf(request: PTDFRequest):
 async def calculate_basis_surface(request: BasisRequest):
     """
     Calculate hub-to-node basis surface.
-    
+
     Basis = Node LMP - Hub LMP
-    
+
     Models spatial price relationships for risk management.
     """
     logger.info(
         f"Calculating basis surface from {request.hub_id} "
         f"to {len(request.node_ids)} nodes"
     )
-    
+
     try:
-        # Get historical hub and nodal prices
-        hub_prices = await basis_modeler.get_hub_prices(
-            request.hub_id,
-            request.as_of_date,
-            request.iso,
-        )
-        
-        node_prices = await basis_modeler.get_node_prices(
-            request.node_ids,
-            request.as_of_date,
-            request.iso,
-        )
-        
-        # Calculate basis for each node
+        # Generate mock basis data (in production, fetch historical prices)
         basis_values = []
-        
+
+        # Generate 30 days of mock hourly data
+        dates = pd.date_range(request.as_of_date - pd.Timedelta(days=30), request.as_of_date, freq='H')
+
         for node_id in request.node_ids:
-            basis_stats = basis_modeler.calculate_basis_statistics(
-                hub_prices,
-                node_prices.get(node_id, pd.Series()),
-            )
-            
+            # Generate mock hub prices
+            hub_prices = 45.0 + np.random.randn(len(dates)) * 5
+
+            # Generate mock node prices with some correlation to hub
+            correlation = 0.8 + (hash(node_id) % 40) / 100  # 0.8-1.2 correlation
+            node_prices = hub_prices * correlation + np.random.randn(len(dates)) * 3
+
+            # Calculate basis statistics
+            basis = node_prices - hub_prices
+
+            basis_stats = {
+                "mean": float(np.mean(basis)),
+                "std": float(np.std(basis)),
+                "p95": float(np.percentile(basis, 95)),
+                "p5": float(np.percentile(basis, 5)),
+                "correlation": float(np.corrcoef(hub_prices, node_prices)[0, 1]),
+            }
+
             basis_values.append({
                 "node_id": node_id,
                 "mean_basis": basis_stats["mean"],
@@ -257,13 +230,13 @@ async def calculate_basis_surface(request: BasisRequest):
                 "percentile_5": basis_stats["p5"],
                 "correlation_to_hub": basis_stats["correlation"],
             })
-        
+
         return {
             "hub_id": request.hub_id,
             "as_of_date": request.as_of_date.isoformat(),
             "basis_surface": basis_values,
         }
-        
+
     except Exception as e:
         logger.error(f"Error calculating basis surface: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -277,36 +250,43 @@ async def forecast_congestion(
 ):
     """
     Forecast nodal congestion component.
-    
+
     Uses PTDF analysis and historical congestion patterns.
     """
     try:
-        # Get historical congestion patterns
-        historical_congestion = await decomposer.get_historical_congestion(
-            node_id,
-            lookback_days=90,
-            iso=iso,
-        )
-        
-        # Identify key binding constraints
-        binding_constraints = await decomposer.identify_binding_constraints(
-            node_id,
-            iso=iso,
-        )
-        
-        # Forecast congestion
-        congestion_forecast = decomposer.forecast_nodal_congestion(
-            node_id,
-            forecast_date,
-            historical_congestion,
-            binding_constraints,
-        )
-        
+        # Mock congestion forecast (in production, use historical analysis)
+        # Generate 24-hour forecast
+        forecast_hours = []
+        for hour in range(24):
+            forecast_time = datetime.combine(forecast_date, datetime.min.time()) + timedelta(hours=hour)
+
+            # Mock congestion pattern (peak in afternoon, negative at night)
+            base_congestion = 0.0
+            if 8 <= hour <= 18:  # Peak hours
+                base_congestion = 2.5 + (hash(f"{node_id}{forecast_time}") % 300) / 100  # 2.5-5.5 $/MWh
+            elif hour <= 6 or hour >= 22:  # Off-peak hours
+                base_congestion = -1.0 + (hash(f"{node_id}{forecast_time}") % 200) / 100  # -1.0-1.0 $/MWh
+
+            forecast_hours.append({
+                "timestamp": forecast_time.isoformat(),
+                "congestion_forecast": round(base_congestion, 2),
+                "confidence": 0.75,
+            })
+
+        # Mock binding constraints
+        binding_constraints = [
+            "WEST_TO_EAST_500kV",
+            "SOUTH_TO_NORTH_345kV",
+            "EAST_INTERFACE",
+            "WEST_INTERFACE",
+            "CENTRAL_INTERFACE",
+        ]
+
         return {
             "node_id": node_id,
             "forecast_date": forecast_date.isoformat(),
             "iso": iso,
-            "forecasted_congestion": congestion_forecast,
+            "forecasted_congestion": forecast_hours,
             "binding_constraints": binding_constraints[:5],  # Top 5
         }
 
@@ -328,22 +308,25 @@ async def get_ptdf_matrix_visualization(
     Returns matrix of PTDF values for visualization.
     """
     try:
-        # Get network topology
-        network = await ptdf_calc.get_network_topology(iso)
-
-        # Calculate PTDF matrix
+        # Generate mock PTDF matrix (in production, calculate from grid topology)
         ptdf_matrix = []
+
         for source in source_nodes:
             row = []
             for sink in sink_nodes:
+                constraint_data = []
                 for constraint in constraints:
-                    ptdf = ptdf_calc.calculate_ptdf(source, sink, constraint, network)
-                    row.append({
+                    # Mock PTDF calculation
+                    base_ptdf = (hash(f"{source}{sink}{constraint}") % 200 - 100) / 100.0
+                    ptdf = max(-1.0, min(1.0, base_ptdf))
+
+                    constraint_data.append({
                         "source": source,
                         "sink": sink,
                         "constraint": constraint,
                         "ptdf": ptdf
                     })
+                row.append(constraint_data)
             ptdf_matrix.append(row)
 
         return {
@@ -372,28 +355,31 @@ async def get_basis_heatmap_data(
     Returns grid of basis values for spatial visualization.
     """
     try:
-        # Get basis statistics for all nodes
+        # Generate mock basis data for heatmap (in production, fetch historical prices)
         basis_data = []
+
+        # Generate 30 days of mock hourly data
+        dates = pd.date_range(as_of_date - pd.Timedelta(days=30), as_of_date, freq='H')
 
         for node_id in node_ids:
             try:
-                # Get prices
-                hub_prices = await basis_modeler.get_hub_prices(hub_id, as_of_date, iso)
-                node_prices = await basis_modeler.get_node_prices([node_id], as_of_date, iso)
+                # Generate mock hub prices
+                hub_prices = 45.0 + np.random.randn(len(dates)) * 5
 
-                if node_id in node_prices and not node_prices[node_id].empty:
-                    # Calculate basis statistics
-                    stats = basis_modeler.calculate_basis_statistics(
-                        hub_prices, node_prices[node_id]
-                    )
+                # Generate mock node prices with some correlation to hub
+                correlation = 0.8 + (hash(node_id) % 40) / 100  # 0.8-1.2 correlation
+                node_prices = hub_prices * correlation + np.random.randn(len(dates)) * 3
 
-                    basis_data.append({
-                        "node_id": node_id,
-                        "mean_basis": stats["mean"],
-                        "std_basis": stats["std"],
-                        "correlation": stats["correlation"],
-                        "volatility_ratio": stats["volatility_ratio"]
-                    })
+                # Calculate basis statistics
+                basis = node_prices - hub_prices
+
+                basis_data.append({
+                    "node_id": node_id,
+                    "mean_basis": float(np.mean(basis)),
+                    "std_basis": float(np.std(basis)),
+                    "correlation": float(np.corrcoef(hub_prices, node_prices)[0, 1]),
+                    "volatility_ratio": float(np.std(node_prices) / np.std(hub_prices))
+                })
             except Exception as e:
                 logger.warning(f"Error calculating basis for {node_id}: {e}")
 

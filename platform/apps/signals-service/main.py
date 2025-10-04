@@ -282,18 +282,151 @@ class SignalGenerator:
         instrument_id: str,
         market_data: Dict[str, Any]
     ) -> TradingSignal:
-        """Volatility-based strategy."""
-        # Placeholder
-        return self._hold_signal(instrument_id)
-    
+        """
+        Volatility-based strategy.
+
+        Buy when volatility is low and expected to increase,
+        sell when volatility is high and expected to decrease.
+        """
+        prices = market_data.get("prices", [])
+        if len(prices) < 30:
+            return self._hold_signal(instrument_id)
+
+        current_price = prices[-1]
+
+        # Calculate historical volatility (20-day)
+        returns = []
+        for i in range(1, min(21, len(prices))):
+            ret = (prices[-i] - prices[-i-1]) / prices[-i-1]
+            returns.append(ret)
+
+        if len(returns) < 10:
+            return self._hold_signal(instrument_id)
+
+        # Annualized volatility
+        vol_20 = (sum(r**2 for r in returns) / len(returns)) ** 0.5 * (252 ** 0.5)
+
+        # Recent volatility (5-day)
+        recent_returns = returns[-5:] if len(returns) >= 5 else returns
+        vol_5 = (sum(r**2 for r in recent_returns) / len(recent_returns)) ** 0.5 * (252 ** 0.5)
+
+        # Volatility regime detection
+        if vol_5 < vol_20 * 0.7 and vol_5 < 0.25:  # Low volatility regime
+            # Expect volatility to increase - buy volatility (sell when high)
+            signal_type = SignalType.SELL
+            strength = SignalStrength.MODERATE
+            confidence = min(vol_20 / 0.3, 0.8)  # Higher long-term vol = more confident
+            target = current_price * 0.95
+            stop_loss = current_price * 1.08
+            rationale = f"Low volatility regime detected. Historical vol: {vol_20:.2f}, Current: {vol_5:.2f}. Mean reversion expected."
+
+        elif vol_5 > vol_20 * 1.3 and vol_5 > 0.35:  # High volatility regime
+            # Expect volatility to decrease - sell volatility (buy when low)
+            signal_type = SignalType.BUY
+            strength = SignalStrength.MODERATE
+            confidence = min(vol_5 / 0.4, 0.8)
+            target = current_price * 1.05
+            stop_loss = current_price * 0.92
+            rationale = f"High volatility regime detected. Historical vol: {vol_20:.2f}, Current: {vol_5:.2f}. Mean reversion expected."
+
+        else:
+            return self._hold_signal(instrument_id)
+
+        return TradingSignal(
+            signal_id=f"SIG-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}",
+            instrument_id=instrument_id,
+            signal_type=signal_type,
+            strength=strength,
+            confidence=confidence,
+            entry_price=current_price,
+            target_price=target,
+            stop_loss=stop_loss,
+            strategy=Strategy.VOLATILITY,
+            generated_at=datetime.utcnow(),
+            expires_at=datetime.utcnow() + timedelta(hours=72),
+            rationale=rationale,
+        )
+
     async def _ml_ensemble_signal(
         self,
         instrument_id: str,
         market_data: Dict[str, Any]
     ) -> TradingSignal:
-        """ML ensemble strategy combining multiple models."""
-        # Placeholder - would use transformer model outputs
-        return self._hold_signal(instrument_id)
+        """
+        ML ensemble strategy combining multiple models.
+
+        Combines signals from mean reversion, momentum, and volatility models.
+        """
+        prices = market_data.get("prices", [])
+        if len(prices) < 50:
+            return self._hold_signal(instrument_id)
+
+        current_price = prices[-1]
+
+        # Get signals from individual strategies (simplified)
+        mean_reversion_signal = await self._mean_reversion_signal(instrument_id, market_data)
+        momentum_signal = await self._momentum_signal(instrument_id, market_data)
+        volatility_signal = await self._volatility_signal(instrument_id, market_data)
+
+        # Simple ensemble: majority vote with confidence weighting
+        signals = []
+        confidences = []
+
+        if mean_reversion_signal.signal_type != SignalType.HOLD:
+            signals.append(mean_reversion_signal.signal_type.value)
+            confidences.append(mean_reversion_signal.confidence)
+
+        if momentum_signal.signal_type != SignalType.HOLD:
+            signals.append(momentum_signal.signal_type.value)
+            confidences.append(momentum_signal.confidence)
+
+        if volatility_signal.signal_type != SignalType.HOLD:
+            signals.append(volatility_signal.signal_type.value)
+            confidences.append(volatility_signal.confidence)
+
+        if not signals:
+            return self._hold_signal(instrument_id)
+
+        # Majority vote
+        buy_count = signals.count("BUY")
+        sell_count = signals.count("SELL")
+
+        if buy_count > sell_count:
+            signal_type = SignalType.BUY
+            strength = SignalStrength.STRONG if buy_count >= 2 else SignalStrength.MODERATE
+            rationale = f"Ensemble: {buy_count} BUY, {sell_count} SELL signals. Mean reversion and momentum aligned."
+        elif sell_count > buy_count:
+            signal_type = SignalType.SELL
+            strength = SignalStrength.STRONG if sell_count >= 2 else SignalStrength.MODERATE
+            rationale = f"Ensemble: {buy_count} BUY, {sell_count} SELL signals. Mean reversion and momentum aligned."
+        else:
+            return self._hold_signal(instrument_id)
+
+        # Average confidence
+        avg_confidence = sum(confidences) / len(confidences)
+
+        # Conservative targets for ensemble
+        if signal_type == SignalType.BUY:
+            target = current_price * 1.03
+            stop_loss = current_price * 0.98
+        else:
+            target = current_price * 0.97
+            stop_loss = current_price * 1.02
+
+        return TradingSignal(
+            signal_id=f"SIG-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}",
+            instrument_id=instrument_id,
+            signal_type=signal_type,
+            strength=strength,
+            confidence=min(avg_confidence * 1.2, 0.9),  # Boost confidence for ensemble
+            entry_price=current_price,
+            target_price=target,
+            stop_loss=stop_loss,
+            strategy=Strategy.ML_ENSEMBLE,
+            generated_at=datetime.utcnow(),
+            expires_at=datetime.utcnow() + timedelta(hours=48),
+            rationale=rationale,
+        )
     
     def _hold_signal(self, instrument_id: str) -> TradingSignal:
         """Generate HOLD signal."""
