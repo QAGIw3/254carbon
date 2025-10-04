@@ -11,10 +11,10 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from .feature_engineering import FeatureEngineer
-from .models import PriceForecastModel, ModelRegistry
-from .training import ModelTrainer
-from .retraining_pipeline import RetrainingPipeline
+from feature_engineering import FeatureEngineer
+from models import PriceForecastModel, ModelRegistry
+from training import ModelTrainer
+from retraining_pipeline import RetrainingPipeline
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -362,4 +362,3 @@ async def get_models_health():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8006)
-

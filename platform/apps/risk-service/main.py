@@ -12,9 +12,10 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from scipy import stats
 
-from .var_calculator import VaRCalculator
-from .portfolio import PortfolioAggregator
-from .stress_testing import StressTestEngine
+# Use absolute imports to allow running as a module entrypoint
+from var_calculator import VaRCalculator
+from portfolio import PortfolioAggregator
+from stress_testing import StressTestEngine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -291,4 +292,3 @@ async def get_portfolio_summary(positions: List[Position]):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8008)
-

@@ -13,9 +13,9 @@ import pandas as pd
 import requests
 from clickhouse_driver import Client
 
-from .models import ModelRegistry
-from .training import ModelTrainer
-from .feature_engineering import FeatureEngineer
+from models import ModelRegistry
+from training import ModelTrainer
+from feature_engineering import FeatureEngineer
 
 logger = logging.getLogger(__name__)
 
