@@ -178,25 +178,11 @@ To add more services to Ingress, edit `ingress.yaml` and add additional `paths` 
 - **Location**: `/platform/apps/web-hub/`
 - **Features**: Dashboard, explorer, curve viewer, scenario builder
 
-### LMP Decomposition Service ✨ NEW
-- **Purpose**: Nodal price decomposition and basis risk analytics
-- **Location**: `/platform/apps/lmp-decomposition-service/`
-- **Features**: Energy/Congestion/Loss decomposition, PTDF calculations, basis surface modeling
-
-### Trading Signals Service ✨ NEW
-- **Purpose**: Algorithmic trading signal generation
-- **Location**: `/platform/apps/signals-service/`
-- **Features**: Mean reversion, momentum, spread trading, volatility, ML ensemble strategies
-
-### Marketplace Service ✨ NEW
-- **Purpose**: Third-party data integration and revenue sharing
-- **Location**: `/platform/apps/marketplace/`
-- **Features**: Partner registration, product listing, sandbox environment, usage tracking
-
-### ML Service (Enhanced)
-- **Purpose**: Advanced forecasting with transformer models
-- **Location**: `/platform/apps/ml-service/`
-- **Features**: XGBoost, LightGBM, Transformer models, uncertainty quantification, AutoML
+### Routing Service
+- **Purpose**: Multi-source redundancy with intelligent failover, blending, and trust scoring
+- **Location**: `/platform/apps/routing-service/`
+- **Features**: Automatic source selection, circuit breaker, synthetic fallback, full audit trail
+- **Documentation**: [Design Document](docs/ROUTING_SERVICE_DESIGN.md) | [Integration Guide](platform/apps/routing-service/INTEGRATION.md)
 
 ---
 

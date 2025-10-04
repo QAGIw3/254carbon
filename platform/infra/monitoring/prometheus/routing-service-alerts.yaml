@@ -1,0 +1,160 @@
+groups:
+  - name: routing_service_alerts
+    interval: 30s
+    rules:
+      # Critical Alerts
+      - alert: SyntheticFallbackRatioHigh
+        expr: synthetic_fallback_ratio > 0.20
+        for: 5m
+        labels:
+          severity: critical
+          component: routing-service
+        annotations:
+          summary: "High synthetic fallback ratio for {{ $labels.metric_key }}"
+          description: "Synthetic fallback ratio is {{ $value | humanizePercentage }} for metric {{ $labels.metric_key }}. Most sources may be unavailable or unreliable."
+
+      - alert: AllSourcesDown
+        expr: active_sources_count == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: routing-service
+        annotations:
+          summary: "No active sources available for {{ $labels.metric_key }}"
+          description: "All sources are unavailable for metric {{ $labels.metric_key }}. System is in full synthetic fallback mode."
+
+      - alert: CircuitBreakerOpenCritical
+        expr: circuit_breaker_state{source_id=~".*primary.*"} == 2
+        for: 5m
+        labels:
+          severity: critical
+          component: routing-service
+        annotations:
+          summary: "Circuit breaker open for critical source {{ $labels.source_id }}"
+          description: "Primary source {{ $labels.source_id }} has been disabled due to repeated failures."
+
+      # High Priority Alerts
+      - alert: SourceTrustScoreLow
+        expr: source_trust_score < 0.40
+        for: 10m
+        labels:
+          severity: high
+          component: routing-service
+        annotations:
+          summary: "Low trust score for {{ $labels.source_id }}"
+          description: "Trust score for {{ $labels.source_id }} on {{ $labels.metric_key }} is {{ $value }}, below minimum threshold."
+
+      - alert: RoutingConfidenceLow
+        expr: routing_confidence_avg < 0.60
+        for: 10m
+        labels:
+          severity: high
+          component: routing-service
+        annotations:
+          summary: "Low routing confidence for {{ $labels.metric_key }}"
+          description: "Average routing confidence for {{ $labels.metric_key }} is {{ $value }}, indicating uncertain data quality."
+
+      - alert: RoutingDecisionLatencyHigh
+        expr: histogram_quantile(0.95, rate(routing_decision_latency_seconds_bucket[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: high
+          component: routing-service
+        annotations:
+          summary: "High routing decision latency for {{ $labels.strategy }}"
+          description: "P95 routing decision latency is {{ $value | humanizeDuration }} for strategy {{ $labels.strategy }}, exceeding 100ms target."
+
+      # Medium Priority Alerts
+      - alert: SourceFreshnessLagHigh
+        expr: source_freshness_lag_seconds > 300
+        for: 5m
+        labels:
+          severity: medium
+          component: routing-service
+        annotations:
+          summary: "High freshness lag for {{ $labels.source_id }}"
+          description: "Freshness lag for {{ $labels.source_id }} on {{ $labels.metric_key }} is {{ $value }}s, exceeding normal threshold."
+
+      - alert: FrequentCircuitBreakerChanges
+        expr: rate(circuit_breaker_state_changes_total[10m]) > 0.05
+        for: 10m
+        labels:
+          severity: medium
+          component: routing-service
+        annotations:
+          summary: "Frequent circuit breaker state changes for {{ $labels.source_id }}"
+          description: "Circuit breaker for {{ $labels.source_id }} is changing state frequently, indicating source instability."
+
+      - alert: LowSourceDiversity
+        expr: active_sources_count < 2
+        for: 10m
+        labels:
+          severity: medium
+          component: routing-service
+        annotations:
+          summary: "Low source diversity for {{ $labels.metric_key }}"
+          description: "Only {{ $value }} source(s) available for {{ $labels.metric_key }}. Redundancy is reduced."
+
+      # Warning Alerts
+      - alert: SourceResponseLatencyHigh
+        expr: histogram_quantile(0.95, rate(source_response_latency_seconds_bucket[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: routing-service
+        annotations:
+          summary: "High response latency for {{ $labels.source_id }}"
+          description: "P95 response latency for {{ $labels.source_id }} on {{ $labels.metric_key }} is {{ $value | humanizeDuration }}."
+
+      - alert: RoutingStrategyImbalance
+        expr: |
+          (sum(rate(routing_decisions_total{strategy="synthetic"}[10m])) by (metric_key) / 
+           sum(rate(routing_decisions_total[10m])) by (metric_key)) > 0.15
+        for: 10m
+        labels:
+          severity: warning
+          component: routing-service
+        annotations:
+          summary: "High synthetic decision rate for {{ $labels.metric_key }}"
+          description: "Synthetic decisions account for {{ $value | humanizePercentage }} of routing decisions for {{ $labels.metric_key }}."
+
+      # Info Alerts (for tracking)
+      - alert: NewSourceRegistered
+        expr: changes(source_trust_score[5m]) > 0 and source_trust_score == 0
+        for: 1m
+        labels:
+          severity: info
+          component: routing-service
+        annotations:
+          summary: "New source {{ $labels.source_id }} registered"
+          description: "Source {{ $labels.source_id }} has been registered for {{ $labels.metric_key }}."
+
+  - name: routing_service_slo
+    interval: 1m
+    rules:
+      # SLO: 95% of routing decisions should complete in < 50ms
+      - record: routing_decision_latency_slo_compliance
+        expr: |
+          (
+            sum(rate(routing_decision_latency_seconds_bucket{le="0.05"}[5m]))
+            /
+            sum(rate(routing_decision_latency_seconds_count[5m]))
+          )
+
+      # SLO: 95% of routing decisions should have confidence > 0.7
+      - record: routing_confidence_slo_compliance
+        expr: |
+          (
+            sum(routing_confidence_avg > 0.7) 
+            / 
+            count(routing_confidence_avg)
+          )
+
+      # SLO: Synthetic fallback ratio should be < 10%
+      - record: synthetic_fallback_slo_compliance
+        expr: |
+          (
+            count(synthetic_fallback_ratio < 0.1)
+            /
+            count(synthetic_fallback_ratio)
+          )
