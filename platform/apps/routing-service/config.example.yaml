@@ -1,0 +1,101 @@
+# Multi-Source Redundancy Router Configuration
+# Copy this file to config.yaml and adjust as needed
+
+# Routing Policy Configuration
+policy_version: v1
+
+# Trust score thresholds
+thresholds:
+  min_trust: 0.55                  # Minimum trust score to consider a source
+  max_fresh_lag_sec: 180           # Maximum freshness lag (3 minutes)
+  stable_dispersion: 0.012         # Dispersion threshold for blending (1.2%)
+  switch_margin: 0.07              # Minimum score difference to switch sources (7%)
+
+# Trust score component weights (must sum to ~1.0)
+weights:
+  freshness: 0.30                  # Weight for data freshness
+  error_rate: 0.20                 # Weight for error rate
+  deviation: 0.15                  # Weight for deviation from consensus
+  consistency: 0.15                # Weight for value consistency over time
+  uptime: 0.20                     # Weight for historical uptime
+
+# Synthetic fallback configuration
+synthetic:
+  decay_factor: 0.85               # Confidence decay per synthetic iteration
+  max_consecutive: 12              # Max consecutive synthetic decisions before alert
+
+# Hysteresis configuration (prevents rapid switching)
+hysteresis:
+  min_intervals_before_switch: 3   # Minimum intervals before allowing source switch
+
+# MAD (Median Absolute Deviation) outlier detection
+mad_k_factor: 3.0                  # MAD multiplier for outlier threshold
+
+# Circuit breaker configuration
+circuit_breaker:
+  failure_threshold: 5             # Number of failures before opening circuit
+  cooldown_sec: 300                # Cooldown period in seconds (5 minutes)
+
+# Database configuration
+database:
+  host: postgresql
+  port: 5432
+  database: market_intelligence
+  user: market_user
+  password: ${POSTGRES_PASSWORD}   # Use environment variable
+  min_pool_size: 2
+  max_pool_size: 10
+
+# API configuration
+api:
+  host: 0.0.0.0
+  port: 8007
+  workers: 4
+  reload: false                    # Enable for development
+
+# Logging configuration
+logging:
+  level: INFO                      # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Monitoring configuration
+monitoring:
+  prometheus_port: 9090
+  enable_metrics: true
+
+# Source registry examples
+# These would typically be in the database, but can be bootstrapped from config
+sources:
+  - source_id: caiso_rt_lmp
+    metric_types:
+      - carbon_intensity
+      - lmp
+    cadence_sec: 300               # 5 minutes
+    default_weight: 1.0
+    license_class: standard
+    reliability_baseline: 0.95
+    sla_freshness_sec: 180
+    enabled: true
+    fallback_role: primary
+
+  - source_id: eia_carbon_intensity
+    metric_types:
+      - carbon_intensity
+    cadence_sec: 3600              # 1 hour
+    default_weight: 0.8
+    license_class: standard
+    reliability_baseline: 0.90
+    sla_freshness_sec: 7200
+    enabled: true
+    fallback_role: secondary
+
+  - source_id: watttime_carbon
+    metric_types:
+      - carbon_intensity
+    cadence_sec: 300
+    default_weight: 1.0
+    license_class: restricted      # Cannot blend with others
+    reliability_baseline: 0.92
+    sla_freshness_sec: 180
+    enabled: true
+    fallback_role: primary
