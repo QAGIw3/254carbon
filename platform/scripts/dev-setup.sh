@@ -2,6 +2,8 @@
 
 # 254Carbon Platform - Development Environment Setup
 # One-command setup for local development environment
+# - Starts core infra (Postgres/ClickHouse/Kafka/MinIO/Keycloak)
+# - Waits for health and performs basic readiness checks
 
 set -e
 

@@ -38,3 +38,5 @@ spec:
             name: web-hub
             port:
               number: 3000
+# Ingress configuration for public endpoints
+# - Configure TLS, hosts, and routing to services

@@ -246,4 +246,12 @@ resource "random_password" "grafana_admin" {
   length  = 16
   special = true
 }
-
+# Root Terraform module for 254Carbon infrastructure
+#
+# Responsibilities
+# - Defines shared providers, remote state, and common modules
+# - Acts as a wrapper for per-environment stacks in environments/*
+#
+# Conventions
+# - Use variables.tf for inputs and outputs.tf for key exported values
+# - Keep environment-specific overrides in environments/<env>

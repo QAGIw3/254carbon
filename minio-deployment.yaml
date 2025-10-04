@@ -1,6 +1,7 @@
 # MinIO Deployment and Service (S3-compatible)
 # - Exposes API on 9000 and Console on 9001
 # - Backs up ClickHouse via CronJobs
+# - Stores artifacts, backups, and user uploads
 apiVersion: apps/v1
 kind: Deployment
 metadata:

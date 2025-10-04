@@ -1,4 +1,5 @@
 #!/bin/bash
+# Generate sample analytics reports using platform services
 
 # 254Carbon Platform - Report Generation Script
 # Tests and demonstrates report generation functionality

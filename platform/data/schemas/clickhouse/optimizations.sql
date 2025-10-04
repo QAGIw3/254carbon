@@ -295,4 +295,5 @@ TTL event_time + INTERVAL 90 DAY;
 -- SELECT t.*, dictGet('ch.instrument_dict', 'timezone', t.instrument_id) as tz
 -- FROM ch.market_price_ticks t
 -- WHERE ...;
-
+-- ClickHouse optimizations and materialized views
+-- Applies TTLs, projections, and sample aggregation views

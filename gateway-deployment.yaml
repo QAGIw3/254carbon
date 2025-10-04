@@ -47,3 +47,5 @@ spec:
   - port: 8000
     targetPort: 8000
   type: ClusterIP
+# Kubernetes Deployment for API Gateway
+# - Fronts platform services and handles HTTP/WebSocket traffic

@@ -17,3 +17,4 @@ metadata:
 spec:
   ipAddressPools:
   - default-pool
+# MetalLB configuration for LoadBalancer IP address pools

@@ -45,3 +45,5 @@ spec:
   - port: 8001
     targetPort: 8001
   type: ClusterIP
+# Kubernetes Deployment for Curve Service
+# - Generates forward curves from targets/fundamentals

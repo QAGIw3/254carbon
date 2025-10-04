@@ -1,3 +1,13 @@
+## Local development docker-compose for core platform dependencies
+##
+## Services
+## - postgres: transactional store for app state (dev defaults)
+## - clickhouse: columnar analytics DB for market data
+## - kafka: message broker for streaming ingestion (single-broker)
+##
+## Notes
+## - Mounts schema init SQL for quick bootstrap
+## - Healthchecks ensure dependent services wait for readiness
 version: '3.8'
 
 services:
@@ -226,4 +236,3 @@ volumes:
   clickhouse_data:
   kafka_data:
   minio_data:
-

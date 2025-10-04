@@ -1,4 +1,5 @@
 #!/bin/bash
+# Seed local databases with sample data for development
 
 # 254Carbon Platform - Sample Data Seeding Script
 # Seeds sample market data for development and testing

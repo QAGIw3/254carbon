@@ -48,4 +48,4 @@ spec:
     name: market-intelligence-.*-green
     jsonPointers:
     - /spec/replicas
-
+# ArgoCD Application for staging environment

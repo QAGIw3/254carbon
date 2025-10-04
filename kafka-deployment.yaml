@@ -80,3 +80,5 @@ spec:
     port: 9092
     targetPort: 9092
   type: ClusterIP
+# Single-broker Kafka deployment (dev/testing)
+# - Use external managed Kafka or cluster operator for production

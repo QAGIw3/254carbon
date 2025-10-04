@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Lightweight Kafka (KRaft) bootstrap script for local/dev use
+#
+# Responsibilities
+# - Generate server.properties with sane defaults
+# - Format storage if missing (random cluster id)
+# - Start Kafka in combined broker/controller mode
 set -euo pipefail
 
 KAFKA_HOME=${KAFKA_HOME:-/opt/kafka}

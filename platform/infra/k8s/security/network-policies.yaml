@@ -269,4 +269,5 @@ spec:
       port: 5432
 
 
-
+# NetworkPolicy definitions to restrict pod egress/ingress
+# - Deny-all by default and explicitly allow required paths
