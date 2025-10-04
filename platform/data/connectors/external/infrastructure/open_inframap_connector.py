@@ -1,16 +1,33 @@
 """
 Open Infrastructure Map Connector
 
-Coverage: Global power lines, substations, pipelines (derived from OSM).
-Portal: https://openinframap.org/
-
-Live mode uses Overpass API queries to summarize infrastructure within a
-bounding box or OSM area: total power line length (km), substation count,
-and pipeline length (km). Falls back to safe mocks otherwise.
+Overview
+--------
+Summarizes power infrastructure derived from OpenStreetMap via OpenInfraMap:
+total power line length, number of substations, and total pipeline length.
+In development, emits deterministic sample values; in live mode uses the
+Overpass API to query either a bounding box or OSM area id.
 
 Data Flow
 ---------
 Overpass/OSM → infra summaries (lines_km, substation_count, pipelines_km) → Kafka
+
+Configuration
+-------------
+- `live`: Toggle live Overpass queries; defaults to False (mocked values).
+- `overpass_url`: Overpass endpoint (default: https://overpass-api.de/api/interpreter).
+- `bbox`: Optional [south, west, north, east]; if set, preferred over `area_id`.
+- `area_id`: Optional OSM area id (e.g., 3600062421) when bbox not provided.
+- `region`/`region_name`: Labels used for output `entity`/instrument id.
+- `kafka.topic`/`kafka.bootstrap_servers` for event emission.
+
+Operational Notes
+-----------------
+- Overpass QL requests are composed per layer (power lines, substations,
+  pipelines) and executed independently; failures fall back to zero for that
+  layer with warnings.
+- Geometry can be returned as node lists or explicit geometry coordinates;
+  the `_sum_way_lengths_km` helper handles both for path length estimation.
 """
 import logging
 import time
@@ -47,6 +64,7 @@ class OpenInfrastructureMapConnector(Ingestor):
         self.producer: KafkaProducer | None = None
 
     def discover(self) -> Dict[str, Any]:
+        """Describe the available summary streams for inspection/telemetry."""
         return {
             "source_id": self.source_id,
             "streams": [
@@ -57,6 +75,12 @@ class OpenInfrastructureMapConnector(Ingestor):
         }
 
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
+        """Query Overpass (live) or emit representative mock values (dev).
+
+        Live mode composes Overpass QL queries for the configured `bbox` or
+        `area_id` and aggregates lengths and counts; errors degrade gracefully
+        with layer-local zeros and warnings.
+        """
         if not self.live:
             now = datetime.utcnow().isoformat()
             yield {"timestamp": now, "entity": self.region_name, "variable": "lines_km", "value": 1_250_000.0, "unit": "km"}
@@ -121,6 +145,7 @@ class OpenInfrastructureMapConnector(Ingestor):
         yield {"timestamp": ts, "entity": self.region_name, "variable": "pipelines_km", "value": float(pipelines_km), "unit": "km"}
 
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """Map raw summary values to the canonical infrastructure format."""
         ts = datetime.fromisoformat(raw["timestamp"].replace("Z", "+00:00"))
         entity = raw.get("entity", "WORLD")
         variable = raw.get("variable", "lines_km")
@@ -159,6 +184,7 @@ class OpenInfrastructureMapConnector(Ingestor):
         return count
 
     def checkpoint(self, state: Dict[str, Any]) -> None:
+        """Persist last query state (simple assignment here)."""
         self.checkpoint_state = state
         logger.debug(f"OpenInfraMap checkpoint saved: {state}")
 

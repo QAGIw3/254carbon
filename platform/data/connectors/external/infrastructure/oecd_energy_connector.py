@@ -1,12 +1,31 @@
 """
 OECD Energy Statistics Connector
 
-Coverage: Cross-country energy balances, prices, policies.
-Portal: https://data.oecd.org/energy.htm
+Overview
+--------
+Pulls selected OECD energy datasets via CSV/Excel downloads or the SDMX API
+where available. In development, emits deterministic sample indicators.
 
-Implementation
-- Primary: CSV/Excel download mode (api=false) using configurable URLs.
-- Optional: SDMX JSON path (stats.oecd.org) when available for public datasets.
+Data Flow
+---------
+OECD CSV/SDMX → normalize indicator rows → canonical fundamentals → Kafka
+
+Configuration
+-------------
+- `live`: Toggle live downloads (default False, emit mocks).
+- `mode`: `csv` (default) or `sdmx`.
+- `downloads`: List of CSV specs: { url, variable, unit, date_col, value_col,
+  country_col?, country?, date_format?, encoding?, delimiter? }.
+- `sdmx_queries`: List of SDMX specs: { dataset, filter, variable, unit,
+  time_param? }.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- Many OECD energy datasets are sourced from IEA and may be license-restricted;
+  keep URLs and dataset selection compliant with your entitlements.
+- CSV parsing attempts ISO or format-specific parsing, falling back to YYYY.
+  Rows without a timestamp or value are skipped.
 """
 import csv
 import io
@@ -44,6 +63,7 @@ class OECDEnergyStatsConnector(Ingestor):
         self.producer: KafkaProducer | None = None
 
     def discover(self) -> Dict[str, Any]:
+        """Describe available streams and example endpoints."""
         return {
             "source_id": self.source_id,
             "streams": [
@@ -58,6 +78,7 @@ class OECDEnergyStatsConnector(Ingestor):
         }
 
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
+        """Download and yield indicator rows, or emit mocks in dev mode."""
         if not self.live:
             now = datetime.utcnow().isoformat()
             yield {"timestamp": now, "entity": "OECD", "variable": "energy_balance_ktoe", "value": 1_250_000.0, "unit": "ktoe"}
@@ -74,6 +95,7 @@ class OECDEnergyStatsConnector(Ingestor):
             logger.warning("No live download configuration provided (downloads/sdmx_queries)")
 
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """Map OECD indicator rows to the canonical infrastructure format."""
         ts = datetime.fromisoformat(raw["timestamp"].replace("Z", "+00:00"))
         entity = raw.get("entity", "OECD")
         variable = raw.get("variable", "energy_balance_ktoe")
@@ -112,11 +134,19 @@ class OECDEnergyStatsConnector(Ingestor):
         return count
 
     def checkpoint(self, state: Dict[str, Any]) -> None:
+        """Persist last download state (simple assignment here)."""
         self.checkpoint_state = state
         logger.debug(f"OECD Energy checkpoint saved: {state}")
 
     # ---- Helpers ----
     def _fetch_csv(self, spec: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
+        """Download a CSV and yield unified indicator rows.
+
+        Spec keys
+        ---------
+        url, variable, unit, date_col, value_col, country_col?, country?,
+        date_format? (strftime), encoding?, delimiter?
+        """
         url = spec.get("url")
         if not url:
             return
@@ -167,6 +197,7 @@ class OECDEnergyStatsConnector(Ingestor):
             }
 
     def _fetch_sdmx(self, q: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
+        """Fetch SDMX generic CSV for a dataset/filter pair and yield rows."""
         dataset = q.get("dataset")
         flt = q.get("filter")
         variable = q.get("variable", dataset or "oecd_energy")

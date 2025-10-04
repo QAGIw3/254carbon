@@ -29,6 +29,13 @@ services:
     image:
       registry: ""
     replicas: 1
+    env:
+      - name: ENABLE_GRAPHQL
+        value: "true"
+      - name: ENABLE_ANALYTICS
+        value: "true"
+      - name: ENABLE_RESEARCH
+        value: "true"
     resources:
       limits:
         cpu: 500m

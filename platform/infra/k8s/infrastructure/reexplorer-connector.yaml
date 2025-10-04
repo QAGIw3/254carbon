@@ -1,3 +1,7 @@
+# REexplorer Renewables Connector (Config/CronJob/Monitoring)
+# ----------------------------------------------------------
+# Runs renewable resource ingestion for REexplorer datasets and ships canonical
+# events to Kafka. Includes job schedule and ServiceMonitor for metrics.
 apiVersion: v1
 kind: ConfigMap
 metadata:

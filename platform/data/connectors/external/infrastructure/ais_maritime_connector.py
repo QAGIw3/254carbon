@@ -1,4 +1,33 @@
-"""Synthetic AIS vessel and port call connector for LNG supply chain analytics."""
+"""
+AIS Maritime Connector (LNG Terminals)
+
+Overview
+--------
+Normalizes AIS-derived activity around LNG terminals into canonical metrics
+useful for supply chain analytics (berth occupancy, waiting vessels, daily
+port calls, loading durations). This implementation synthesizes signals to
+avoid external dependencies in development; wire in a real AIS provider for
+production by replacing the metric synthesis logic with provider-backed data.
+
+Data Flow
+---------
+AIS positions/port calls → aggregate per terminal → canonical fundamentals → Kafka
+
+Configuration
+-------------
+- `ports`: Dict of terminals with coordinates and region metadata; falls back to
+  a small default catalog.
+- `lookback_hours`: Window for aggregations.
+- `synthetic`: When true, metrics are generated deterministically for dev.
+- `kafka.topic`/`kafka.bootstrap_servers`: Destination for emitted events.
+
+Operational Notes
+-----------------
+- `pull_or_subscribe` emits a snapshot per interval for each configured
+  terminal and checkpoints the last event time.
+- To integrate with a live AIS provider, compute the same metrics from vessel
+  tracks and port call events and feed them through `map_to_schema`.
+"""
 
 from __future__ import annotations
 
@@ -20,7 +49,12 @@ logger = logging.getLogger(__name__)
 
 
 class AISMaritimeConnector(InfrastructureConnector):
-    """Connector that normalises AIS vessel movements around LNG terminals."""
+    """Connector that normalises AIS vessel movements around LNG terminals.
+
+    Exposed metrics include counts at berth/waiting and daily arrivals,
+    plus an average loading duration proxy. Units are chosen for convenient
+    monitoring and downstream modeling.
+    """
 
     DEFAULT_PORTS: Dict[str, Dict[str, Any]] = {
         "US_SABINE_PASS": {"country": "US", "region": "TX", "lat": 29.738, "lon": -93.871},
@@ -75,7 +109,7 @@ class AISMaritimeConnector(InfrastructureConnector):
             self.assets[port_code] = asset
 
     def discover(self) -> Dict[str, Any]:
-        """Describe exposed AIS metrics."""
+        """Describe exposed AIS metrics for UIs and observability."""
         return {
             "source_id": self.source_id,
             "coverage": list(self.port_catalog.keys()),
@@ -89,7 +123,11 @@ class AISMaritimeConnector(InfrastructureConnector):
         }
 
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
-        """Yield AIS-derived metrics for each configured LNG terminal."""
+        """Yield AIS-derived metrics for each configured LNG terminal.
+
+        In production, replace `_synthesise_metric` with computations over
+        provider data (e.g., berth detection, anchorage dwell, call windows).
+        """
         now = datetime.utcnow().replace(minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
         for port_code, asset in self.assets.items():
             phase = (hash(port_code) % 12) / 12
@@ -123,6 +161,7 @@ class AISMaritimeConnector(InfrastructureConnector):
         )
 
     def checkpoint(self, state: Dict[str, Any]) -> None:
+        """Persist last emission state through the base `Ingestor`."""
         super().checkpoint(state)
 
     def _synthesise_metric(self, metric: str, hours_since_midnight: float) -> float:

@@ -33,7 +33,7 @@ def test_transformer_model():
         y = y + trend + seasonal
 
         print(f"Sample data shape: X={X.shape}, y={y.shape}")
-        print(f"Data range: y min={y.min()".2f"}, max={y.max()".2f"}")
+        print(f"Data range: y min={y.min():.2f}, max={y.max():.2f}")
 
         # Initialize and train model
         model = TransformerPriceForecastModel(
@@ -63,7 +63,10 @@ def test_transformer_model():
         ci_lower, ci_upper = model.predict_interval(test_X)
 
         print(f"Confidence interval shape: {ci_lower.shape}")
-        print(f"Sample CI: pred={predictions[0]".2f"}, lower={ci_lower[0]".2f"}, upper={ci_upper[0]".2f"}")
+        print(
+            f"Sample CI: pred={predictions[0]:.2f}, "
+            f"lower={ci_lower[0]:.2f}, upper={ci_upper[0]:.2f}"
+        )
 
         print("✅ Transformer model test passed!")
         return True

@@ -1,3 +1,12 @@
+# ALSI LNG Connector CronJob and Config
+# ------------------------------------
+# Purpose: Run the AGSI/ALSI LNG inventory connector on a 6-hour cadence,
+# emitting canonical fundamentals to Kafka. Includes configuration, secrets,
+# job scheduling, and a ServiceMonitor for Prometheus scraping.
+# Notes:
+# - The container expects CONFIG_PATH mounted from the ConfigMap.
+# - Secrets are read into env variables used by the connector at runtime.
+# - Update resources per environment SLOs.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -37,7 +46,8 @@ metadata:
   name: alsi-lng-connector
   namespace: market-intelligence
 spec:
-  schedule: "0 */6 * * *"  # Every 6 hours
+  # Every 6 hours; adjust to match data provider update cadence
+  schedule: "0 */6 * * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3

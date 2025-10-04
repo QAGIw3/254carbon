@@ -1,4 +1,27 @@
-"""Rail and trucking tariff connector for coal logistics drivers."""
+"""
+Rail and Trucking Tariff Connector (Coal Logistics)
+
+Overview
+--------
+Publishes regional rail and trucking tariff indices used in coal logistics
+models. Values are representative and deterministic for development; wire to a
+transportation index provider in production.
+
+Data Flow
+---------
+Provider (indices) → normalize per region/mode → canonical fundamentals → Kafka
+
+Configuration
+-------------
+- `series`: Dict keyed by series_id with `mode`, `region`, `unit`, `baseline`.
+- `lookback_days`: Number of days to emit per run for backfill.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- Emissions occur at daily granularity; downstream can resample as needed.
+- The synthetic generator adds small seasonal drift and weekend adjustment.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +35,11 @@ logger = logging.getLogger(__name__)
 
 
 class TransportTariffConnector(Ingestor):
-    """Publishes regional rail and trucking tariff indices."""
+    """Publishes regional rail and trucking tariff indices.
+
+    Output products are named `<mode>_tariff_index` and instrument IDs encode
+    the mode and region for easy filtering in analytics.
+    """
 
     DEFAULT_SERIES: Dict[str, Dict[str, Any]] = {
         "US_RAIL_APPALACHIA": {
@@ -51,6 +78,7 @@ class TransportTariffConnector(Ingestor):
         self._state = self.load_checkpoint() or {}
 
     def discover(self) -> Dict[str, Any]:
+        """Describe series and modes for telemetry and UI inspection."""
         return {
             "source_id": self.source_id,
             "series": list(self.series.keys()),
@@ -59,6 +87,7 @@ class TransportTariffConnector(Ingestor):
         }
 
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
+        """Yield a daily value for each series across the lookback window."""
         anchor = datetime.utcnow().date()
         for offset in range(self.lookback_days):
             date = anchor - timedelta(days=offset)
@@ -73,6 +102,7 @@ class TransportTariffConnector(Ingestor):
         self.checkpoint(self._state)
 
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """Map synthetic/raw tariff values to the canonical event format."""
         event_time = datetime.combine(raw["date"], datetime.min.time(), tzinfo=timezone.utc)
         spec = raw["spec"]
         product = f"{spec['mode']}_tariff_index"
@@ -99,6 +129,7 @@ class TransportTariffConnector(Ingestor):
         super().checkpoint(state)
 
     def _synthetic_value(self, series_id: str, ordinal: int, baseline: float) -> float:
+        """Create a simple drift + weekend-adjusted tariff index."""
         drift = 1 + 0.01 * ((ordinal % 365) / 365)
         weekend_adjustment = 0.98 if ordinal % 7 in (5, 6) else 1.0
         return round(baseline * drift * weekend_adjustment, 5)

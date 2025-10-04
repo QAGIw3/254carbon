@@ -6,7 +6,11 @@ import json
 import logging
 from typing import Dict, Set, Optional, List
 from fastapi import WebSocket
-from aiokafka import AIOKafkaConsumer
+import os
+try:
+    from aiokafka import AIOKafkaConsumer
+except Exception:  # pragma: no cover
+    AIOKafkaConsumer = None
 import avro.schema
 import avro.io
 import io
@@ -216,6 +220,9 @@ class StreamManager:
         logger.info(f"Starting Kafka consumer for topics: {self._kafka_topics}")
 
         try:
+            if os.getenv("ENABLE_KAFKA", "false").lower() != "true" or AIOKafkaConsumer is None:
+                raise RuntimeError("Kafka disabled or aiokafka unavailable")
+
             self._kafka_consumer = AIOKafkaConsumer(
                 *self._kafka_topics,
                 bootstrap_servers=self._kafka_bootstrap_servers,

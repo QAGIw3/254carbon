@@ -1,3 +1,8 @@
+# GEM Transmission Connector (Config/CronJob/Monitoring)
+# -----------------------------------------------------
+# Ingests Global Energy Monitor transmission infrastructure data on a schedule
+# and exposes Prometheus metrics for health/throughput. This manifest groups
+# the ConfigMap, Secret, CronJob, Service, and ServiceMonitor for the connector.
 apiVersion: v1
 kind: ConfigMap
 metadata:

@@ -1,3 +1,7 @@
+# WRI Power Plants Connector (Config/CronJob/Monitoring)
+# -----------------------------------------------------
+# Monthly job that ingests the WRI Global Power Plant Database and emits
+# canonical infrastructure events. Schedule aligns with monthly dataset cadence.
 apiVersion: v1
 kind: ConfigMap
 metadata:

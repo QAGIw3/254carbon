@@ -15,7 +15,7 @@ import pandas as pd
 from datetime import date, datetime, timedelta
 from typing import List, Optional, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, Body
 from pydantic import BaseModel
 
 from auth import verify_token, has_permission
@@ -60,13 +60,16 @@ class ModelPerformanceResponse(BaseModel):
     dataset_size: int
 
 
+class CreateNotebookRequest(BaseModel):
+    title: str
+    description: str
+    template: str = "research_template"
+    tags: List[str] = []
+
+
 @research_router.post("/notebooks/create")
 async def create_research_notebook(
-    title: str = Query(..., description="Notebook title"),
-    description: str = Query(..., description="Notebook description"),
-    template: str = Query(default="research_template", description="Template to use"),
-    tags: List[str] = Query(default=[], description="Research tags"),
-    background_tasks: BackgroundTasks = None
+    request: CreateNotebookRequest
 ):
     """Create a new research notebook."""
     try:
@@ -80,17 +83,17 @@ async def create_research_notebook(
 
         # Create notebook
         notebook_id = jupyter.create_research_notebook(
-            title=title,
-            description=description,
-            template=template,
-            tags=tags,
-            author="researcher"  # Would get from auth context
+            title=request.title,
+            description=request.description,
+            template=request.template,
+            tags=request.tags,
+            author="researcher"
         )
 
         return {
             'notebook_id': notebook_id,
-            'title': title,
-            'description': description,
+            'title': request.title,
+            'description': request.description,
             'status': 'created',
             'created_at': datetime.now()
         }
@@ -151,13 +154,16 @@ async def get_notebook_results(notebook_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class CreateExperimentRequest(BaseModel):
+    name: str
+    model_type: str
+    dataset: str
+    parameters: Dict[str, Any]
+
+
 @research_router.post("/experiments/create")
 async def create_experiment(
-    name: str = Query(..., description="Experiment name"),
-    model_type: str = Query(..., description="Model type"),
-    dataset: str = Query(..., description="Dataset to use"),
-    parameters: Dict[str, Any] = Query(..., description="Model parameters"),
-    background_tasks: BackgroundTasks = None
+    request: CreateExperimentRequest
 ):
     """Create a new model experiment."""
     try:
@@ -171,19 +177,19 @@ async def create_experiment(
 
         # Create experiment notebook
         notebook_id = jupyter.create_experiment_notebook(
-            experiment_name=name,
-            model_type=model_type,
-            dataset=dataset,
-            parameters=parameters
+            experiment_name=request.name,
+            model_type=request.model_type,
+            dataset=request.dataset,
+            parameters=request.parameters
         )
 
         return {
-            'experiment_id': f"EXP_{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            'experiment_id': f"EXP_{request.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             'notebook_id': notebook_id,
-            'name': name,
-            'model_type': model_type,
-            'dataset': dataset,
-            'parameters': parameters,
+            'name': request.name,
+            'model_type': request.model_type,
+            'dataset': request.dataset,
+            'parameters': request.parameters,
             'status': 'created',
             'created_at': datetime.now()
         }
@@ -357,11 +363,15 @@ async def get_academic_partnerships():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class ShareResultsRequest(BaseModel):
+    notebook_id: str
+    collaborators: List[str]
+    permissions: str = "view"
+
+
 @research_router.post("/collaboration/share")
 async def share_research_results(
-    notebook_id: str = Query(..., description="Notebook to share"),
-    collaborators: List[str] = Query(..., description="Collaborator emails"),
-    permissions: str = Query(default="view", description="Sharing permissions")
+    request: ShareResultsRequest
 ):
     """Share research results with collaborators."""
     try:
@@ -370,18 +380,18 @@ async def share_research_results(
 
         # Implement sharing logic (simplified)
         sharing_record = {
-            'notebook_id': notebook_id,
-            'collaborators': collaborators,
-            'permissions': permissions,
+            'notebook_id': request.notebook_id,
+            'collaborators': request.collaborators,
+            'permissions': request.permissions,
             'shared_at': datetime.now(),
             'share_id': f"SHARE_{uuid.uuid4().hex[:8]}"
         }
 
         return {
             'share_id': sharing_record['share_id'],
-            'notebook_id': notebook_id,
-            'collaborators': collaborators,
-            'permissions': permissions,
+            'notebook_id': request.notebook_id,
+            'collaborators': request.collaborators,
+            'permissions': request.permissions,
             'shared_at': sharing_record['shared_at'],
             'access_url': f"/research/shared/{sharing_record['share_id']}"
         }

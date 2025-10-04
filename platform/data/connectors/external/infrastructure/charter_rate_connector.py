@@ -1,4 +1,29 @@
-"""Charter rate connector supplying LNG vessel economics for supply chain analytics."""
+"""
+LNG Charter Rate Connector
+
+Overview
+--------
+Publishes benchmark LNG vessel charter rates (e.g., TFDE, MEGI, FSRU) into the
+fundamentals topic for downstream routing and analytics. This scaffold uses a
+small deterministic time series for development; plug in a broker or index
+provider in production.
+
+Data Flow
+---------
+Provider (indices) → normalize per series → canonical fundamentals → Kafka
+
+Configuration
+-------------
+- `series`: Mapping of series code to metadata (unit, route, vessel_class).
+- `lookback_days`: Backfill window emitted each run.
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings.
+
+Operational Notes
+-----------------
+- Connector emits one value per series per day across the lookback window,
+  then checkpoints the last date for monitoring.
+- Customize or extend `DEFAULT_SERIES` as needed to match provider coverage.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +37,11 @@ logger = logging.getLogger(__name__)
 
 
 class CharterRateConnector(Ingestor):
-    """Publish LNG charter rate benchmarks into the fundamentals topic."""
+    """Publish LNG charter rate benchmarks into the fundamentals topic.
+
+    Series values represent assessed daily rate levels. Units default to
+    `USD/DAY` but can be overridden per series.
+    """
 
     DEFAULT_SERIES: Dict[str, Dict[str, Any]] = {
         "TFDE_SPOT": {
@@ -51,6 +80,7 @@ class CharterRateConnector(Ingestor):
         self._state = self.load_checkpoint() or {}
 
     def discover(self) -> Dict[str, Any]:
+        """Describe available charter rate series for inspection/telemetry."""
         return {
             "source_id": self.source_id,
             "series": [
@@ -61,7 +91,7 @@ class CharterRateConnector(Ingestor):
         }
 
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
-        """Yield daily charter rate benchmarks."""
+        """Yield daily charter rate benchmarks over the lookback window."""
         anchor = datetime.utcnow().date()
         for offset in range(self.lookback_days):
             day = anchor - timedelta(days=offset)
@@ -77,6 +107,7 @@ class CharterRateConnector(Ingestor):
         self.checkpoint(self._state)
 
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """Map synthetic/raw series to the canonical event wire format."""
         event_time = datetime.combine(raw["date"], datetime.min.time(), tzinfo=timezone.utc)
         spec = raw["spec"]
         instrument_id = f"CHARTER.{raw['code']}"

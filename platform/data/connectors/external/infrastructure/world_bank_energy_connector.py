@@ -1,15 +1,31 @@
 """
 World Bank Energy Data Connector
 
-Coverage: Global energy indicators and infrastructure.
-Catalog: https://datacatalog.worldbank.org/
-
-This scaffold emits sample indicators; production will use the World Bank
-API (e.g., https://api.worldbank.org/v2/) with indicator codes.
+Overview
+--------
+Fetches global energy indicators (e.g., per-capita energy use, electricity
+access) from the World Bank API. In development, emits deterministic sample
+values; in live mode, queries indicator series across a year range.
 
 Data Flow
 ---------
 World Bank API → indicator series → canonical fundamentals → Kafka
+
+Configuration
+-------------
+- `indicators`: List of indicator codes, e.g., EG.USE.PCAP.KG.OE, EG.ELC.ACCS.ZS.
+- `country`: ISO-3 country code or `WLD` for world aggregate.
+- `live`: Toggle live API requests (default False).
+- `start_year`/`end_year`: Optional bounds for year-range queries.
+- `indicator_aliases`: Mapping from indicator code to (variable, unit) alias.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- API returns results paginated in JSON with [metadata, data] list; this
+  connector reads the second element when present.
+- Rows lacking `date` or `value` are skipped; timestamps default to Jan 1 UTC
+  for the given year.
 """
 import logging
 import time
@@ -49,6 +65,7 @@ class WorldBankEnergyConnector(Ingestor):
         self.producer: KafkaProducer | None = None
 
     def discover(self) -> Dict[str, Any]:
+        """Describe indicator streams and example endpoints."""
         return {
             "source_id": self.source_id,
             "streams": [
@@ -62,6 +79,7 @@ class WorldBankEnergyConnector(Ingestor):
         }
 
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
+        """Query indicator series or emit representative values in dev mode."""
         if not self.live:
             now = datetime.utcnow().isoformat()
             yield {"timestamp": now, "entity": self.country, "variable": "energy_use_pc", "value": 1800.0, "unit": "kg_oil_eq"}
@@ -99,6 +117,7 @@ class WorldBankEnergyConnector(Ingestor):
                 }
 
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """Map World Bank indicator rows to the canonical infrastructure format."""
         ts = datetime.fromisoformat(raw["timestamp"].replace("Z", "+00:00"))
         entity = raw.get("entity", "WLD")
         variable = raw.get("variable", "energy_use_pc")
@@ -137,6 +156,7 @@ class WorldBankEnergyConnector(Ingestor):
         return count
 
     def checkpoint(self, state: Dict[str, Any]) -> None:
+        """Persist last query state (simple assignment here)."""
         self.checkpoint_state = state
         logger.debug(f"World Bank Energy checkpoint saved: {state}")
 

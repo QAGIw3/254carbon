@@ -1,3 +1,14 @@
+## 254Carbon CI/CD Pipeline
+## ------------------------
+## Stages: lint → test → build → scan → deploy
+##
+## Notes
+## - Connectors are built/deployed via their own images/manifests under
+##   `platform/infra/k8s/infrastructure` and Helm charts; this pipeline focuses
+##   on core services (gateway, curve-service, etc.).
+## - Add connector image build jobs if/when connectors are versioned and
+##   released independently.
+
 stages:
   - lint
   - test
@@ -73,6 +84,9 @@ build:images:
     - docker push 254carbon/scenario-engine:$CI_COMMIT_SHA
     - docker push 254carbon/download-center:$CI_COMMIT_SHA
     - docker push 254carbon/report-service:$CI_COMMIT_SHA
+    # Tag gateway :dev for ArgoCD dev tracking
+    - docker tag 254carbon/gateway:$CI_COMMIT_SHA 254carbon/gateway:dev
+    - docker push 254carbon/gateway:dev
   only:
     - main
 
@@ -117,4 +131,3 @@ deploy:production:
   when: manual
   only:
     - main
-

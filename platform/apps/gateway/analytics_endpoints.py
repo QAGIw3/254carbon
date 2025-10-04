@@ -12,10 +12,13 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import List, Optional, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, Body
 from pydantic import BaseModel
+import pandas as pd
+import numpy as np
 
 from auth import verify_token, has_permission
+from entitlements import check_entitlement
 from db import get_clickhouse_client
 from cache import create_cache_decorator, CacheStrategy
 
@@ -70,7 +73,7 @@ async def get_correlation_matrix(
         # Check entitlements for analytics access
         await check_entitlement("analytics_access")
 
-        clickhouse = await get_clickhouse_client()
+        ch = get_clickhouse_client()
 
         # Determine date range
         if start_date:
@@ -93,10 +96,10 @@ async def get_correlation_matrix(
         ORDER BY instrument_id, event_time
         """
 
-        result = await clickhouse.fetch(
+        result = ch.execute(
             query,
-            parameters={
-                'commodities': commodities,
+            {
+                'commodities': tuple(commodities),
                 'start_date': start_datetime,
                 'end_date': end_datetime
             }
@@ -106,7 +109,7 @@ async def get_correlation_matrix(
             raise HTTPException(status_code=404, detail="No price data found for correlation analysis")
 
         # Convert to DataFrame for correlation calculation
-        df = pd.DataFrame(result)
+        df = pd.DataFrame(result, columns=['instrument_id', 'event_time', 'value'])
 
         # Pivot to get price matrix
         price_matrix = df.pivot(index='event_time', columns='instrument_id', values='value')
@@ -141,7 +144,7 @@ async def get_volatility_surface(
         # Check entitlements for analytics access
         await check_entitlement("analytics_access")
 
-        clickhouse = await get_clickhouse_client()
+        ch = get_clickhouse_client()
 
         # Determine date range
         if start_date:
@@ -164,9 +167,9 @@ async def get_volatility_surface(
         ORDER BY event_time
         """
 
-        result = await clickhouse.fetch(
+        result = ch.execute(
             query,
-            parameters={
+            {
                 'commodity': commodity,
                 'start_date': start_datetime,
                 'end_date': end_datetime
@@ -177,7 +180,7 @@ async def get_volatility_surface(
             raise HTTPException(status_code=404, detail=f"No price data found for {commodity}")
 
         # Convert to DataFrame
-        df = pd.DataFrame(result)
+        df = pd.DataFrame(result, columns=['instrument_id', 'event_time', 'value'])
 
         # Calculate volatility for different horizons
         volatility_surface = {}
@@ -215,7 +218,7 @@ async def get_seasonality_analysis(
         # Check entitlements for analytics access
         await check_entitlement("analytics_access")
 
-        clickhouse = await get_clickhouse_client()
+        ch = get_clickhouse_client()
 
         # Determine analysis period
         if analysis_period == "1_year":
@@ -248,9 +251,9 @@ async def get_seasonality_analysis(
         ORDER BY event_time
         """
 
-        result = await clickhouse.fetch(
+        result = ch.execute(
             query,
-            parameters={
+            {
                 'commodity': commodity,
                 'start_date': start_datetime,
                 'end_date': end_datetime
@@ -261,7 +264,7 @@ async def get_seasonality_analysis(
             raise HTTPException(status_code=404, detail=f"No price data found for {commodity}")
 
         # Convert to DataFrame
-        df = pd.DataFrame(result)
+        df = pd.DataFrame(result, columns=['instrument_id', 'event_time', 'value'])
 
         # Calculate seasonal patterns
         seasonal_pattern = {}
@@ -294,12 +297,15 @@ async def get_seasonality_analysis(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class OptimizePortfolioRequest(BaseModel):
+    commodities: List[str]
+    target_return: Optional[float] = None
+    risk_tolerance: str = "moderate"
+
+
 @analytics_router.post("/portfolio/optimize", response_model=PortfolioOptimizationResponse)
 async def optimize_portfolio(
-    commodities: List[str] = Query(..., description="Commodities to include in portfolio"),
-    target_return: Optional[float] = Query(None, description="Target portfolio return"),
-    risk_tolerance: str = Query(default="moderate", description="Risk tolerance level"),
-    background_tasks: BackgroundTasks = None
+    request: OptimizePortfolioRequest
 ):
     """Optimize multi-commodity portfolio allocation."""
     try:
@@ -316,6 +322,7 @@ async def optimize_portfolio(
         returns_data = pd.DataFrame()  # Placeholder
 
         # Set risk tolerance parameters
+        risk_tolerance = request.risk_tolerance
         if risk_tolerance == "conservative":
             max_weight = 0.15
         elif risk_tolerance == "moderate":
@@ -328,7 +335,7 @@ async def optimize_portfolio(
         # Run optimization
         optimization_result = optimizer.optimize_portfolio_weights(
             returns_data=returns_data,
-            target_return=target_return,
+            target_return=request.target_return,
             max_weight=max_weight,
             optimization_method='mean_variance'
         )
@@ -377,10 +384,14 @@ async def detect_arbitrage_opportunities(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@analytics_router.get("/stress-test/portfolio")
+class StressTestRequest(BaseModel):
+    portfolio_weights: Dict[str, float]
+    stress_scenarios: List[str] = ["oil_shock", "carbon_price_spike"]
+
+
+@analytics_router.post("/stress-test/portfolio")
 async def stress_test_portfolio(
-    portfolio_weights: Dict[str, float] = Query(..., description="Portfolio weights by commodity"),
-    stress_scenarios: List[str] = Query(default=["oil_shock", "carbon_price_spike"], description="Stress scenarios to test")
+    request: StressTestRequest
 ):
     """Perform stress testing on portfolio under various scenarios."""
     try:
@@ -420,7 +431,7 @@ async def stress_test_portfolio(
 
         # Run stress testing
         stress_results = optimizer.perform_scenario_stress_testing(
-            portfolio_weights=portfolio_weights,
+            portfolio_weights=request.portfolio_weights,
             scenario_definitions=scenario_definitions,
             base_returns=base_returns
         )
@@ -432,12 +443,16 @@ async def stress_test_portfolio(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@analytics_router.get("/performance/attribution")
+class PerformanceAttributionRequest(BaseModel):
+    portfolio_returns: List[float]
+    benchmark_returns: List[float]
+    commodity_returns: Dict[str, List[float]]
+    portfolio_weights: Dict[str, float]
+
+
+@analytics_router.post("/performance/attribution")
 async def get_performance_attribution(
-    portfolio_returns: List[float] = Query(..., description="Portfolio return series"),
-    benchmark_returns: List[float] = Query(..., description="Benchmark return series"),
-    commodity_returns: Dict[str, List[float]] = Query(..., description="Individual commodity returns"),
-    portfolio_weights: Dict[str, float] = Query(..., description="Portfolio weights")
+    request: PerformanceAttributionRequest
 ):
     """Calculate performance attribution for portfolio."""
     try:
@@ -450,18 +465,18 @@ async def get_performance_attribution(
         optimizer = MultiCommodityPortfolioOptimizer()
 
         # Convert lists to pandas Series
-        portfolio_series = pd.Series(portfolio_returns)
-        benchmark_series = pd.Series(benchmark_returns)
+        portfolio_series = pd.Series(request.portfolio_returns)
+        benchmark_series = pd.Series(request.benchmark_returns)
 
         # Convert commodity returns dict to DataFrame
-        commodity_df = pd.DataFrame(commodity_returns)
+        commodity_df = pd.DataFrame(request.commodity_returns)
 
         # Run attribution analysis
         attribution_result = optimizer.calculate_performance_attribution(
             portfolio_returns=portfolio_series,
             benchmark_returns=benchmark_series,
             commodity_returns=commodity_df,
-            portfolio_weights=portfolio_weights
+            portfolio_weights=request.portfolio_weights
         )
 
         return attribution_result
@@ -471,27 +486,31 @@ async def get_performance_attribution(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class CustomQueryRequest(BaseModel):
+    query: str
+    parameters: Optional[Dict[str, Any]] = None
+
+
 @analytics_router.post("/custom-query")
 async def execute_custom_query(
-    query: str = Query(..., description="Custom ClickHouse query"),
-    parameters: Optional[Dict[str, Any]] = Query(None, description="Query parameters")
+    request: CustomQueryRequest
 ):
     """Execute custom research queries on ClickHouse data."""
     try:
         # Check entitlements for custom query access
         await check_entitlement("custom_queries")
 
-        clickhouse = await get_clickhouse_client()
+        ch = get_clickhouse_client()
 
         # Execute custom query
-        if parameters:
-            result = await clickhouse.fetch(query, parameters=parameters)
+        if request.parameters:
+            result = ch.execute(request.query, request.parameters)
         else:
-            result = await clickhouse.fetch(query)
+            result = ch.execute(request.query)
 
         return {
-            'query': query,
-            'parameters': parameters,
+            'query': request.query,
+            'parameters': request.parameters,
             'result_count': len(result),
             'results': result[:1000],  # Limit results for API response
             'timestamp': datetime.now()

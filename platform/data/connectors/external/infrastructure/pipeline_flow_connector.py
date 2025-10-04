@@ -1,4 +1,32 @@
-"""Natural gas pipeline flow connector normalising capacity and utilisation signals."""
+"""
+Natural Gas Pipeline Flow Connector
+
+Overview
+--------
+Publishes natural gas pipeline flow and capacity fundamentals for a configured
+catalog of pipelines. This connector demonstrates how to represent
+infrastructure assets and emit canonical fundamentals suitable for downstream
+analytics such as utilization and congestion risk.
+
+Data Flow
+---------
+Pipeline catalog → generate/ingest flow observations → map to infrastructure
+events → Kafka (`market.fundamentals`).
+
+Configuration
+-------------
+- `pipelines`: Dict of pipeline metadata (name, lat/lon, region, capacity).
+- `lookback_hours`: Window used for roll-up/time bucketing when applicable.
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings.
+
+Operational Notes
+-----------------
+- The `_synthetic_flow` helper produces a smooth signal for development. Replace
+  with live telemetry or third-party APIs in production.
+- Events are emitted for both instantaneous flow (`pipeline_flow_bcfd`) and the
+  declared capacity (`pipeline_capacity_bcfd`), enabling downstream utilization
+  calculations.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +47,12 @@ logger = logging.getLogger(__name__)
 
 
 class PipelineFlowConnector(InfrastructureConnector):
-    """Connector for pipeline flow and capacity fundamentals."""
+    """Connector for pipeline flow and capacity fundamentals.
+
+    Emits two core metrics per asset and interval:
+    - `pipeline_flow_bcfd`: Observed or estimated throughput (Bcf/d)
+    - `pipeline_capacity_bcfd`: Nameplate or operational capacity (Bcf/d)
+    """
 
     DEFAULT_PIPELINES: Dict[str, Dict[str, Any]] = {
         "TCO_MAINLINE": {
@@ -81,6 +114,7 @@ class PipelineFlowConnector(InfrastructureConnector):
             self.assets[pipeline_id] = asset
 
     def discover(self) -> Dict[str, Any]:
+        """Describe available metrics and coverage for observability/UI layers."""
         return {
             "source_id": self.source_id,
             "pipelines": list(self.pipeline_catalog.keys()),
@@ -89,6 +123,12 @@ class PipelineFlowConnector(InfrastructureConnector):
         }
 
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
+        """Produce a snapshot for each configured pipeline.
+
+        In a live connector, replace the synthetic generator with polling of the
+        telemetry source or a streaming subscription. Checkpointing persists the
+        last emission time for monitoring and catch-up.
+        """
         now = datetime.utcnow().replace(minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
         for pipeline_id, asset in self.assets.items():
             meta = self.pipeline_catalog[pipeline_id]
@@ -116,6 +156,7 @@ class PipelineFlowConnector(InfrastructureConnector):
         self.checkpoint(self._state)
 
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """Map raw metric dict to the canonical infrastructure event."""
         return self.create_infrastructure_event(
             asset=raw["asset"],
             metric=raw["metric"],
@@ -129,6 +170,11 @@ class PipelineFlowConnector(InfrastructureConnector):
         super().checkpoint(state)
 
     def _synthetic_flow(self, pipeline_id: str, as_of: datetime) -> float:
+        """Generate a smooth, bounded flow series for dev/testing.
+
+        Combines a base load with diurnal and seasonal components to produce a
+        realistic-looking time series without external dependencies.
+        """
         base = float(self.pipeline_catalog[pipeline_id].get("capacity_bcfd", 5.0)) * 0.78
         daily_wave = 0.12 * base * ((as_of.hour % 24) / 24)
         seasonal_wave = 0.08 * base * ((as_of.timetuple().tm_yday % 90) / 90)

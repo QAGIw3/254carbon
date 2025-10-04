@@ -366,10 +366,10 @@ class InfrastructureQuery:
     async def lng_inventory(
         self,
         info: Info,
-        terminal_id: Optional[str] = None,
-        country: Optional[str] = None,
         start_time: datetime,
         end_time: datetime,
+        terminal_id: Optional[str] = None,
+        country: Optional[str] = None,
         limit: int = 1000,
     ) -> List[LNGInventory]:
         """Get LNG terminal inventory time series."""
@@ -421,11 +421,11 @@ class InfrastructureQuery:
     async def power_generation(
         self,
         info: Info,
+        start_time: datetime,
+        end_time: datetime,
         plant_id: Optional[str] = None,
         fuel_type: Optional[str] = None,
         country: Optional[str] = None,
-        start_time: datetime,
-        end_time: datetime,
         limit: int = 1000,
     ) -> List[PowerGeneration]:
         """Get power plant generation time series."""
@@ -602,9 +602,9 @@ class InfrastructureQuery:
         self,
         info: Info,
         country: str,
-        asset_type: Optional[str] = None,
         start_date: date,
         end_date: date,
+        asset_type: Optional[str] = None,
     ) -> List[InfrastructureStats]:
         """Get aggregated infrastructure statistics."""
         

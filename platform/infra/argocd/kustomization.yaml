@@ -22,7 +22,7 @@ patchesStrategicMerge:
 # Image tag management
 images:
   - name: 254carbon/api-gateway
-    newTag: 1.0.0
+    newTag: dev
   - name: 254carbon/curve-service
     newTag: 1.0.0
   - name: 254carbon/scenario-engine
