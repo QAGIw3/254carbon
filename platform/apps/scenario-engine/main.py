@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from fundamentals import FundamentalsEngine
 from ml_calibrator import EnsembleCalibrator
+from caiso_scenarios import caiso_scenarios_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,6 +26,9 @@ app = FastAPI(
     description="Scenario modeling and forecast execution",
     version="1.0.0",
 )
+
+# Include CAISO-specific scenarios
+app.include_router(caiso_scenarios_router)
 
 fundamentals_engine = FundamentalsEngine()
 ml_calibrator = EnsembleCalibrator()

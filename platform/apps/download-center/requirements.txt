@@ -6,4 +6,5 @@ asyncpg==0.29.0
 clickhouse-driver==0.2.6
 pandas==2.1.4
 pyarrow==14.0.2
+apscheduler==3.10.4
 

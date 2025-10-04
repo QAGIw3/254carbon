@@ -1,0 +1,41 @@
+{{- if .Values.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "market-intelligence.fullname" . }}
+  labels:
+    {{- include "market-intelligence.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "75"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ include "market-intelligence.fullname" . }}-tls
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "market-intelligence.fullname" . }}-api-gateway
+                port:
+                  number: {{ .Values.services.api-gateway.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "market-intelligence.fullname" . }}-web-hub
+                port:
+                  number: {{ .Values.services.web-hub.port }}
+{{- end }}

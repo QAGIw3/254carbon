@@ -1,0 +1,23 @@
+{{- range $serviceName, $serviceConfig := .Values.services }}
+{{- if $serviceConfig.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "market-intelligence.fullname" $ }}-{{ $serviceName }}
+  labels:
+    {{- include "market-intelligence.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $serviceName }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ $serviceConfig.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "market-intelligence.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $serviceName }}
+    app.kubernetes.io/color: {{ include "market-intelligence.activeColor" $ }}
+{{- end }}
+{{- end }}

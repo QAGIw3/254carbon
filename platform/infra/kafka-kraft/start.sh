@@ -46,10 +46,11 @@ EOF
 
 # Initialize storage for KRaft if needed
 if [ ! -f "$LOG_DIRS/meta.properties" ]; then
+  echo "Generated server.properties:" >&2
+  cat "$SERVER_PROPERTIES" >&2
   CLUSTER_ID=$($KAFKA_HOME/bin/kafka-storage.sh random-uuid)
   echo "Formatting storage with cluster id $CLUSTER_ID"
   $KAFKA_HOME/bin/kafka-storage.sh format -t "$CLUSTER_ID" -c "$SERVER_PROPERTIES"
 fi
 
 exec "$KAFKA_HOME/bin/kafka-server-start.sh" "$SERVER_PROPERTIES"
-

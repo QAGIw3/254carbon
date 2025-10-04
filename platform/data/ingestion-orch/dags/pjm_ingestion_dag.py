@@ -1,6 +1,8 @@
 """
-PJM Data Ingestion DAGs
-Real-time, day-ahead, capacity, and ancillary services.
+PJM Ingestion DAGs
+
+Schedules RT/DA LMP, capacity, and ancillary services using PJMConnector.
+Swap mocks for Data Miner 2 API calls once keys are configured.
 """
 from datetime import datetime, timedelta
 from airflow import DAG
@@ -223,4 +225,3 @@ with DAG(
         python_callable=run_pjm_backfill,
         provide_context=True,
     )
-

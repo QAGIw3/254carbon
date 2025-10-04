@@ -1,6 +1,17 @@
 """
 API Gateway Service
-FastAPI application with OIDC integration, core endpoints, and WebSocket streaming.
+
+Responsibilities
+- AuthN/Z via Keycloak OIDC and entitlement checks
+- Core REST endpoints: instruments, ticks, forward curves, fundamentals
+- WebSocket streaming of live market ticks with Kafka fan-out
+- UX optimization middleware and adaptive caching hooks
+- Background services (alerts, scheduled reports) managed in lifespan
+
+Design notes
+- Uses async DB clients (PostgreSQL, ClickHouse) and caches hot endpoints
+- Streams either mock or Kafka-backed data depending on environment
+- Splits MISO/CAISO specialized routers for clarity and pilots
 """
 import asyncio
 import logging
@@ -9,10 +20,6 @@ import sys
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Optional
-
-# Set package context for relative imports
-if __name__ == "__main__" and __package__ is None:
-    __package__ = "gateway"
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
@@ -36,6 +43,12 @@ from entitlements import check_entitlement
 from metrics import track_request, track_latency
 from stream import StreamManager
 from websocket_auth import verify_ws_token
+from cache import cache_response, CacheStrategy, cache_invalidate
+from miso_endpoints import miso_router
+from report_service import run_scheduled_reports
+from alert_service import run_alert_monitoring
+from caiso_compliance import caiso_compliance_router
+from ux_optimization import add_ux_middleware, add_loading_metadata, create_progressive_response
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -49,11 +62,48 @@ stream_manager = StreamManager()
 async def lifespan(app: FastAPI):
     """Lifecycle management for the application."""
     logger.info("Starting API Gateway...")
+
     # Initialize database connections
     await get_postgres_pool()
+
+    # Warm cache for common endpoints
+    from cache import cache_manager
+    logger.info("Warming cache for common endpoints...")
+    await cache_manager.warm_all_cache()
+
+    # Start background tasks for MISO pilot features
+    logger.info("Starting MISO pilot background services...")
+
+    # Start alert monitoring in background
+    alert_task = asyncio.create_task(run_alert_monitoring())
+
+    # Start scheduled reports (run daily at 6 AM UTC)
+    async def scheduled_reports_task():
+        while True:
+            now = datetime.utcnow()
+            # Run reports at 6 AM UTC daily
+            target_time = now.replace(hour=6, minute=0, second=0, microsecond=0)
+            if now >= target_time:
+                target_time = target_time + timedelta(days=1)
+
+            sleep_seconds = (target_time - now).total_seconds()
+            await asyncio.sleep(sleep_seconds)
+
+            try:
+                await run_scheduled_reports()
+            except Exception as e:
+                logger.error(f"Error running scheduled reports: {e}")
+
+    reports_task = asyncio.create_task(scheduled_reports_task())
+
     logger.info("API Gateway started successfully")
     yield
+
+    # Cancel background tasks on shutdown
     logger.info("Shutting down API Gateway...")
+    alert_task.cancel()
+    reports_task.cancel()
+
     # Cleanup connections
     await stream_manager.shutdown()
 
@@ -65,6 +115,15 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Include MISO-specific endpoints
+app.include_router(miso_router)
+
+# Include CAISO-specific endpoints
+app.include_router(caiso_compliance_router)
+
+# Add UX optimization middleware
+add_ux_middleware(app)
 
 # CORS middleware
 app.add_middleware(
@@ -130,8 +189,62 @@ async def health_check():
     )
 
 
+# Cache statistics endpoint (for monitoring)
+@app.get("/api/v1/cache/stats")
+async def get_cache_stats(user=Depends(verify_token)):
+    """Get Redis cache statistics."""
+    track_request("get_cache_stats")
+
+    try:
+        from cache import cache_manager
+        stats = await cache_manager.get_stats()
+
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow(),
+            "stats": stats
+        }
+    except Exception as e:
+        logger.error(f"Error fetching cache stats: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Cache warming endpoint (for manual cache warming)
+@app.post("/api/v1/cache/warm")
+async def warm_cache(
+    pattern: Optional[str] = None,
+    user=Depends(verify_token),
+):
+    """Warm cache for specified patterns or all patterns."""
+    track_request("warm_cache")
+
+    try:
+        from cache import cache_manager
+
+        if pattern:
+            # Warm specific pattern
+            success = await cache_manager.warm_cache(pattern)
+            return {
+                "status": "success" if success else "failed",
+                "pattern": pattern,
+                "timestamp": datetime.utcnow()
+            }
+        else:
+            # Warm all patterns
+            results = await cache_manager.warm_all_cache()
+            return {
+                "status": "completed",
+                "results": results,
+                "timestamp": datetime.utcnow()
+            }
+    except Exception as e:
+        logger.error(f"Error warming cache: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 # Instruments endpoint
 @app.get("/api/v1/instruments", response_model=list[InstrumentResponse])
+@cache_response("instruments", CacheStrategy.SEMI_STATIC)
 async def get_instruments(
     market: Optional[str] = None,
     product: Optional[str] = None,
@@ -176,6 +289,7 @@ async def get_instruments(
 
 # Price ticks endpoint
 @app.get("/api/v1/prices/ticks", response_model=list[TickResponse])
+@cache_response("price_ticks", CacheStrategy.DYNAMIC)
 async def get_price_ticks(
     instrument_id: list[str] = Query(...),
     start_time: datetime = Query(...),
@@ -249,6 +363,7 @@ async def get_price_ticks(
 
 # Forward curves endpoint
 @app.get("/api/v1/curves/forward", response_model=list[CurvePoint])
+@cache_response("forward_curves", CacheStrategy.SEMI_STATIC)
 async def get_forward_curves(
     instrument_id: list[str] = Query(...),
     as_of_date: date = Query(...),
@@ -535,4 +650,3 @@ if __name__ == "__main__":
         reload=True,
         log_level="info",
     )
-

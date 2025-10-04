@@ -3,6 +3,7 @@ ML Calibrator Service
 Machine learning models for price forecasting and scenario calibration.
 """
 import logging
+import os
 from datetime import date, datetime
 from typing import List, Dict, Any, Optional
 
@@ -10,6 +11,19 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
+# MLflow integration
+import mlflow
+import mlflow.sklearn
+from mlflow.models.signature import infer_signature
+
+import sys
+import os
+
+# Add current directory to path for absolute imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 from feature_engineering import FeatureEngineer
 from models import PriceForecastModel, ModelRegistry
@@ -24,6 +38,10 @@ app = FastAPI(
     description="Machine learning models for market forecasting",
     version="1.0.0",
 )
+
+# Initialize MLflow
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 # Initialize components
 feature_engineer = FeatureEngineer()
@@ -134,47 +152,94 @@ async def generate_forecast(request: ForecastRequest):
 @app.post("/api/v1/ml/train")
 async def train_model(request: TrainingRequest):
     """
-    Train new forecasting model.
-    
+    Train new forecasting model with MLflow tracking.
+
     Performs feature engineering, hyperparameter tuning, and model training.
+    All training runs are tracked in MLflow for reproducibility.
     """
     logger.info(
         f"Training {request.model_type} model for "
         f"{len(request.instrument_ids)} instruments"
     )
-    
+
     try:
         results = []
-        
+
         for instrument_id in request.instrument_ids:
-            # Fetch historical data and features
-            training_data = await feature_engineer.build_training_dataset(
-                instrument_id=instrument_id,
-                start_date=request.start_date,
-                end_date=request.end_date,
-            )
-            
-            # Train model with hyperparameter tuning
-            model, metrics = await trainer.train(
-                instrument_id=instrument_id,
-                data=training_data,
-                model_type=request.model_type,
-                hyperparameters=request.hyperparameters,
-            )
-            
-            # Register model
-            model_version = model_registry.register(
-                instrument_id=instrument_id,
-                model=model,
-                metrics=metrics,
-            )
-            
-            results.append({
-                "instrument_id": instrument_id,
-                "model_version": model_version,
-                "metrics": metrics,
-            })
-        
+            # Create MLflow experiment for this instrument
+            experiment_name = f"price_forecast_{instrument_id}"
+            experiment = mlflow.get_experiment_by_name(experiment_name)
+            if experiment is None:
+                experiment_id = mlflow.create_experiment(experiment_name)
+            else:
+                experiment_id = experiment.experiment_id
+
+            with mlflow.start_run(experiment_id=experiment_id) as run:
+                # Log training parameters
+                mlflow.log_param("instrument_id", instrument_id)
+                mlflow.log_param("model_type", request.model_type)
+                mlflow.log_param("start_date", str(request.start_date))
+                mlflow.log_param("end_date", str(request.end_date))
+
+                if request.hyperparameters:
+                    for key, value in request.hyperparameters.items():
+                        mlflow.log_param(f"hyperparam_{key}", value)
+
+                # Fetch historical data and features
+                training_data = await feature_engineer.build_training_dataset(
+                    instrument_id=instrument_id,
+                    start_date=request.start_date,
+                    end_date=request.end_date,
+                )
+
+                # Log dataset info
+                mlflow.log_param("training_samples", len(training_data))
+                mlflow.log_param("feature_count", training_data.shape[1] if hasattr(training_data, 'shape') else len(training_data.columns))
+
+                # Train model with hyperparameter tuning
+                model, metrics = await trainer.train(
+                    instrument_id=instrument_id,
+                    data=training_data,
+                    model_type=request.model_type,
+                    hyperparameters=request.hyperparameters,
+                )
+
+                # Log metrics
+                for metric_name, metric_value in metrics.items():
+                    mlflow.log_metric(metric_name, metric_value)
+
+                # Log the model
+                if hasattr(model, 'model'):  # Check if it's a wrapper with a model attribute
+                    mlflow.sklearn.log_model(
+                        model.model,
+                        f"model_{instrument_id}",
+                        signature=infer_signature(training_data.drop('target', axis=1), model.predict(training_data.drop('target', axis=1)))
+                    )
+                else:
+                    # Fallback for direct model logging
+                    mlflow.sklearn.log_model(
+                        model,
+                        f"model_{instrument_id}",
+                        signature=infer_signature(training_data.drop('target', axis=1), model.predict(training_data.drop('target', axis=1)))
+                    )
+
+                # Register model in local registry
+                model_version = model_registry.register(
+                    instrument_id=instrument_id,
+                    model=model,
+                    metrics=metrics,
+                )
+
+                # Log model registry info
+                mlflow.log_param("registry_version", model_version)
+
+                results.append({
+                    "instrument_id": instrument_id,
+                    "model_version": model_version,
+                    "mlflow_run_id": run.info.run_id,
+                    "metrics": metrics,
+                })
+
         return {
             "status": "success",
             "models_trained": len(results),

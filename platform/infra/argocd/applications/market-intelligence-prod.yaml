@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: market-intelligence-prod
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: market-intelligence
+
+  source:
+    repoURL: https://github.com/254carbon/market-intelligence
+    targetRevision: main
+    path: platform/infra/helm/market-intelligence
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: market-intelligence
+
+  syncPolicy:
+    # Manual sync for production - requires approval
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 2
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 1m
+
+  revisionHistoryLimit: 50
+
+  ignoreDifferences:
+  - group: apps
+    kind: Deployment
+    name: market-intelligence-.*-blue
+    jsonPointers:
+    - /spec/replicas
+  - group: apps
+    kind: Deployment
+    name: market-intelligence-.*-green
+    jsonPointers:
+    - /spec/replicas
+
+  # Pre-sync hook to run database migrations
+  sources:
+  - repoURL: https://github.com/254carbon/market-intelligence
+    targetRevision: main
+    path: platform/infra/helm/market-intelligence
+  - repoURL: https://github.com/254carbon/market-intelligence
+    targetRevision: main
+    path: platform/infra/k8s/migrations
+    directory:
+      recurse: true
+
+  # Post-sync hook for validation
+  syncPolicy:
+    postSync:
+    - hook:
+        type: PostSync
+        url: http://api-gateway:8000/health
+        path: /health

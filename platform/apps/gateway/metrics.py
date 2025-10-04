@@ -1,5 +1,9 @@
 """
 Prometheus metrics for API Gateway.
+
+Exposes counters/histograms/gauges and lightweight helpers to increment
+and time requests. The helpers are intentionally minimal so they can be
+swapped or augmented by middleware in larger deployments.
 """
 import time
 from functools import wraps
@@ -53,4 +57,3 @@ def track_latency(endpoint: str):
                 request_latency.labels(endpoint=endpoint).observe(duration)
         return wrapper
     return decorator
-

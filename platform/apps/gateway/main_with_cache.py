@@ -5,20 +5,13 @@ This is an enhanced version of the gateway with caching layer.
 Replace the original main.py with this for production deployment.
 """
 import logging
-import os
-import sys
 from datetime import date, datetime
 from typing import Optional, List
 
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-# Add current directory to path for absolute imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
-
-# Use absolute imports
+# Import will be handled by the main module's path setup
 from auth import verify_token
 from db import get_clickhouse_client, get_postgres_pool
 from cache import cache_manager, cache_response

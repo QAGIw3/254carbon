@@ -16,6 +16,7 @@ spec:
       containers:
       - name: ml-service
         image: 254carbon/ml-service:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 8006
         env:
@@ -31,6 +32,8 @@ spec:
           value: "postgresql"
         - name: POSTGRES_PORT
           value: "5432"
+        - name: MLFLOW_TRACKING_URI
+          value: "http://mlflow:5000"
         resources:
           requests:
             memory: "1Gi"

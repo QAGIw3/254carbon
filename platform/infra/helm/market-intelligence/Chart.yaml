@@ -1,0 +1,30 @@
+apiVersion: v2
+name: market-intelligence
+description: 254Carbon Market Intelligence Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - energy
+  - trading
+  - market-intelligence
+  - forecasting
+home: https://254carbon.com
+sources:
+  - https://github.com/254carbon/market-intelligence
+maintainers:
+  - name: 254Carbon Team
+    email: dev@254carbon.ai
+dependencies:
+  - name: ingress-nginx
+    version: "4.8.0"
+    repository: "https://kubernetes.github.io/ingress-nginx"
+    condition: ingress-nginx.enabled
+  - name: cert-manager
+    version: "1.13.0"
+    repository: "https://charts.jetstack.io"
+    condition: cert-manager.enabled
+  - name: external-secrets
+    version: "0.9.0"
+    repository: "https://charts.external-secrets.io"
+    condition: external-secrets.enabled

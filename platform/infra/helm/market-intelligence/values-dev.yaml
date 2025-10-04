@@ -1,0 +1,82 @@
+# Development environment overrides
+
+app:
+  environment: "development"
+
+# Reduced resource requirements for dev
+services:
+  api-gateway:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  curve-service:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+  scenario-engine:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  backtesting-service:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  download-center:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 250m
+        memory: 256Mi
+      requests:
+        cpu: 125m
+        memory: 128Mi
+
+  web-hub:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 250m
+        memory: 256Mi
+      requests:
+        cpu: 125m
+        memory: 128Mi
+
+# Disable blue-green for dev
+blueGreen:
+  enabled: false
+
+# Disable HPA for dev
+hpa:
+  enabled: false
+
+# Disable PDB for dev
+pdb:
+  enabled: false
+
+# Relaxed monitoring for dev
+monitoring:
+  enabled: false

@@ -19,7 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 class IESOConnector(Ingestor):
-    """IESO Ontario electricity market data connector."""
+    """
+    IESO Ontario electricity market data connector.
+
+    Responsibilities
+    - Discover HOEP, Pre-Dispatch, Intertie, and Demand series
+    - Provide mock generation for dev/test, map to canonical schema
+    - Emit to Kafka with validation
+
+    Production wiring
+    - Data Directory exposes JSON/CSV endpoints; connect with per-endpoint
+      calls and schedule frequency aligned to official publication cadences.
+    """
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
@@ -67,7 +78,7 @@ class IESOConnector(Ingestor):
         }
     
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
-        """Pull data from IESO API."""
+        """Pull data from IESO API (mock in this scaffold)."""
         last_checkpoint = self.load_checkpoint()
         last_time = (
             last_checkpoint.get("last_event_time")
@@ -88,8 +99,8 @@ class IESOConnector(Ingestor):
     
     def _fetch_hoep(self) -> Iterator[Dict[str, Any]]:
         """
-        Fetch HOEP (Hourly Ontario Energy Price).
-        
+        Fetch HOEP (Hourly Ontario Energy Price) (mock).
+
         HOEP is the weighted average of Market Clearing Prices (MCP)
         for all dispatched hours in each hour.
         """
@@ -130,8 +141,8 @@ class IESOConnector(Ingestor):
     
     def _fetch_predispatch(self) -> Iterator[Dict[str, Any]]:
         """
-        Fetch Pre-Dispatch prices.
-        
+        Fetch Pre-Dispatch prices (mock).
+
         IESO publishes pre-dispatch schedules and prices every hour
         for the next 3 hours.
         """
@@ -167,8 +178,8 @@ class IESOConnector(Ingestor):
     
     def _fetch_intertie(self) -> Iterator[Dict[str, Any]]:
         """
-        Fetch intertie flows.
-        
+        Fetch intertie flows (mock).
+
         Ontario has interties with:
         - MISO (Michigan)
         - NYISO (New York)
@@ -367,4 +378,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = IESOConnector(config)
         connector.run()
-

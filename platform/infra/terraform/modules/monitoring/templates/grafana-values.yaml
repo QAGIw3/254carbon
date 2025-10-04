@@ -1,0 +1,52 @@
+grafana.ini:
+  server:
+    domain: ${domain}
+    root_url: "https://${domain}/grafana"
+  security:
+    admin_password: ${admin_password}
+  auth:
+    disable_login_form: false
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - ${domain}
+  path: /grafana
+  tls:
+    - secretName: grafana-tls
+      hosts:
+        - ${domain}
+
+dashboards:
+  default:
+    254carbon-business-kpis:
+      gnetId: 254carbon-business-kpis
+      revision: 1
+      datasource: Prometheus
+    254carbon-forecast-accuracy:
+      url: "https://raw.githubusercontent.com/254carbon/monitoring-dashboards/main/forecast-accuracy.json"
+    254carbon-data-quality:
+      url: "https://raw.githubusercontent.com/254carbon/monitoring-dashboards/main/data-quality.json"
+    254carbon-service-health:
+      url: "https://raw.githubusercontent.com/254carbon/monitoring-dashboards/main/service-health.json"
+    254carbon-security-audit:
+      url: "https://raw.githubusercontent.com/254carbon/monitoring-dashboards/main/security-audit.json"
+
+alerting:
+  enabled: true
+
+sidecar:
+  dashboards:
+    enabled: true
+  datasources:
+    enabled: true

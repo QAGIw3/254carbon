@@ -1,0 +1,221 @@
+# Default values for market-intelligence.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# Application configuration
+app:
+  name: market-intelligence
+  version: "1.0.0"
+  environment: "production"
+
+# Ingress configuration
+ingress-nginx:
+  enabled: true
+  controller:
+    service:
+      type: LoadBalancer
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+        service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    config:
+      ssl-redirect: "true"
+      force-ssl-redirect: "true"
+
+# Certificate manager
+cert-manager:
+  enabled: true
+  installCRDs: true
+
+# External secrets operator
+external-secrets:
+  enabled: true
+  installCRDs: true
+
+# Application services
+services:
+  api-gateway:
+    enabled: true
+    image:
+      registry: 254carbon
+      repository: api-gateway
+      tag: "1.0.0"
+      pullPolicy: IfNotPresent
+    replicas: 3
+    port: 8000
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+    env:
+      - name: ENVIRONMENT
+        value: "production"
+      - name: DATABASE_URL
+        valueFrom:
+          secretKeyRef:
+            name: market-intelligence-secrets
+            key: database-url
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 8000
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readinessProbe:
+      httpGet:
+        path: /health
+        port: 8000
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+  curve-service:
+    enabled: true
+    image:
+      registry: 254carbon
+      repository: curve-service
+      tag: "1.0.0"
+      pullPolicy: IfNotPresent
+    replicas: 2
+    port: 8001
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+      requests:
+        cpu: 1000m
+        memory: 1Gi
+    env:
+      - name: ENVIRONMENT
+        value: "production"
+      - name: DATABASE_URL
+        valueFrom:
+          secretKeyRef:
+            name: market-intelligence-secrets
+            key: database-url
+
+  scenario-engine:
+    enabled: true
+    image:
+      registry: 254carbon
+      repository: scenario-engine
+      tag: "1.0.0"
+      pullPolicy: IfNotPresent
+    replicas: 2
+    port: 8002
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+  backtesting-service:
+    enabled: true
+    image:
+      registry: 254carbon
+      repository: backtesting-service
+      tag: "1.0.0"
+      pullPolicy: IfNotPresent
+    replicas: 2
+    port: 8003
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+  download-center:
+    enabled: true
+    image:
+      registry: 254carbon
+      repository: download-center
+      tag: "1.0.0"
+      pullPolicy: IfNotPresent
+    replicas: 2
+    port: 8004
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  web-hub:
+    enabled: true
+    image:
+      registry: 254carbon
+      repository: web-hub
+      tag: "1.0.0"
+      pullPolicy: IfNotPresent
+    replicas: 2
+    port: 3000
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+# Blue-green deployment configuration
+blueGreen:
+  enabled: true
+  primaryColor: "blue"
+  secondaryColor: "green"
+  serviceSelector: "app.kubernetes.io/instance"
+
+# Horizontal Pod Autoscaler configuration
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Pod Disruption Budget configuration
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# Network policies
+networkPolicies:
+  enabled: true
+  allowExternal: true
+
+# Service mesh (Istio) configuration
+istio:
+  enabled: false
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true
+
+# Logging configuration
+logging:
+  enabled: true
+  level: "INFO"
+
+# Secrets management
+secrets:
+  externalSecrets:
+    enabled: true
+    refreshInterval: 15
+    secretStore:
+      name: aws-secrets-manager
+      kind: SecretStore

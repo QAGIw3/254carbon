@@ -3,11 +3,18 @@ CAISO Nodal LMP Connector
 
 Pulls real-time and day-ahead LMP data from CAISO OASIS API.
 Implements entitlement restrictions per pilot requirements.
+
+Production path uses the OASIS SingleZip endpoint with CSV-in-ZIP (resultformat=6)
+for reliable parsing. Falls back to minimal mock data only in development or
+when OASIS is unavailable.
 """
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Iterator, Dict, Any, Optional
+from typing import Iterator, Dict, Any, Optional, List
 import time
+import io
+import zipfile
+import csv
 
 import requests
 from kafka import KafkaProducer
@@ -19,23 +26,57 @@ logger = logging.getLogger(__name__)
 
 
 class CAISOConnector(Ingestor):
-    """CAISO nodal DA/RT LMP connector with entitlement support."""
+    """
+    CAISO nodal DA/RT LMP connector with entitlement support.
+
+    Responsibilities
+    - Discover and pull RTM/DAM LMPs via OASIS SingleZip (CSV-in-ZIP)
+    - Normalize timestamps and fields from CSV rows into canonical schema
+    - Enforce entitlement restrictions (pilot hub-only access)
+    - Emit to Kafka with validation and sequence ordering
+
+    Configuration highlights
+    - api_base: OASIS SingleZip base URL
+    - market_type: RTM (real-time) or DAM (day-ahead)
+    - hub_only / allowed_hubs / allowed_nodes: entitlement/allowlist controls
+    - timeout_seconds / max_retries / retry_backoff_base: network behavior
+    """
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self.api_base = config.get("api_base", "http://oasis.caiso.com/oasisapi/SingleZip")
+        self.api_base = config.get("api_base", "https://oasis.caiso.com/oasisapi/SingleZip")
         self.market_type = config.get("market_type", "RTM")  # RTM (Real-Time) or DAM (Day-Ahead)
         self.kafka_topic = config.get("kafka_topic", "power.ticks.v1")
         self.kafka_bootstrap = config.get("kafka_bootstrap", "kafka:9092")
         self.entitlements_enabled = config.get("entitlements_enabled", True)
         self.producer = None
+        # Networking and retry settings
+        self.timeout_seconds: int = int(config.get("timeout_seconds", 30))
+        self.max_retries: int = int(config.get("max_retries", 3))
+        self.retry_backoff_base: float = float(config.get("retry_backoff_base", 1.0))
+        self.dev_mode: bool = bool(config.get("dev_mode", False))
+        # Optional backfill window overrides (datetime or OASIS-formatted string)
+        self.override_start = config.get("override_start")
+        self.override_end = config.get("override_end")
         
         # CAISO-specific configuration
         self.price_nodes = config.get("price_nodes", "ALL")  # ALL or specific nodes
         self.hub_only = config.get("hub_only", True)  # For pilot: only hub data
+        self.allowed_hubs: List[str] = [
+            "TH_SP15_GEN-APND",
+            "TH_NP15_GEN-APND",
+            "TH_ZP26_GEN-APND",
+        ]
+        # Optional controlled allowlist for nodal expansion
+        self.allowed_nodes: Optional[List[str]] = config.get("allowed_nodes")
     
     def discover(self) -> Dict[str, Any]:
-        """Discover CAISO pricing points and hubs."""
+        """
+        Discover CAISO pricing points and hubs.
+
+        Returns a metadata snapshot indicating the scope of data we
+        will request from OASIS and how entitlements constrain it.
+        """
         # Major CAISO trading hubs
         hubs = [
             "TH_SP15_GEN-APND",  # SP15 Trading Hub
@@ -61,11 +102,11 @@ class CAISOConnector(Ingestor):
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
         """
         Pull LMP data from CAISO OASIS.
-        
-        For RTM: polls every 5 minutes
-        For DAM: polls hourly for next day
-        
-        Implements hub-only restriction for pilot customers.
+
+        Behavior
+        - RTM: 5-minute intervals
+        - DAM: hourly/day-ahead intervals
+        - Entitlements: hub-only restriction for pilot customers unless disabled
         """
         last_checkpoint = self.load_checkpoint()
         last_time = self._resolve_last_time(last_checkpoint)
@@ -85,130 +126,148 @@ class CAISOConnector(Ingestor):
         
         # Query CAISO OASIS API for each trading hub
         for node in nodes:
+            # Enforce hub-only entitlement when enabled
+            if self.entitlements_enabled and self.hub_only and node not in self.allowed_hubs:
+                logger.debug(f"Skipping unauthorized node under hub-only restriction: {node}")
+                continue
+            # If an explicit allowlist is provided, enforce it
+            if self.allowed_nodes is not None and node not in self.allowed_nodes:
+                logger.debug(f"Skipping node not in allowed_nodes: {node}")
+                continue
+
             try:
-                # Determine query parameters based on market type
-                if self.market_type == "RTM":
-                    # Real-time market: 5-minute intervals
-                    query_params = {
-                        "queryname": "PRC_RTM_LMP",
-                        "startdatetime": (datetime.utcnow() - timedelta(hours=2)).strftime("%Y%m%dT%H:%M-0000"),
-                        "enddatetime": datetime.utcnow().strftime("%Y%m%dT%H:%M-0000"),
-                        "market_run_id": "RTM",
-                        "version": "1",
-                        "node": node,
+                yield from self._fetch_oasis_csv_for_node(node)
+            except Exception as e:
+                logger.error(f"Error querying CAISO OASIS for {node}: {e}")
+                if self.dev_mode:
+                    # Minimal dev-mode mock with components
+                    current_time = datetime.now(timezone.utc)
+                    base_price = 40.00
+                    energy = base_price * 0.9
+                    cong = base_price * 0.07
+                    loss = base_price * 0.03
+                    yield {
+                        "timestamp": current_time.isoformat(),
+                        "node_id": node,
+                        "lmp": round(base_price, 2),
+                        "energy_component": round(energy, 2),
+                        "congestion_component": round(cong, 2),
+                        "loss_component": round(loss, 2),
+                        "market": self.market_type,
+                        "interval": "5min" if self.market_type == "RTM" else "hourly",
                     }
                 else:
-                    # Day-ahead market: hourly intervals
-                    query_params = {
-                        "queryname": "PRC_LMP",
-                        "startdatetime": (datetime.utcnow() - timedelta(days=1)).strftime("%Y%m%dT00:00-0000"),
-                        "enddatetime": datetime.utcnow().strftime("%Y%m%dT23:00-0000"),
-                        "market_run_id": "DAM",
-                        "version": "1",
-                        "node": node,
-                    }
-
-                logger.info(f"Querying CAISO API for node {node}, market {self.market_type}")
-
-                response = requests.get(
-                    self.api_base,
-                    params=query_params,
-                    timeout=30,
-                    headers={"User-Agent": "254Carbon-Platform/1.0"}
-                )
-
-                if response.status_code != 200:
-                    logger.error(f"CAISO API error for {node}: HTTP {response.status_code}")
                     continue
 
-                # Parse CAISO XML response
-                # For now, fall back to mock data if API is unavailable
-                # TODO: Implement proper XML parsing of CAISO OASIS response format
-                logger.warning(f"Using mock data for {node} - implement XML parsing")
+    def _fetch_oasis_csv_for_node(self, node: str) -> Iterator[Dict[str, Any]]:
+        """
+        Fetch CAISO OASIS SingleZip CSV for one node and yield raw records.
 
-                # Mock data for development until XML parsing is implemented
-                current_time = datetime.now(timezone.utc)
+        Uses resultformat=6 (CSV-in-ZIP) for robust, schema-stable ingestion.
+        Retries with exponential backoff and bails early on 4xx auth errors.
+        """
+        now_utc = datetime.now(timezone.utc)
+        headers = {"User-Agent": "254Carbon-Platform/1.0"}
 
-                # Generate realistic CAISO hub prices
-                base_price = {
-                    "TH_SP15_GEN-APND": 42.50,  # Southern California
-                    "TH_NP15_GEN-APND": 38.75,  # Northern California
-                    "TH_ZP26_GEN-APND": 40.25,  # Central California
-                }.get(node, 40.00)
+        # Determine query name and default window
+        if self.market_type == "RTM":
+            queryname = "PRC_RTM_LMP"
+            market_run_id = "RTM"
+            default_start = (now_utc - timedelta(minutes=15))
+            default_end = now_utc
+        else:
+            queryname = "PRC_LMP"
+            market_run_id = "DAM"
+            default_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+            default_end = now_utc.replace(hour=23, minute=59, second=0, microsecond=0)
 
-                # Add time-of-day and market variation
-                hour = current_time.hour
-                if self.market_type == "RTM":
-                    # Real-time: 5-minute intervals for last 2 hours
-                    for minute_offset in range(0, 120, 5):  # Every 5 minutes for 2 hours
-                        event_time = current_time - timedelta(minutes=minute_offset)
-
-                        # More volatile pricing for real-time
-                        volatility_factor = 1.2 if 6 <= hour < 22 else 0.8
-                        price_multiplier = volatility_factor + (hash(f"{node}{minute_offset}") % 20) / 100
-
-                        lmp = base_price * price_multiplier
-
-                        yield {
-                            "timestamp": event_time.isoformat(),
-                            "node_id": node,
-                            "lmp": round(lmp, 2),
-                            "mcc": round(lmp * 0.08, 2),  # Congestion component (~8%)
-                            "mlc": round(lmp * 0.04, 2),  # Loss component (~4%)
-                            "market": self.market_type,
-                            "interval": "5min",
-                        }
+        # Apply overrides if provided
+        start_dt = default_start
+        end_dt = default_end
+        if self.override_start is not None and self.override_end is not None:
+            try:
+                if isinstance(self.override_start, datetime):
+                    start_dt = self.override_start
                 else:
-                    # Day-ahead: hourly intervals for last 24 hours
-                    for hour_offset in range(24):
-                        event_time = current_time - timedelta(hours=hour_offset)
+                    start_dt = datetime.fromisoformat(str(self.override_start).replace('Z', '+00:00'))
+                if isinstance(self.override_end, datetime):
+                    end_dt = self.override_end
+                else:
+                    end_dt = datetime.fromisoformat(str(self.override_end).replace('Z', '+00:00'))
+            except Exception:
+                # Fallback to defaults on parse errors
+                start_dt = default_start
+                end_dt = default_end
 
-                        # Day-ahead is more stable
-                        if 6 <= hour < 10 or 17 <= hour < 21:  # Peak hours
-                            price_multiplier = 1.15
-                        elif 22 <= hour or hour < 6:  # Off-peak
-                            price_multiplier = 0.85
-                        else:  # Mid-day
-                            price_multiplier = 1.0
+        start = start_dt.strftime("%Y%m%dT%H:%M-0000")
+        end = end_dt.strftime("%Y%m%dT%H:%M-0000")
 
-                        lmp = base_price * price_multiplier + (hash(f"{node}{hour_offset}") % 5)
+        params = {
+            "queryname": queryname,
+            "version": "1",
+            "market_run_id": market_run_id,
+            "node": node,
+            "startdatetime": start,
+            "enddatetime": end,
+            "resultformat": "6",
+        }
 
-                        yield {
-                            "timestamp": event_time.isoformat(),
-                            "node_id": node,
-                            "lmp": round(lmp, 2),
-                            "mcc": round(lmp * 0.08, 2),  # Congestion component (~8%)
-                            "mlc": round(lmp * 0.04, 2),  # Loss component (~4%)
-                            "market": self.market_type,
-                            "interval": "hourly",
+        attempt = 0
+        while True:
+            attempt += 1
+            resp = requests.get(self.api_base, params=params, headers=headers, timeout=self.timeout_seconds)
+            if resp.status_code == 200:
+                break
+            if attempt > self.max_retries or resp.status_code in (400, 401, 403):
+                raise RuntimeError(f"CAISO OASIS HTTP {resp.status_code} for node {node}")
+            backoff = self.retry_backoff_base * (2 ** (attempt - 1))
+            time.sleep(backoff)
+
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+            csv_name = next((n for n in zf.namelist() if n.lower().endswith('.csv')), None)
+            if not csv_name:
+                raise ValueError("No CSV found in OASIS ZIP response")
+            with zf.open(csv_name) as f:
+                reader = csv.DictReader(io.TextIOWrapper(f, encoding='utf-8', newline=''))
+                for row in reader:
+                    try:
+                        ts_raw = row.get('INTERVALENDTIME_GMT') or row.get('INTERVALENDTIME') or row.get('OPR_INTERVAL_END')
+                        node_id = row.get('NODE') or row.get('PNODE') or node
+                        lmp = row.get('LMP_PRC') or row.get('LMP')
+                        energy = row.get('ENERGY_PRC') or row.get('ENERGY') or None
+                        cong = row.get('CONG_PRC') or row.get('CONGESTION') or None
+                        loss = row.get('LOSS_PRC') or row.get('LOSS') or None
+                        if ts_raw is None or lmp is None or node_id is None:
+                            continue
+                        # Normalize timestamp
+                        ts = datetime.fromisoformat(str(ts_raw).replace('Z', '+00:00'))
+                        rec = {
+                            "timestamp": ts.isoformat(),
+                            "node_id": node_id,
+                            "lmp": float(lmp),
+                            "energy_component": float(energy) if energy not in (None, '') else None,
+                            "congestion_component": float(cong) if cong not in (None, '') else None,
+                            "loss_component": float(loss) if loss not in (None, '') else None,
+                            "market": market_run_id,
+                            "interval": "5min" if market_run_id == "RTM" else "hourly",
                         }
-
-            except Exception as e:
-                logger.error(f"Error querying CAISO API for {node}: {e}")
-                # Fallback to minimal mock data for testing
-                logger.warning("Falling back to minimal mock data")
-
-                current_time = datetime.now(timezone.utc)
-                base_price = 40.00
-
-                yield {
-                    "timestamp": current_time.isoformat(),
-                    "node_id": node,
-                    "lmp": round(base_price, 2),
-                    "mcc": round(base_price * 0.08, 2),
-                    "mlc": round(base_price * 0.04, 2),
-                    "market": self.market_type,
-                    "interval": "5min" if self.market_type == "RTM" else "hourly",
-                }
+                        yield rec
+                    except Exception as ex:
+                        logger.debug(f"Skipping malformed CAISO row for {node}: {ex}")
     
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
-        """Map CAISO format to canonical schema."""
+        """
+        Map CAISO format to canonical schema.
+
+        This preserves instrument identity as CAISO.<node>, sets price_type by
+        market, and promotes component fields where available.
+        """
         timestamp = datetime.fromisoformat(raw["timestamp"].replace("Z", "+00:00"))
         
         # Create standardized instrument ID
         instrument_id = f"CAISO.{raw['node_id']}"
         
-        return {
+        payload = {
             "event_time_utc": int(timestamp.timestamp() * 1000),  # milliseconds
             "market": "power",
             "product": "lmp",
@@ -221,13 +280,15 @@ class CAISOConnector(Ingestor):
             "unit": "MWh",
             "source": self.source_id,
             "seq": int(time.time() * 1000000),
-            "metadata": {
-                "mcc": raw.get("mcc"),  # Marginal Cost of Congestion
-                "mlc": raw.get("mlc"),  # Marginal Cost of Losses
-                "interval": raw.get("interval"),
-                "entitlement_restricted": self.entitlements_enabled,
-            }
         }
+        # Promote components when available
+        if raw.get("energy_component") is not None:
+            payload["energy_component"] = float(raw["energy_component"])  # type: ignore[arg-type]
+        if raw.get("congestion_component") is not None:
+            payload["congestion_component"] = float(raw["congestion_component"])  # type: ignore[arg-type]
+        if raw.get("loss_component") is not None:
+            payload["loss_component"] = float(raw["loss_component"])  # type: ignore[arg-type]
+        return payload
 
     def _resolve_last_time(self, checkpoint: Optional[Dict[str, Any]]) -> datetime:
         """Resolve the most recent processed timestamp for incremental pulls."""
@@ -319,5 +380,3 @@ if __name__ == "__main__":
     
     # Run ingestion
     connector.run()
-
-

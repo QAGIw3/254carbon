@@ -27,7 +27,11 @@ _CACHE_DURATION = timedelta(hours=1)
 
 
 async def get_jwks() -> Dict[str, Any]:
-    """Fetch JWKS from Keycloak with caching."""
+    """Fetch JWKS from Keycloak with caching.
+
+    Returns:
+        Dict[str, Any]: JWKS payload as returned by the authorization server.
+    """
     global _jwks_cache, _jwks_cache_time
 
     now = datetime.utcnow()
@@ -58,7 +62,15 @@ async def get_jwks() -> Dict[str, Any]:
 
 
 def find_key_by_kid(kid: str, jwks: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Find the key with matching kid in JWKS."""
+    """Find the key with matching kid in JWKS.
+
+    Args:
+        kid: Key ID from the token header.
+        jwks: JWKS document containing keys.
+
+    Returns:
+        Matching key dict if found, otherwise None.
+    """
     for key in jwks.get("keys", []):
         if key.get("kid") == kid:
             return key
@@ -68,10 +80,16 @@ def find_key_by_kid(kid: str, jwks: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 async def verify_token(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> dict:
-    """
-    Verify JWT token from Keycloak with proper signature verification.
+    """Verify a JWT token issued by Keycloak.
 
-    Returns decoded token payload with user information.
+    Performs header inspection, JWKS lookup, RSA signature verification and
+    claim validation (exp, iat, aud, iss). Returns selected user claims.
+
+    Args:
+        credentials: FastAPI security-provided bearer credentials.
+
+    Returns:
+        dict: Normalized user claims for downstream authorization.
     """
     token = credentials.credentials
 
@@ -147,17 +165,30 @@ async def verify_token(
 
 
 def has_permission(user: dict, permission: str) -> bool:
-    """
-    Check if user has required permission.
-    
+    """Check if user has a required permission.
+
     Permissions format: "read:ticks", "write:scenarios", etc.
+
+    Args:
+        user: Verified user claims mapping.
+        permission: Permission string to check.
+
+    Returns:
+        True if the permission is present in user scopes.
     """
     scopes = user.get("scopes", [])
     return permission in scopes
 
 
 def has_role(user: dict, role: str) -> bool:
-    """Check if user has required role."""
+    """Check if user has required role.
+
+    Args:
+        user: Verified user claims mapping.
+        role: Role name to check.
+
+    Returns:
+        True if the role is present in user roles.
+    """
     roles = user.get("roles", [])
     return role in roles
-

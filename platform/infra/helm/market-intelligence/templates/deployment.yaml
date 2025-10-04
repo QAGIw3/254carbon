@@ -1,0 +1,145 @@
+{{- range $serviceName, $serviceConfig := .Values.services }}
+{{- if $serviceConfig.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "market-intelligence.fullname" $ }}-{{ $serviceName }}-blue
+  labels:
+    {{- include "market-intelligence.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $serviceName }}
+    app.kubernetes.io/color: blue
+    app.kubernetes.io/instance: {{ $.Release.Name }}-{{ $serviceName }}-blue
+spec:
+  replicas: {{ if $.Values.blueGreen.enabled }}{{ if eq $.Values.blueGreen.primaryColor "blue" }}{{ $serviceConfig.replicas }}{{ else }}0{{ end }}{{ else }}{{ $serviceConfig.replicas }}{{ end }}
+  selector:
+    matchLabels:
+      {{- include "market-intelligence.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $serviceName }}
+      app.kubernetes.io/color: blue
+  template:
+    metadata:
+      labels:
+        {{- include "market-intelligence.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $serviceName }}
+        app.kubernetes.io/color: blue
+        app.kubernetes.io/instance: {{ $.Release.Name }}-{{ $serviceName }}-blue
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+    spec:
+      {{- if $.Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml $.Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      {{- if $.Values.serviceAccount.create }}
+      serviceAccountName: {{ include "market-intelligence.serviceAccountName" $ }}
+      {{- end }}
+      containers:
+        - name: {{ $serviceName }}
+          image: {{ include "market-intelligence.image" (dict "repository" $serviceConfig.image.repository "tag" $serviceConfig.image.tag "Values" $) }}
+          imagePullPolicy: {{ $serviceConfig.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $serviceConfig.port }}
+              protocol: TCP
+          env:
+            {{- range $env := $serviceConfig.env }}
+            - name: {{ $env.name }}
+              {{- if $env.value }}
+              value: {{ $env.value | quote }}
+              {{- else if $env.valueFrom }}
+              valueFrom:
+                {{- toYaml $env.valueFrom | nindent 16 }}
+              {{- end }}
+            {{- end }}
+          resources:
+            {{- toYaml $serviceConfig.resources | nindent 12 }}
+          livenessProbe:
+            {{- toYaml $serviceConfig.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml $serviceConfig.readinessProbe | nindent 12 }}
+      {{- if $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml $.Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if $.Values.tolerations }}
+      tolerations:
+        {{- toYaml $.Values.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if $.Values.affinity }}
+      affinity:
+        {{- toYaml $.Values.affinity | nindent 8 }}
+      {{- end }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "market-intelligence.fullname" $ }}-{{ $serviceName }}-green
+  labels:
+    {{- include "market-intelligence.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $serviceName }}
+    app.kubernetes.io/color: green
+    app.kubernetes.io/instance: {{ $.Release.Name }}-{{ $serviceName }}-green
+spec:
+  replicas: {{ if $.Values.blueGreen.enabled }}{{ if eq $.Values.blueGreen.primaryColor "green" }}{{ $serviceConfig.replicas }}{{ else }}0{{ end }}{{ else }}0{{ end }}
+  selector:
+    matchLabels:
+      {{- include "market-intelligence.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $serviceName }}
+      app.kubernetes.io/color: green
+  template:
+    metadata:
+      labels:
+        {{- include "market-intelligence.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $serviceName }}
+        app.kubernetes.io/color: green
+        app.kubernetes.io/instance: {{ $.Release.Name }}-{{ $serviceName }}-green
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+    spec:
+      {{- if $.Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml $.Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      {{- if $.Values.serviceAccount.create }}
+      serviceAccountName: {{ include "market-intelligence.serviceAccountName" $ }}
+      {{- end }}
+      containers:
+        - name: {{ $serviceName }}
+          image: {{ include "market-intelligence.image" (dict "repository" $serviceConfig.image.repository "tag" $serviceConfig.image.tag "Values" $) }}
+          imagePullPolicy: {{ $serviceConfig.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $serviceConfig.port }}
+              protocol: TCP
+          env:
+            {{- range $env := $serviceConfig.env }}
+            - name: {{ $env.name }}
+              {{- if $env.value }}
+              value: {{ $env.value | quote }}
+              {{- else if $env.valueFrom }}
+              valueFrom:
+                {{- toYaml $env.valueFrom | nindent 16 }}
+              {{- end }}
+            {{- end }}
+          resources:
+            {{- toYaml $serviceConfig.resources | nindent 12 }}
+          livenessProbe:
+            {{- toYaml $serviceConfig.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml $serviceConfig.readinessProbe | nindent 12 }}
+      {{- if $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml $.Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if $.Values.tolerations }}
+      tolerations:
+        {{- toYaml $.Values.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if $.Values.affinity }}
+      affinity:
+        {{- toYaml $.Values.affinity | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

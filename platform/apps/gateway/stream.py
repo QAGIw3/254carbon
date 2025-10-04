@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class StreamManager:
-    """Manages WebSocket connections and real-time data streaming."""
+    """Manage WebSocket connections and real-time data streaming.
+
+    Maintains bidirectional maps of connections/subscriptions and runs a
+    Kafka consumer loop to fan out Avro-encoded messages to subscribers.
+    """
 
     def __init__(self):
         # WebSocket -> subscribed instrument IDs
@@ -47,7 +51,12 @@ class StreamManager:
         """)
     
     async def register(self, websocket: WebSocket, instrument_ids: list[str]):
-        """Register a WebSocket connection with subscriptions."""
+        """Register a WebSocket connection with subscriptions.
+
+        Args:
+            websocket: FastAPI WebSocket instance.
+            instrument_ids: List of instrument IDs to subscribe to.
+        """
         self.connections[websocket] = set(instrument_ids)
         
         for inst_id in instrument_ids:
@@ -62,7 +71,7 @@ class StreamManager:
             self._kafka_task = asyncio.create_task(self._consume_kafka())
     
     async def unregister(self, websocket: WebSocket):
-        """Unregister a WebSocket connection."""
+        """Unregister a WebSocket connection and clean up subscriptions."""
         if websocket in self.connections:
             instrument_ids = self.connections[websocket]
             
@@ -76,7 +85,12 @@ class StreamManager:
             logger.info("Unregistered WebSocket")
     
     async def broadcast(self, instrument_id: str, data: dict):
-        """Broadcast data to all subscribers of an instrument."""
+        """Broadcast data to all subscribers of an instrument.
+
+        Args:
+            instrument_id: Key for subscriber lookup.
+            data: JSON-serializable payload to send.
+        """
         if instrument_id in self.subscriptions:
             disconnected = []
             
@@ -202,4 +216,3 @@ class StreamManager:
         self.connections.clear()
         self.subscriptions.clear()
         logger.info("Stream manager shut down")
-

@@ -1,0 +1,21 @@
+{{- if .Values.pdb.enabled }}
+{{- range $serviceName, $serviceConfig := .Values.services }}
+{{- if $serviceConfig.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "market-intelligence.fullname" $ }}-{{ $serviceName }}-pdb
+  labels:
+    {{- include "market-intelligence.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $serviceName }}
+spec:
+  minAvailable: {{ $.Values.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "market-intelligence.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $serviceName }}
+      app.kubernetes.io/color: {{ include "market-intelligence.activeColor" $ }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -12,7 +12,7 @@ import cvxpy as cp
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from db import get_clickhouse_client, get_postgres_pool
+import db
 from qp_solver import smooth_curve, reconcile_tenors
 import os
 import httpx
@@ -70,7 +70,7 @@ async def generate_curve(request: CurveRequest):
     
     try:
         # Get instrument metadata
-        pool = await get_postgres_pool()
+        pool = await db.get_postgres_pool()
         async with pool.acquire() as conn:
             instrument = await conn.fetchrow(
                 "SELECT * FROM pg.instrument WHERE instrument_id = $1",
@@ -126,7 +126,7 @@ async def generate_curve(request: CurveRequest):
         reconciled = reconcile_tenors(prices)
         
         # Store in ClickHouse
-        ch_client = get_clickhouse_client()
+        ch_client = db.get_clickhouse_client()
         
         points = []
         for i, price in enumerate(reconciled):
@@ -216,7 +216,7 @@ async def generate_curve(request: CurveRequest):
 async def get_curve_status(run_id: str):
     """Get status of a curve generation run."""
     try:
-        ch_client = get_clickhouse_client()
+        ch_client = db.get_clickhouse_client()
         
         result = ch_client.execute(
             """

@@ -1,10 +1,3 @@
-terraform {
-  source = "terraform-aws-modules/eks/aws"
-
-  # For production use, you should pin to a specific version
-  # version = "19.15.3"
-}
-
 locals {
   name = var.cluster_name
 

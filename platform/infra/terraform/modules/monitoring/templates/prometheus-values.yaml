@@ -1,0 +1,79 @@
+prometheus:
+  prometheusSpec:
+    retention: "30d"
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+
+grafana:
+  enabled: false  # We're using separate Grafana deployment
+
+alertmanager:
+  enabled: true
+  config:
+    global:
+      smtp_smarthost: 'localhost:25'
+      smtp_from: 'alertmanager@${cluster_name}.local'
+
+    route:
+      group_by: ['alertname']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'pagerduty'
+
+    receivers:
+    - name: 'pagerduty'
+      pagerduty_configs:
+      - routing_key: $PAGERDUTY_INTEGRATION_KEY
+
+kube-state-metrics:
+  enabled: true
+
+prometheus-node-exporter:
+  enabled: true
+
+kubelet:
+  enabled: true
+
+kubeControllerManager:
+  enabled: true
+
+coreDns:
+  enabled: true
+
+kubeEtcd:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: false
+    general: true
+    k8s: true
+    kubeApiserver: true
+    kubeApiserverAvailability: true
+    kubeApiserverSlos: true
+    kubelet: true
+    kubePrometheusNodeAlerting: true
+    kubePrometheusNodeRecording: true
+    kubernetesApps: true
+    kubernetesControlPlane: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    network: true
+    node: true
+    prometheus: true
+    prometheusOperator: true
+    time: true

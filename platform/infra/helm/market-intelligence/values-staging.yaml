@@ -1,0 +1,85 @@
+# Staging environment overrides
+
+app:
+  environment: "staging"
+
+# Moderate resource requirements for staging
+services:
+  api-gateway:
+    replicas: 2
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+  curve-service:
+    replicas: 2
+    resources:
+      limits:
+        cpu: 1500m
+        memory: 1.5Gi
+      requests:
+        cpu: 750m
+        memory: 768Mi
+
+  scenario-engine:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 750m
+        memory: 768Mi
+      requests:
+        cpu: 375m
+        memory: 384Mi
+
+  backtesting-service:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 750m
+        memory: 768Mi
+      requests:
+        cpu: 375m
+        memory: 384Mi
+
+  download-center:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 375m
+        memory: 384Mi
+      requests:
+        cpu: 187m
+        memory: 192Mi
+
+  web-hub:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 375m
+        memory: 384Mi
+      requests:
+        cpu: 187m
+        memory: 192Mi
+
+# Enable blue-green for staging
+blueGreen:
+  enabled: true
+
+# Enable HPA for staging
+hpa:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+
+# Enable PDB for staging
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# Enable monitoring for staging
+monitoring:
+  enabled: true

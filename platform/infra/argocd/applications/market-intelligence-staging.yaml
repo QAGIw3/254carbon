@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: market-intelligence-staging
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: market-intelligence
+
+  source:
+    repoURL: https://github.com/254carbon/market-intelligence
+    targetRevision: main
+    path: platform/infra/helm/market-intelligence
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: market-intelligence
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m
+
+  revisionHistoryLimit: 20
+
+  ignoreDifferences:
+  - group: apps
+    kind: Deployment
+    name: market-intelligence-.*-blue
+    jsonPointers:
+    - /spec/replicas
+  - group: apps
+    kind: Deployment
+    name: market-intelligence-.*-green
+    jsonPointers:
+    - /spec/replicas

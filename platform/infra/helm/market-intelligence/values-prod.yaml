@@ -1,0 +1,140 @@
+# Production environment overrides
+
+app:
+  environment: "production"
+
+# Production-grade resource requirements (optimized for cost-efficiency)
+services:
+  api-gateway:
+    replicas: 3
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+  curve-service:
+    replicas: 2
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+      requests:
+        cpu: 1000m
+        memory: 1Gi
+
+  scenario-engine:
+    replicas: 2
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+      requests:
+        cpu: 1000m
+        memory: 1Gi
+
+  backtesting-service:
+    replicas: 2
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+      requests:
+        cpu: 1000m
+        memory: 1Gi
+
+  download-center:
+    replicas: 2
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+  web-hub:
+    replicas: 2
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+# Full blue-green deployment for production
+blueGreen:
+  enabled: true
+  primaryColor: "blue"
+  secondaryColor: "green"
+
+# Production HPA configuration
+hpa:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Production PDB configuration
+pdb:
+  enabled: true
+  minAvailable: 2
+
+# Full monitoring stack for production
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    retention: "30d"
+  grafana:
+    enabled: true
+
+# Enhanced logging for production
+logging:
+  enabled: true
+  level: "INFO"
+
+# Production security configurations
+security:
+  enabled: true
+  podSecurityPolicy:
+    enabled: true
+  networkPolicies:
+    enabled: true
+    allowExternal: true
+
+# Secrets management for production
+secrets:
+  externalSecrets:
+    enabled: true
+    refreshInterval: 15
+    secretStore:
+      name: aws-secrets-manager
+      kind: SecretStore
+
+# Production networking
+networking:
+  enabled: true
+  serviceMesh:
+    enabled: false  # Can be enabled later for advanced traffic management
+  ingress:
+    class: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+
+# Production storage
+storage:
+  enabled: true
+  class: gp3  # AWS gp3 for better performance/cost ratio
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention: 30  # Keep 30 days of backups

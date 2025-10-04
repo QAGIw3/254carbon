@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: market-intelligence
+  labels:
+    app: mlflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      volumes:
+      - name: mlflow-storage
+        emptyDir: {}
+      containers:
+      - name: mlflow
+        image: ghcr.io/mlflow/mlflow:v2.8.1
+        ports:
+        - containerPort: 5000
+        env:
+        - name: BACKEND_STORE_URI
+          value: /mlflow/mlruns
+        - name: ARTIFACT_ROOT
+          value: s3://mlflow-models/
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: access_key
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: secret_key
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://minio:9000
+        command:
+        - mlflow
+        - server
+        - --backend-store-uri
+        - /mlflow/mlruns
+        - --default-artifact-root
+        - s3://mlflow-models/
+        - --host
+        - 0.0.0.0
+        - --port
+        - "5000"
+        volumeMounts:
+        - name: mlflow-storage
+          mountPath: /mlflow
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+  namespace: market-intelligence
+  labels:
+    app: mlflow
+spec:
+  selector:
+    app: mlflow
+  ports:
+  - port: 5000
+    targetPort: 5000
+  type: ClusterIP

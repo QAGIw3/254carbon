@@ -19,7 +19,20 @@ logger = logging.getLogger(__name__)
 
 
 class PJMConnector(Ingestor):
-    """PJM real-time, day-ahead, capacity, and ancillary services connector."""
+    """
+    PJM real-time, day-ahead, capacity, and ancillary services connector.
+
+    Responsibilities
+    - Discover streams (RT/DA LMPs, Capacity, Ancillary Services)
+    - Pull data (stubbed with mocks unless API key provided and wired)
+    - Map heterogeneous products to canonical schema
+    - Emit to Kafka with basic validation
+
+    Production wiring
+    - API base: https://api.pjm.com/api/v1
+    - Auth header: Ocp-Apim-Subscription-Key: <key>
+    - Endpoints: rt_hrl_lmps, da_hrl_lmps, etc.
+    """
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
@@ -66,8 +79,11 @@ class PJMConnector(Ingestor):
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
         """
         Pull data from PJM API.
-        
-        Real implementation would use actual PJM OASIS API with authentication.
+
+        Notes
+        - In this scaffolding, data generation is mocked for predictable
+          behavior in dev/test. Swap to live endpoints by adding key and
+          calling the documented PJM APIs.
         """
         last_checkpoint = self.load_checkpoint()
         last_time = self._resolve_last_time(last_checkpoint)
@@ -84,7 +100,7 @@ class PJMConnector(Ingestor):
             yield from self._fetch_ancillary_services()
     
     def _fetch_realtime_lmp(self, last_time: datetime) -> Iterator[Dict[str, Any]]:
-        """Fetch real-time LMP data."""
+        """Fetch real-time LMP data (mock)."""
         # Mock data - in production would call PJM API
         # Example: GET /v1/rt_hrl_lmps
         
@@ -121,7 +137,7 @@ class PJMConnector(Ingestor):
             }
     
     def _fetch_dayahead_lmp(self, last_time: datetime) -> Iterator[Dict[str, Any]]:
-        """Fetch day-ahead LMP data."""
+        """Fetch day-ahead LMP data (mock)."""
         # Mock data - in production would call PJM API
         # Example: GET /v1/da_hrl_lmps
         
@@ -150,7 +166,7 @@ class PJMConnector(Ingestor):
                 }
     
     def _fetch_capacity_prices(self) -> Iterator[Dict[str, Any]]:
-        """Fetch capacity auction results."""
+        """Fetch capacity auction results (mock)."""
         # Mock capacity prices by zone
         # In production: GET /v1/capacity_market_results
         
@@ -175,7 +191,7 @@ class PJMConnector(Ingestor):
             }
     
     def _fetch_ancillary_services(self) -> Iterator[Dict[str, Any]]:
-        """Fetch ancillary services prices."""
+        """Fetch ancillary services prices (mock)."""
         # Regulation, spinning reserve, etc.
         # In production: GET /v1/ancillary_services
         
@@ -196,7 +212,13 @@ class PJMConnector(Ingestor):
             }
     
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
-        """Map PJM format to canonical schema."""
+        """
+        Map PJM format to canonical schema for multiple product types.
+
+        - LMP (RT/DA): instrument is zone/hub; unit MWh; price_type trade/settle
+        - Capacity: unit MW-day, payload carries delivery year and auction info
+        - Ancillary: product-specific instrument prefix maintained
+        """
         timestamp = datetime.fromisoformat(raw["timestamp"].replace("Z", "+00:00"))
         
         # Determine product type
@@ -213,7 +235,7 @@ class PJMConnector(Ingestor):
             value = raw["clearing_price"]
             location = "PJM.RTO"
         
-        return {
+        payload = {
             "event_time_utc": int(timestamp.timestamp() * 1000),
             "market": "power",
             "product": product,
@@ -227,6 +249,14 @@ class PJMConnector(Ingestor):
             "source": self.source_id,
             "seq": int(time.time() * 1000000),
         }
+        # Promote LMP components if present
+        if raw.get("energy_component") is not None:
+            payload["energy_component"] = float(raw["energy_component"])  # type: ignore[arg-type]
+        if raw.get("congestion_component") is not None:
+            payload["congestion_component"] = float(raw["congestion_component"])  # type: ignore[arg-type]
+        if raw.get("loss_component") is not None:
+            payload["loss_component"] = float(raw["loss_component"])  # type: ignore[arg-type]
+        return payload
 
     def _resolve_last_time(self, checkpoint: Optional[Dict[str, Any]]) -> datetime:
         """Determine the timestamp to resume from when fetching PJM data."""
@@ -301,4 +331,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = PJMConnector(config)
         connector.run()
-

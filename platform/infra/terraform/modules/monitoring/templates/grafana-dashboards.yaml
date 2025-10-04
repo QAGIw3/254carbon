@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  forecast-accuracy.json: |
+    {
+      "dashboard": {
+        "title": "254Carbon - Forecast Accuracy",
+        "tags": ["254carbon", "forecasts"],
+        "panels": [
+          {
+            "title": "MAPE by Market and Horizon",
+            "type": "heatmap",
+            "targets": [
+              {
+                "expr": "254carbon_forecast_mape",
+                "legendFormat": "{{market}} - {{horizon}}"
+              }
+            ]
+          }
+        ]
+      }
+    }

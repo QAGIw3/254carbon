@@ -1,6 +1,14 @@
 """
-MISO Real-Time and Day-Ahead LMP Ingestion DAG
-Scheduled to run every 5 minutes for RT, hourly for DA.
+MISO Real-Time and Day-Ahead LMP Ingestion DAGs
+
+Schedules
+- RT: every 5 minutes
+- DA: hourly
+
+Design
+- Each DAG runs the MISOConnector with the appropriate market_type,
+  pushes the processed count to XCom, and performs simple quality checks
+  against ClickHouse for freshness and event counts.
 """
 from datetime import datetime, timedelta
 from airflow import DAG
@@ -128,4 +136,3 @@ with DAG(
         python_callable=run_miso_da_ingestion,
         provide_context=True,
     )
-

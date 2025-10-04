@@ -1,6 +1,12 @@
 """
 Monte Carlo simulation engine for scenario analysis and risk modeling.
-Implements geometric Brownian motion and jump diffusion models.
+Implements geometric Brownian motion (GBM) and jump diffusion models.
+
+Mathematical notes
+- GBM discretization (Euler–Maruyama for log S):
+  S_{t+Δ} = S_t · exp((r - 0.5 σ²) Δ + σ √Δ · Z), Z ~ N(0, 1)
+- Jump diffusion augments the exponent with a jump term J_t ~ Poisson(λΔ) · N(μ_J, σ_J²).
+- Correlated drivers: Cholesky factorization L of correlation matrix C with Z_corr = L · Z.
 """
 import logging
 import numpy as np
@@ -34,7 +40,10 @@ class SimulationResult:
 
 
 class GeometricBrownianMotion:
-    """Geometric Brownian Motion simulator for price paths."""
+    """Geometric Brownian Motion simulator for price paths.
+
+    Uses log-normal increments consistent with risk-neutral GBM.
+    """
 
     def __init__(self, config: SimulationConfig):
         self.config = config
@@ -69,7 +78,10 @@ class GeometricBrownianMotion:
 
 
 class JumpDiffusion:
-    """Jump diffusion model with Poisson jumps."""
+    """Jump diffusion model with Poisson jumps.
+
+    Implements a Merton-like model with normal jump sizes and Poisson arrivals.
+    """
 
     def __init__(self, config: SimulationConfig):
         self.config = config
@@ -120,7 +132,11 @@ class JumpDiffusion:
 
 
 class MonteCarloEngine:
-    """Main Monte Carlo simulation engine."""
+    """Main Monte Carlo simulation engine.
+
+    Provides single-asset and correlated multi-asset simulations with
+    post-run statistics and confidence intervals.
+    """
 
     def __init__(self, config: Optional[SimulationConfig] = None):
         self.config = config or SimulationConfig()
@@ -216,7 +232,15 @@ class MonteCarloEngine:
         return results
 
     def _generate_correlated_gbm_paths(self, S0: float, Z_corr: np.ndarray) -> np.ndarray:
-        """Generate correlated GBM price paths."""
+        """Generate correlated GBM price paths with pre-supplied normals.
+
+        Args:
+            S0: Initial price
+            Z_corr: Correlated standard normals (n_simulations, n_steps)
+
+        Returns:
+            Price path array (n_simulations, n_steps + 1)
+        """
         n_sim, n_steps = Z_corr.shape
         dt = self.config.dt
 

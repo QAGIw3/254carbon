@@ -1,6 +1,11 @@
 """
-ERCOT Real-Time and Day-Ahead LMP Ingestion DAG
-Scheduled to run every 5 minutes for RT, hourly for DA.
+ERCOT Ingestion DAGs
+
+Runs SPP (settlement point prices), hub prices, ORDC adders, and resource
+telemetry ingestions on schedules aligned to product cadence.
+
+This DAG file uses the ERCOTConnector which currently produces mock data
+in dev/testing; swap to live API endpoints as available.
 """
 from datetime import datetime, timedelta
 from airflow import DAG

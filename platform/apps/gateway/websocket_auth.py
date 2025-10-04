@@ -5,28 +5,36 @@ WebSocket authentication helpers for validating JWTs outside FastAPI dependency 
 from __future__ import annotations
 
 import logging
-import os
-import sys
 import time
 from typing import Any, Dict
 
 import jwt
 
-# Add current directory to path for absolute imports
+# Import using absolute path since we're in the gateway package
+import sys
+import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
-
-# Use absolute import
-from auth import get_jwks, KEYCLOAK_AUDIENCE, KEYCLOAK_URL
+import auth
 
 logger = logging.getLogger(__name__)
 
 
 async def verify_ws_token(token: str) -> Dict[str, Any]:
-    """Validate a raw JWT string for WebSocket connections and return user claims.
+    """Validate a raw JWT string for WebSocket connections.
 
-    Raises ValueError on invalid tokens.
+    Performs JWKS lookup and claim verification matching REST auth; useful
+    when FastAPI dependency injection is not available on WS upgrades.
+
+    Args:
+        token: Raw bearer token string.
+
+    Returns:
+        Dict of normalized user claims on success.
+
+    Raises:
+        ValueError: If the token is missing required headers/claims or invalid.
     """
     try:
         unverified_header = jwt.get_unverified_header(token)
@@ -34,7 +42,7 @@ async def verify_ws_token(token: str) -> Dict[str, Any]:
         if not kid:
             raise ValueError("Token missing key ID")
 
-        jwks = await get_jwks()
+        jwks = await auth.get_jwks()
         key = None
         for k in jwks.get("keys", []):
             if k.get("kid") == kid:
@@ -51,8 +59,8 @@ async def verify_ws_token(token: str) -> Dict[str, Any]:
             token,
             public_key,
             algorithms=["RS256"],
-            audience=KEYCLOAK_AUDIENCE,
-            issuer=f"{KEYCLOAK_URL}/",
+            audience=auth.KEYCLOAK_AUDIENCE,
+            issuer=f"{auth.KEYCLOAK_URL}/",
             options={
                 "verify_exp": True,
                 "verify_iat": True,
@@ -78,5 +86,4 @@ async def verify_ws_token(token: str) -> Dict[str, Any]:
     except Exception as e:
         logger.warning(f"WebSocket token validation failed: {e}")
         raise
-
 

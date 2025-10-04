@@ -19,7 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 class ERCOTConnector(Ingestor):
-    """ERCOT market data connector."""
+    """
+    ERCOT market data connector.
+
+    Responsibilities
+    - Discover SPP, hub prices, ORDC adders, and resource telemetry streams
+    - Pull data (mocked in this scaffold) and map to canonical schema
+    - Emit to Kafka with validation and sequencing
+
+    Production notes
+    - API base: https://api.ercot.com/api/public-reports
+    - Real integrations typically require dataset-specific paths/filters
+    """
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
@@ -88,7 +99,7 @@ class ERCOTConnector(Ingestor):
             yield from self._fetch_resource_data()
     
     def _fetch_spp(self) -> Iterator[Dict[str, Any]]:
-        """Fetch Settlement Point Prices (15-minute intervals)."""
+        """Fetch Settlement Point Prices (15-minute intervals, mock)."""
         # Mock data - in production would call ERCOT API
         # Example: GET /np6-345-cd/spp_node_zone_hub
         
@@ -129,7 +140,7 @@ class ERCOTConnector(Ingestor):
             }
     
     def _fetch_hub_prices(self) -> Iterator[Dict[str, Any]]:
-        """Fetch hub prices for major load zones."""
+        """Fetch hub prices for major load zones (mock)."""
         hubs = {
             "ERCOT.HUB.NORTH": 42.0,
             "ERCOT.HUB.SOUTH": 44.0,
@@ -159,8 +170,8 @@ class ERCOTConnector(Ingestor):
     
     def _fetch_ordc_adders(self) -> Iterator[Dict[str, Any]]:
         """
-        Fetch Operating Reserve Demand Curve (ORDC) adders.
-        
+        Fetch Operating Reserve Demand Curve (ORDC) adders (mock).
+
         ORDC adds scarcity pricing when reserves are tight.
         """
         now = datetime.utcnow()
@@ -193,7 +204,7 @@ class ERCOTConnector(Ingestor):
         }
     
     def _fetch_resource_data(self) -> Iterator[Dict[str, Any]]:
-        """Fetch resource-specific generation and telemetry."""
+        """Fetch resource-specific generation and telemetry (mock)."""
         # Sample resources
         resources = [
             {"id": "ERCOT.GEN.WIND_01", "type": "WIND", "capacity": 250},
@@ -224,7 +235,7 @@ class ERCOTConnector(Ingestor):
             }
     
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
-        """Map ERCOT format to canonical schema."""
+        """Map ERCOT format to canonical schema for SPP/Hub/ORDC/Generation."""
         timestamp = datetime.fromisoformat(raw["timestamp"].replace("Z", "+00:00"))
         
         # Determine product type
@@ -245,7 +256,7 @@ class ERCOTConnector(Ingestor):
             value = raw.get("generation_mw", 0)
             location = raw.get("resource_id", "ERCOT.UNKNOWN")
         
-        return {
+        payload = {
             "event_time_utc": int(timestamp.timestamp() * 1000),
             "market": "power",
             "product": product,
@@ -259,6 +270,17 @@ class ERCOTConnector(Ingestor):
             "source": self.source_id,
             "seq": int(time.time() * 1000000),
         }
+        # Promote components if present in raw
+        if raw.get("energy_component") is not None:
+            payload["energy_component"] = float(raw["energy_component"])  # type: ignore[arg-type]
+        if raw.get("congestion_component") is not None:
+            payload["congestion_component"] = float(raw["congestion_component"])  # type: ignore[arg-type]
+        if raw.get("loss_component") is not None:
+            payload["loss_component"] = float(raw["loss_component"])  # type: ignore[arg-type]
+        # ORDC components can be preserved in metadata or promoted separately if schema supports
+        if raw.get("ordc_component") is not None:
+            payload["ordc_component"] = float(raw["ordc_component"])  # type: ignore[arg-type]
+        return payload
     
     def emit(self, events: Iterator[Dict[str, Any]]) -> int:
         """Emit events to Kafka."""
@@ -310,4 +332,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = ERCOTConnector(config)
         connector.run()
-

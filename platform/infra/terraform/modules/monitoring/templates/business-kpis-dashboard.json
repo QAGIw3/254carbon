@@ -1,0 +1,155 @@
+{
+  "dashboard": {
+    "title": "254Carbon - Business KPIs",
+    "tags": ["254carbon", "business", "kpis"],
+    "timezone": "UTC",
+    "panels": [
+      {
+        "title": "Revenue Metrics",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(254carbon_revenue_total)",
+            "legendFormat": "Total Revenue"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "decimals": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "title": "Customer Usage by Market",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "254carbon_customer_usage_by_market",
+            "legendFormat": "{{market}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "title": "Market Coverage Progress",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "254carbon_market_coverage_percentage",
+            "legendFormat": "{{market}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 50 },
+                { "color": "green", "value": 80 }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "title": "Feature Adoption Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "254carbon_feature_adoption_rate * 100",
+            "legendFormat": "Adoption Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 1
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "title": "Customer Satisfaction (NPS)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "254carbon_customer_nps",
+            "legendFormat": "NPS Score"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "thresholds": {
+              "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 30 },
+                { "color": "green", "value": 70 }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 16
+        }
+      },
+      {
+        "title": "Revenue per Market",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "254carbon_revenue_per_market",
+            "legendFormat": "{{market}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "decimals": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 16
+        }
+      }
+    ],
+    "time": {
+      "from": "now-30d",
+      "to": "now"
+    },
+    "refresh": "5m"
+  }
+}

@@ -19,7 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 class NYISOConnector(Ingestor):
-    """NYISO market data connector."""
+    """
+    NYISO market data connector.
+
+    Responsibilities
+    - Discover and ingest RT/DA LBMP, ICAP, Ancillary Services, and TCCs
+    - Provide mock data generation for predictable dev/test behavior
+    - Map multiple product families to canonical schema consistently
+
+    Production wiring
+    - MIS CSV endpoints or JSON feeds (date-partitioned paths common)
+    - Robust CSV ingestion would add daily path resolution and parsing
+    """
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
@@ -70,7 +81,7 @@ class NYISOConnector(Ingestor):
         }
     
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
-        """Pull data from NYISO API."""
+        """Pull data from NYISO API (mock in this scaffold)."""
         last_checkpoint = self.load_checkpoint()
         last_time = (
             last_checkpoint.get("last_event_time")
@@ -92,7 +103,7 @@ class NYISOConnector(Ingestor):
             yield from self._fetch_tcc_prices()
     
     def _fetch_realtime_lbmp(self) -> Iterator[Dict[str, Any]]:
-        """Fetch Real-Time LBMP (5-minute intervals)."""
+        """Fetch Real-Time LBMP (5-minute intervals, mock)."""
         # NYISO has 11 zones + interfaces
         zones = [
             "NYISO.ZONE.A",  # West
@@ -138,7 +149,7 @@ class NYISOConnector(Ingestor):
             }
     
     def _fetch_dayahead_lbmp(self) -> Iterator[Dict[str, Any]]:
-        """Fetch Day-Ahead LBMP."""
+        """Fetch Day-Ahead LBMP (hourly, mock)."""
         zones = [
             "NYISO.ZONE.J",  # NYC
             "NYISO.ZONE.K",  # Long Island
@@ -178,8 +189,8 @@ class NYISOConnector(Ingestor):
     
     def _fetch_capacity_market(self) -> Iterator[Dict[str, Any]]:
         """
-        Fetch ICAP (Installed Capacity) market prices.
-        
+        Fetch ICAP (Installed Capacity) market prices (mock).
+
         NYISO runs monthly capacity auctions.
         """
         # Capacity zones
@@ -214,8 +225,8 @@ class NYISOConnector(Ingestor):
     
     def _fetch_ancillary_services(self) -> Iterator[Dict[str, Any]]:
         """
-        Fetch Ancillary Services prices.
-        
+        Fetch Ancillary Services prices (mock).
+
         Includes Regulation, 10-min Spinning Reserve, 10-min Non-Sync Reserve,
         and 30-min Operating Reserve.
         """
@@ -248,8 +259,8 @@ class NYISOConnector(Ingestor):
     
     def _fetch_tcc_prices(self) -> Iterator[Dict[str, Any]]:
         """
-        Fetch Transmission Congestion Contract prices.
-        
+        Fetch Transmission Congestion Contract prices (mock).
+
         TCCs provide congestion hedging between zones.
         """
         # Sample TCC paths
@@ -280,7 +291,7 @@ class NYISOConnector(Ingestor):
             }
     
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
-        """Map NYISO format to canonical schema."""
+        """Map NYISO format to canonical schema across LBMP/ICAP/AS/TCC."""
         timestamp = datetime.fromisoformat(raw["timestamp"].replace("Z", "+00:00"))
         
         # Determine product type and value
@@ -305,7 +316,7 @@ class NYISOConnector(Ingestor):
             value = 0
             location = "NYISO.UNKNOWN"
         
-        return {
+        payload = {
             "event_time_utc": int(timestamp.timestamp() * 1000),
             "market": "power",
             "product": product,
@@ -319,6 +330,13 @@ class NYISOConnector(Ingestor):
             "source": self.source_id,
             "seq": int(time.time() * 1000000),
         }
+        if raw.get("energy_component") is not None:
+            payload["energy_component"] = float(raw["energy_component"])  # type: ignore[arg-type]
+        if raw.get("congestion_component") is not None:
+            payload["congestion_component"] = float(raw["congestion_component"])  # type: ignore[arg-type]
+        if raw.get("loss_component") is not None:
+            payload["loss_component"] = float(raw["loss_component"])  # type: ignore[arg-type]
+        return payload
     
     def emit(self, events: Iterator[Dict[str, Any]]) -> int:
         """Emit events to Kafka."""
@@ -375,4 +393,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = NYISOConnector(config)
         connector.run()
-

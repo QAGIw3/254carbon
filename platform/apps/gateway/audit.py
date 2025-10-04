@@ -2,19 +2,17 @@
 Comprehensive audit logging for all data access and mutations.
 """
 import logging
-import os
-import sys
 from datetime import datetime
 from typing import Optional, Dict, Any
 from fastapi import Request
 
-# Add current directory to path for absolute imports
+# Import using absolute path since we're in the gateway package
+import sys
+import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
-
-# Use absolute import
-from db import get_postgres_pool
+import db
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +45,7 @@ class AuditLogger:
             details: Additional context (query params, filters, etc.)
         """
         try:
-            pool = await get_postgres_pool()
+            pool = await db.get_postgres_pool()
             async with pool.acquire() as conn:
                 await conn.execute(
                     """

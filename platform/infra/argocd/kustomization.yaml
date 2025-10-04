@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: argocd-applications
+
+resources:
+  - projects/market-intelligence-project.yaml
+  - applications/market-intelligence-dev.yaml
+  - applications/market-intelligence-staging.yaml
+  - applications/market-intelligence-prod.yaml
+
+# Common labels for all resources
+commonLabels:
+  app.kubernetes.io/managed-by: argocd
+  app.kubernetes.io/part-of: market-intelligence
+
+# Patches for environment-specific configurations
+patchesStrategicMerge:
+  - patches/environment-labels.yaml
+
+# Image tag management
+images:
+  - name: 254carbon/api-gateway
+    newTag: 1.0.0
+  - name: 254carbon/curve-service
+    newTag: 1.0.0
+  - name: 254carbon/scenario-engine
+    newTag: 1.0.0
+  - name: 254carbon/backtesting-service
+    newTag: 1.0.0
+  - name: 254carbon/download-center
+    newTag: 1.0.0
+  - name: 254carbon/web-hub
+    newTag: 1.0.0

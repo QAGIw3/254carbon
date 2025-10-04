@@ -19,7 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 class SPPConnector(Ingestor):
-    """SPP market data connector."""
+    """
+    SPP market data connector.
+
+    Responsibilities
+    - Discover and ingest RT/DA LMP, Integrated Markets, Operating Reserves
+    - Provide mock series for repeatable dev/test behavior
+    - Map multi-product payloads to canonical schema consistently
+
+    Production wiring
+    - Portal/API: https://portal.spp.org/web/api (catalog behind UI)
+    - Replace mocks with dataset-specific calls and auth as needed
+    """
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
@@ -66,9 +77,10 @@ class SPPConnector(Ingestor):
     
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
         """
-        Pull data from SPP Marketplace API.
-        
-        SPP provides data through their Marketplace API.
+        Pull data from SPP Marketplace API (mock in this scaffold).
+
+        Use this skeleton to swap to live marketplace datasets with
+        the appropriate authentication and query parameters.
         """
         last_checkpoint = self.load_checkpoint()
         last_time = (
@@ -89,7 +101,7 @@ class SPPConnector(Ingestor):
             yield from self._fetch_operating_reserves()
     
     def _fetch_realtime_lmp(self) -> Iterator[Dict[str, Any]]:
-        """Fetch Real-Time LMP (5-minute intervals)."""
+        """Fetch Real-Time LMP (5-minute intervals, mock)."""
         # Mock data - in production would call SPP API
         # Example: GET /settlement-location-prices/rtbm
         
@@ -130,7 +142,7 @@ class SPPConnector(Ingestor):
             }
     
     def _fetch_dayahead_lmp(self) -> Iterator[Dict[str, Any]]:
-        """Fetch Day-Ahead LMP."""
+        """Fetch Day-Ahead LMP (hourly, mock)."""
         settlement_locations = [
             "SPP.HUB.NORTH",
             "SPP.HUB.SOUTH",
@@ -168,8 +180,8 @@ class SPPConnector(Ingestor):
     
     def _fetch_integrated_markets(self) -> Iterator[Dict[str, Any]]:
         """
-        Fetch Integrated Marketplace prices.
-        
+        Fetch Integrated Marketplace prices (mock).
+
         SPP's Integrated Marketplace combines RT and DA operations.
         """
         now = datetime.utcnow()
@@ -197,8 +209,8 @@ class SPPConnector(Ingestor):
     
     def _fetch_operating_reserves(self) -> Iterator[Dict[str, Any]]:
         """
-        Fetch Operating Reserve prices.
-        
+        Fetch Operating Reserve prices (mock).
+
         Includes Regulation Up/Down and Spinning Reserve.
         """
         now = datetime.utcnow()
@@ -229,7 +241,7 @@ class SPPConnector(Ingestor):
             }
     
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
-        """Map SPP format to canonical schema."""
+        """Map SPP format to canonical schema across LMP/IM/OR."""
         timestamp = datetime.fromisoformat(raw["timestamp"].replace("Z", "+00:00"))
         
         # Determine product type
@@ -250,7 +262,7 @@ class SPPConnector(Ingestor):
             value = 0
             location = "SPP.UNKNOWN"
         
-        return {
+        payload = {
             "event_time_utc": int(timestamp.timestamp() * 1000),
             "market": "power",
             "product": product,
@@ -264,6 +276,14 @@ class SPPConnector(Ingestor):
             "source": self.source_id,
             "seq": int(time.time() * 1000000),
         }
+        # Promote components if present
+        if raw.get("energy_component") is not None:
+            payload["energy_component"] = float(raw["energy_component"])  # type: ignore[arg-type]
+        if raw.get("congestion_component") is not None:
+            payload["congestion_component"] = float(raw["congestion_component"])  # type: ignore[arg-type]
+        if raw.get("loss_component") is not None:
+            payload["loss_component"] = float(raw["loss_component"])  # type: ignore[arg-type]
+        return payload
     
     def emit(self, events: Iterator[Dict[str, Any]]) -> int:
         """Emit events to Kafka."""
@@ -315,4 +335,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = SPPConnector(config)
         connector.run()
-

@@ -1,0 +1,67 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: market-intelligence
+  namespace: argocd
+  # Finalizer that ensures that project is not deleted until it is not referenced by any application
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: 254Carbon Market Intelligence Platform Project
+
+  # Allow manifests to deploy from any Git repos
+  sourceRepos:
+  - '*'
+
+  # Only permit applications to deploy to the following namespaces
+  destinations:
+  - namespace: 'market-intelligence'
+    server: https://kubernetes.default.svc
+  - namespace: 'monitoring'
+    server: https://kubernetes.default.svc
+  - namespace: 'ingress-nginx'
+    server: https://kubernetes.default.svc
+
+  # Deny all cluster-scoped resources from being created, except for Namespace
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+
+  # Allow all namespaced-scoped resources to be created
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+  # Enables namespace orphaned resource monitoring.
+  orphanedResources:
+    warn: true
+
+  # Sync windows for automated sync
+  syncWindows:
+  - kind: allow
+    schedule: '0 8-18 * * 1-5'  # Allow sync during business hours Mon-Fri
+    duration: 10h
+    applications:
+    - 'market-intelligence-*'
+    - 'monitoring-*'
+    manualSync: true
+
+  # RBAC configuration for the project
+  roles:
+  - name: project-admin
+    description: Project administrator
+    policies:
+    - p, proj:market-intelligence:project-admin, applications, *, market-intelligence/*, allow
+    - p, proj:market-intelligence:project-admin, repositories, *, *, allow
+    - p, proj:market-intelligence:project-admin, clusters, *, *, allow
+    groups:
+    - 254carbon-admins
+
+  - name: developer
+    description: Developer role with limited permissions
+    policies:
+    - p, proj:market-intelligence:developer, applications, sync, market-intelligence/*, allow
+    - p, proj:market-intelligence:developer, applications, get, market-intelligence/*, allow
+    - p, proj:market-intelligence:developer, repositories, get, *, allow
+    groups:
+    - 254carbon-developers

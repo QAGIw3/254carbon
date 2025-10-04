@@ -1,0 +1,28 @@
+# Patches to add environment labels to ArgoCD applications
+
+- target:
+    kind: Application
+    name: market-intelligence-dev
+  patch: |-
+    - op: add
+      path: /metadata/labels
+      value:
+        environment: development
+
+- target:
+    kind: Application
+    name: market-intelligence-staging
+  patch: |-
+    - op: add
+      path: /metadata/labels
+      value:
+        environment: staging
+
+- target:
+    kind: Application
+    name: market-intelligence-prod
+  patch: |-
+    - op: add
+      path: /metadata/labels
+      value:
+        environment: production

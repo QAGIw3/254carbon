@@ -1,6 +1,14 @@
 """
-SPP Real-Time and Day-Ahead LMP Ingestion DAG
-Scheduled to run every 5 minutes for RT, hourly for DA.
+SPP Ingestion DAGs
+
+Schedules
+- RTM: every 5 minutes
+- DAM: hourly
+- IM: every 15 minutes
+
+Design
+- Uses SPPConnector to ingest LMP and IM series (mocked by default) and
+  performs simple quality checks for volume expectations.
 """
 from datetime import datetime, timedelta
 from airflow import DAG
