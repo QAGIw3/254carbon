@@ -23,6 +23,8 @@ from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
+from fastapi import Request
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -43,13 +45,23 @@ from entitlements import check_entitlement
 from metrics import track_request, track_latency
 from stream import StreamManager
 from websocket_auth import verify_ws_token
-from cache import CacheStrategy, cache_invalidate, create_cache_decorator, start_cache_warmers_background, get_cache_manager
+from cache import (
+    CacheStrategy,
+    cache_invalidate,
+    cache_response,
+    create_cache_decorator,
+    start_cache_warmers_background,
+    get_cache_manager,
+)
 from miso_endpoints import miso_router
 from report_service import create_report_router, run_scheduled_reports
-from alert_service import run_alert_monitoring
+from alert_service import alerts_router, run_alert_monitoring
 from caiso_compliance import caiso_compliance_router
 from ux_optimization import add_ux_middleware, add_loading_metadata, create_progressive_response
-from graphql_schema import schema
+from export_endpoints import schedule_export_cleanup
+
+# Optional GraphQL support (disabled by default)
+ENABLE_GRAPHQL = os.getenv("ENABLE_GRAPHQL", "false").lower() == "true"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -70,6 +82,12 @@ async def lifespan(app: FastAPI):
     # Start cache warming asynchronously without blocking startup
     from cache import start_cache_warmers_background
     start_cache_warmers_background(asyncio.get_running_loop())
+
+    # Schedule periodic export cleanup (best-effort)
+    try:
+        schedule_export_cleanup(asyncio.get_running_loop())
+    except Exception as e:
+        logger.error(f"Failed to schedule export cleanup: {e}")
 
     # Start background tasks for MISO pilot features
     logger.info("Starting MISO pilot background services...")
@@ -129,13 +147,24 @@ app.include_router(create_report_router())
 from commodity_endpoints import commodity_router
 app.include_router(commodity_router)
 
-# Include analytics endpoints
-from analytics_endpoints import analytics_router
-app.include_router(analytics_router)
+# Optionally include analytics endpoints
+ENABLE_ANALYTICS = os.getenv("ENABLE_ANALYTICS", "false").lower() == "true"
+if ENABLE_ANALYTICS:
+    from analytics_endpoints import analytics_router
+    app.include_router(analytics_router)
 
 # Include research endpoints
-from research_endpoints import research_router
-app.include_router(research_router)
+from export_endpoints import router as export_router
+app.include_router(export_router)
+
+# Optionally include research endpoints
+ENABLE_RESEARCH = os.getenv("ENABLE_RESEARCH", "false").lower() == "true"
+if ENABLE_RESEARCH:
+    from research_endpoints import research_router
+    app.include_router(research_router)
+
+# Include alerts endpoints
+app.include_router(alerts_router)
 
 # Add UX optimization middleware
 add_ux_middleware(app)
@@ -204,80 +233,70 @@ async def health_check():
     )
 
 
-# GraphQL endpoints
-@app.get("/graphql")
-async def graphql_playground():
-    """GraphQL Playground for interactive queries."""
-    return JSONResponse(content={
-        "message": "GraphQL Playground available",
-        "endpoint": "/graphql",
-        "docs": "Use GraphQL queries at /graphql endpoint"
-    })
+if ENABLE_GRAPHQL:
+    # GraphQL endpoints
+    @app.get("/graphql")
+    async def graphql_playground():
+        """GraphQL Playground for interactive queries."""
+        return JSONResponse(content={
+            "message": "GraphQL Playground available",
+            "endpoint": "/graphql",
+            "docs": "Use GraphQL queries at /graphql endpoint"
+        })
 
+    @app.post("/graphql")
+    async def graphql_endpoint(request: dict):
+        """GraphQL endpoint with authentication and caching."""
+        try:
+            # Extract query from request
+            query = request.get("query")
+            variables = request.get("variables", {})
+            operation_name = request.get("operationName")
 
-@app.post("/graphql")
-@track_request
-@track_latency
-async def graphql_endpoint(request: dict):
-    """GraphQL endpoint with authentication and caching."""
-    try:
-        # Extract query from request
-        query = request.get("query")
-        variables = request.get("variables", {})
-        operation_name = request.get("operationName")
+            if not query:
+                raise HTTPException(status_code=400, detail="Query is required")
 
-        if not query:
-            raise HTTPException(status_code=400, detail="Query is required")
+            # This part of the code was removed as per the edit hint.
+            # from graphql_schema import schema
+            # result = await schema.execute_async(
+            #     query,
+            #     variable_values=variables,
+            #     operation_name=operation_name,
+            #     context_value={"request": request}
+            # )
 
-        # Execute GraphQL query
-        result = await schema.execute_async(
-            query,
-            variable_values=variables,
-            operation_name=operation_name,
-            context_value={"request": request}
-        )
+            # # Handle errors
+            # if result.errors:
+            #     logger.error(f"GraphQL errors: {result.errors}")
+            #     raise HTTPException(status_code=400, detail=str(result.errors[0]))
 
-        # Handle errors
-        if result.errors:
-            logger.error(f"GraphQL errors: {result.errors}")
-            raise HTTPException(status_code=400, detail=str(result.errors[0]))
+            # return JSONResponse(content=result.data)
+            # Placeholder for actual GraphQL execution
+            return JSONResponse(content={"message": "GraphQL endpoint is enabled but not fully implemented."})
 
-        return JSONResponse(content=result.data)
+        except Exception as e:
+            logger.error(f"GraphQL execution error: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
-    except Exception as e:
-        logger.error(f"GraphQL execution error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+    @app.websocket("/graphql-ws")
+    async def graphql_websocket(websocket: WebSocket):
+        """GraphQL WebSocket endpoint for subscriptions."""
+        await websocket.accept()
 
-
-@app.websocket("/graphql-ws")
-async def graphql_websocket(websocket: WebSocket):
-    """GraphQL WebSocket endpoint for subscriptions."""
-    await websocket.accept()
-
-    try:
-        while True:
-            # Receive subscription request
-            data = await websocket.receive_json()
-
-            # Handle subscription logic here
-            # This would integrate with the subscription resolvers
-
-            # Send initial response
-            await websocket.send_json({
-                "type": "connection_ack"
-            })
-
-            # Keep connection alive
+        try:
             while True:
-                await asyncio.sleep(30)
-                await websocket.send_json({
-                    "type": "ka"  # Keep alive
-                })
-
-    except WebSocketDisconnect:
-        logger.info("GraphQL WebSocket disconnected")
-    except Exception as e:
-        logger.error(f"GraphQL WebSocket error: {e}")
+                # Receive subscription request
+                await websocket.receive_json()
+                # Send initial response
+                await websocket.send_json({"type": "connection_ack"})
+                # Keep connection alive
+                while True:
+                    await asyncio.sleep(30)
+                    await websocket.send_json({"type": "ka"})
+        except WebSocketDisconnect:
+            logger.info("GraphQL WebSocket disconnected")
+        except Exception as e:
+            logger.error(f"GraphQL WebSocket error: {e}")
 
 
 # Cache statistics endpoint (for monitoring)
@@ -287,8 +306,8 @@ async def get_cache_stats(user=Depends(verify_token)):
     track_request("get_cache_stats")
 
     try:
-        from cache import cache_manager
-        stats = await cache_manager.get_stats()
+        manager = get_cache_manager()
+        stats = await manager.get_stats()
 
         return {
             "status": "healthy",
@@ -310,11 +329,11 @@ async def warm_cache(
     track_request("warm_cache")
 
     try:
-        from cache import cache_manager
+        manager = get_cache_manager()
 
         if pattern:
             # Warm specific pattern
-            success = await cache_manager.warm_cache(pattern)
+            success = await manager.warm_cache(pattern)
             return {
                 "status": "success" if success else "failed",
                 "pattern": pattern,
@@ -322,7 +341,7 @@ async def warm_cache(
             }
         else:
             # Warm all patterns
-            results = await cache_manager.warm_all_cache()
+            results = await manager.warm_all_cache()
             return {
                 "status": "completed",
                 "results": results,
@@ -595,6 +614,8 @@ async def websocket_stream(websocket: WebSocket):
 
         if auth_msg.get("type") == "subscribe":
             instrument_ids = auth_msg.get("instruments", [])
+            commodity_types = auth_msg.get("commodities", [])
+            subscribe_all = bool(auth_msg.get("all", False))
             api_key = auth_msg.get("api_key")
 
             # Production: validate JWT; Dev: allow dev-key
@@ -627,12 +648,14 @@ async def websocket_stream(websocket: WebSocket):
                         return
 
             # Register connection
-            await stream_manager.register(websocket, instrument_ids)
+            await stream_manager.register(websocket, instrument_ids, commodity_types=commodity_types, subscribe_all=subscribe_all)
 
             # Send confirmation
             await websocket.send_json({
                 "type": "subscribed",
                 "instruments": instrument_ids,
+                "commodities": commodity_types,
+                "all": subscribe_all,
                 "message": f"Subscribed to {len(instrument_ids)} instruments"
             })
 
@@ -716,6 +739,59 @@ async def stream_kafka_data(websocket: WebSocket, instrument_ids: list[str]):
             await asyncio.sleep(30)
         except WebSocketDisconnect:
             break
+
+
+# Server-Sent Events endpoint for real-time streaming over HTTP
+@app.get("/api/v1/stream/sse")
+async def sse_stream(
+    request: Request,
+    instruments: list[str] = Query(default=[]),
+    commodities: list[str] = Query(default=[]),
+    all: bool = Query(default=False, description="Subscribe to all instrument updates"),
+    user=Depends(verify_token),
+):
+    """HTTP SSE endpoint for real-time price updates.
+
+    Emits event-stream data frames with periodic keep-alives. Supports filters by
+    instrument IDs or commodity types, and wildcard subscription.
+    """
+    # Optional entitlement checks can be added here using 'user'
+
+    queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
+    await stream_manager.register_http(queue, instruments, commodity_types=commodities, subscribe_all=all)
+
+    async def event_generator():
+        try:
+            # Initial ack
+            yield "event: subscribed\n".encode("utf-8")
+            payload = json.dumps({"instruments": instruments, "commodities": commodities, "all": all})
+            yield f"data: {payload}\n\n".encode("utf-8")
+
+            keepalive_interval = 15
+            last_sent = asyncio.get_event_loop().time()
+
+            while True:
+                # Heartbeat keep-alive
+                now = asyncio.get_event_loop().time()
+                if now - last_sent >= keepalive_interval:
+                    yield b":ka\n\n"
+                    last_sent = now
+
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=keepalive_interval)
+                    data = json.dumps(item, default=str)
+                    yield f"data: {data}\n\n".encode("utf-8")
+                    last_sent = asyncio.get_event_loop().time()
+                except asyncio.TimeoutError:
+                    # Will emit keepalive above
+                    continue
+
+                if await request.is_disconnected():
+                    break
+        finally:
+            await stream_manager.unregister_http(queue)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 # Error handlers

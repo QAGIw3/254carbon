@@ -516,6 +516,8 @@ class CarbonClient:
     async def stream_prices(
         self,
         instrument_ids: List[str],
+        commodities: Optional[List[str]] = None,
+        subscribe_all: bool = False,
         callback: Callable[[PriceTick], None],
         reconnect: bool = True,
         reconnect_delay: float = 5.0,
@@ -549,6 +551,8 @@ class CarbonClient:
                     subscription = {
                         "type": "subscribe",
                         "instruments": instrument_ids,
+                        "commodities": commodities or [],
+                        "all": subscribe_all,
                         "api_key": self.api_key
                     }
                     await websocket.send(json.dumps(subscription))
@@ -597,6 +601,8 @@ class CarbonClient:
     async def stream_prices_async(
         self,
         instrument_ids: List[str],
+        commodities: Optional[List[str]] = None,
+        subscribe_all: bool = False,
         reconnect: bool = True,
         reconnect_delay: float = 5.0,
         max_reconnect_attempts: int = 10,
@@ -614,6 +620,8 @@ class CarbonClient:
         """
         async for tick in self.stream_prices(
             instrument_ids,
+            commodities=commodities,
+            subscribe_all=subscribe_all,
             callback=None,  # Use async generator instead
             reconnect=reconnect,
             reconnect_delay=reconnect_delay,
@@ -637,6 +645,95 @@ class CarbonClient:
         async def run_stream():
             async for tick in self.stream_prices(instrument_ids, callback=callback):
                 pass  # Callback is handled in stream_prices
+    # Research exports API
+
+    def create_export_job(
+        self,
+        dataset_id: Optional[str] = None,
+        sql: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        fmt: str = "csv",
+        compression: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "dataset_id": dataset_id,
+            "sql": sql,
+            "params": params,
+            "fmt": fmt,
+            "compression": compression,
+            "idempotency_key": idempotency_key,
+        }
+        if start_date:
+            payload["start_date"] = start_date.isoformat()
+        if end_date:
+            payload["end_date"] = end_date.isoformat()
+
+        response = self._client.post("/api/v1/research/export/jobs", json=payload)
+        return self._handle_response(response)
+
+    def get_export_status(self, job_id: str) -> Dict[str, Any]:
+        response = self._client.get(f"/api/v1/research/export/jobs/{job_id}")
+        return self._handle_response(response)
+
+    def get_export_download_url(self, job_id: str) -> str:
+        response = self._client.get(f"/api/v1/research/export/jobs/{job_id}/download")
+        data = self._handle_response(response)
+        return data.get("url")
+
+    def preview_export(
+        self,
+        dataset_id: Optional[str] = None,
+        sql: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        query_params: Dict[str, Any] = {}
+        if dataset_id:
+            query_params["dataset_id"] = dataset_id
+        if sql:
+            query_params["sql"] = sql
+        if params:
+            query_params["params"] = json.dumps(params)
+        if start_date:
+            query_params["start_date"] = start_date.isoformat()
+        if end_date:
+            query_params["end_date"] = end_date.isoformat()
+        query_params["limit"] = limit
+        response = self._client.get("/api/v1/research/export/preview", params=query_params)
+        return self._handle_response(response)
+
+    # SSE streaming (HTTP event-stream)
+    def stream_prices_sse(
+        self,
+        instruments: Optional[List[str]] = None,
+        commodities: Optional[List[str]] = None,
+        subscribe_all: bool = False,
+    ):
+        """Return an httpx streaming response iterator for SSE events."""
+        params: Dict[str, Any] = {}
+        if instruments:
+            params["instruments"] = instruments
+        if commodities:
+            params["commodities"] = commodities
+        if subscribe_all:
+            params["all"] = "true"
+        with httpx.stream("GET", f"{self.base_url}/api/v1/stream/sse", params=params, headers=self._get_headers(), timeout=None) as r:
+            if r.status_code != 200:
+                raise self._handle_response(r)
+            for line in r.iter_lines():
+                if not line:
+                    continue
+                if line.startswith("data: "):
+                    payload = line[len("data: "):]
+                    try:
+                        yield json.loads(payload)
+                    except Exception:
+                        yield payload
 
         loop.run_until_complete(run_stream())
 

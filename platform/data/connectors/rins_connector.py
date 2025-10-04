@@ -49,7 +49,7 @@ class RINsConnector(Ingestor):
 
         # D4 RINs (Biomass-based diesel)
         d4_spec = ContractSpecification(
-            commodity_code="D4_RIN",
+            commodity_code="RIN.D4",
             commodity_type=CommodityType.BIOFUELS,
             contract_unit="RIN",
             quality_spec={
@@ -69,7 +69,7 @@ class RINsConnector(Ingestor):
 
         # D5 RINs (Advanced biofuels)
         d5_spec = ContractSpecification(
-            commodity_code="D5_RIN",
+            commodity_code="RIN.D5",
             commodity_type=CommodityType.BIOFUELS,
             contract_unit="RIN",
             quality_spec={
@@ -89,7 +89,7 @@ class RINsConnector(Ingestor):
 
         # D6 RINs (Renewable fuels)
         d6_spec = ContractSpecification(
-            commodity_code="D6_RIN",
+            commodity_code="RIN.D6",
             commodity_type=CommodityType.BIOFUELS,
             contract_unit="RIN",
             quality_spec={
@@ -114,7 +114,7 @@ class RINsConnector(Ingestor):
             "commodity_type": self.commodity_type.value,
             "rin_categories": [
                 {
-                    "commodity_code": "D4_RIN",
+                    "commodity_code": "RIN.D4",
                     "name": "D4 Biomass-based Diesel RIN",
                     "frequency": "daily",
                     "unit": "USD/RIN",
@@ -122,7 +122,7 @@ class RINsConnector(Ingestor):
                     "ethanol_equivalent": 1.5
                 },
                 {
-                    "commodity_code": "D5_RIN",
+                    "commodity_code": "RIN.D5",
                     "name": "D5 Advanced Biofuels RIN",
                     "frequency": "daily",
                     "unit": "USD/RIN",
@@ -130,7 +130,7 @@ class RINsConnector(Ingestor):
                     "ethanol_equivalent": 1.0
                 },
                 {
-                    "commodity_code": "D6_RIN",
+                    "commodity_code": "RIN.D6",
                     "name": "D6 Renewable Fuels RIN",
                     "frequency": "daily",
                     "unit": "USD/RIN",
@@ -153,7 +153,7 @@ class RINsConnector(Ingestor):
             assessment_date = datetime.now(timezone.utc).date()
 
             # Pull pricing data for each RIN category
-            rin_categories = ["D4_RIN", "D5_RIN", "D6_RIN"]
+            rin_categories = ["RIN.D4", "RIN.D5", "RIN.D6"]
 
             for rin_category in rin_categories:
                 try:
@@ -184,9 +184,9 @@ class RINsConnector(Ingestor):
 
         # RIN price relationships
         base_prices = {
-            "D4_RIN": 1.25,   # $1.25/RIN (biodiesel premium)
-            "D5_RIN": 0.85,   # $0.85/RIN (advanced biofuels)
-            "D6_RIN": 0.45    # $0.45/RIN (corn ethanol)
+            "RIN.D4": 1.25,   # $1.25/RIN (biodiesel premium)
+            "RIN.D5": 0.85,   # $0.85/RIN (advanced biofuels)
+            "RIN.D6": 0.45    # $0.45/RIN (corn ethanol)
         }
 
         base_price = base_prices.get(rin_category, 0.50)

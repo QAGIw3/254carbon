@@ -11,8 +11,8 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from .db import get_clickhouse_client, get_postgres_pool
-from .metrics import calculate_mape, calculate_wape, calculate_rmse
+from db import get_clickhouse_client, get_postgres_pool
+from metrics import calculate_mape, calculate_wape, calculate_rmse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ async def run_backtest(request: BacktestRequest):
             delivery_start,
             delivery_end,
             price as forecast_price
-        FROM ch.forward_curve_points
+        FROM market_intelligence.forward_curve_points
         WHERE instrument_id = %(instrument_id)s
           AND scenario_id = %(scenario_id)s
           AND as_of_date = %(forecast_date)s
@@ -115,7 +115,7 @@ async def run_backtest(request: BacktestRequest):
         SELECT 
             toDate(event_time) as date,
             avg(value) as realized_price
-        FROM ch.market_price_ticks
+        FROM market_intelligence.market_price_ticks
         WHERE instrument_id = %(instrument_id)s
           AND price_type = 'settle'
           AND toDate(event_time) >= %(eval_start)s

@@ -20,7 +20,8 @@ from pydantic import BaseModel
 from auth import verify_token, has_permission
 from db import get_clickhouse_client
 from entitlements import check_entitlement
-from cache import create_cache_decorator
+from cache import create_cache_decorator, CacheStrategy
+from commodity_query import build_price_query, build_curve_query, build_latest_snapshot_query
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,7 @@ class GasBasisModelResponse(BaseModel):
 
 
 @commodity_router.get("/oil/benchmarks", response_model=List[CommodityPriceResponse])
-@create_cache_decorator(ttl_seconds=300)  # 5 minute cache
+@create_cache_decorator("oil_benchmarks", CacheStrategy.SEMI_STATIC)
 async def get_oil_benchmarks(
     start_date: date = Query(..., description="Start date for price data"),
     end_date: date = Query(..., description="End date for price data"),
@@ -173,7 +174,7 @@ async def get_oil_benchmarks(
 
 
 @commodity_router.get("/gas/hubs/{hub_id}/prices", response_model=List[CommodityPriceResponse])
-@create_cache_decorator(ttl_seconds=60)  # 1 minute cache for real-time data
+@create_cache_decorator("gas_hub_prices", CacheStrategy.REALTIME)
 async def get_gas_hub_prices(
     hub_id: str,
     start_date: date = Query(..., description="Start date for price data"),
@@ -238,7 +239,7 @@ async def get_gas_hub_prices(
 
 
 @commodity_router.get("/coal/indices", response_model=List[CommodityPriceResponse])
-@create_cache_decorator(ttl_seconds=3600)  # 1 hour cache for daily indices
+@create_cache_decorator("coal_indices", CacheStrategy.STATIC)
 async def get_coal_indices(
     start_date: date = Query(..., description="Start date for price data"),
     end_date: date = Query(..., description="End date for price data"),
@@ -299,7 +300,7 @@ async def get_coal_indices(
 
 
 @commodity_router.get("/analytics/gas/arbitrage", response_model=StorageArbitrageResponse)
-@create_cache_decorator(ttl_seconds=300)
+@create_cache_decorator("gas_storage_arbitrage", CacheStrategy.SEMI_STATIC)
 async def get_gas_storage_arbitrage(
     hub: str = Query(..., description="Storage hub identifier"),
     as_of: date = Query(..., description="As-of date"),
@@ -359,7 +360,7 @@ async def get_gas_storage_arbitrage(
 
 
 @commodity_router.get("/analytics/weather-impact", response_model=List[WeatherImpactResponse])
-@create_cache_decorator(ttl_seconds=300)
+@create_cache_decorator("weather_impact", CacheStrategy.SEMI_STATIC)
 async def get_weather_impact_analytics(
     entity: str = Query(..., description="Hub or region identifier"),
     window: Optional[str] = Query(None, description="Window label, e.g. 120d"),
@@ -420,7 +421,7 @@ async def get_weather_impact_analytics(
 
 
 @commodity_router.get("/analytics/coal-to-gas", response_model=CoalToGasSwitchResponse)
-@create_cache_decorator(ttl_seconds=300)
+@create_cache_decorator("coal_to_gas", CacheStrategy.SEMI_STATIC)
 async def get_coal_to_gas_switching(
     region: str = Query(..., description="Region identifier"),
     as_of: date = Query(..., description="As-of date"),
@@ -475,7 +476,7 @@ async def get_coal_to_gas_switching(
 
 
 @commodity_router.get("/analytics/gas/basis-model", response_model=GasBasisModelResponse)
-@create_cache_decorator(ttl_seconds=300)
+@create_cache_decorator("gas_basis_model", CacheStrategy.SEMI_STATIC)
 async def get_gas_basis_model(
     hub: str = Query(..., description="Gas hub identifier"),
     as_of: date = Query(..., description="As-of date"),
@@ -528,7 +529,7 @@ async def get_gas_basis_model(
 
 
 @commodity_router.get("/refined-products/prices", response_model=List[CommodityPriceResponse])
-@create_cache_decorator(ttl_seconds=300)  # 5 minute cache
+@create_cache_decorator("refined_products_prices", CacheStrategy.SEMI_STATIC)
 async def get_refined_products_prices(
     start_date: date = Query(..., description="Start date for price data"),
     end_date: date = Query(..., description="End date for price data"),
@@ -592,7 +593,7 @@ async def get_refined_products_prices(
 
 
 @commodity_router.get("/biofuels/prices", response_model=List[CommodityPriceResponse])
-@create_cache_decorator(ttl_seconds=300)  # 5 minute cache
+@create_cache_decorator("biofuels_prices", CacheStrategy.SEMI_STATIC)
 async def get_biofuels_prices(
     start_date: date = Query(..., description="Start date for price data"),
     end_date: date = Query(..., description="End date for price data"),
@@ -653,7 +654,7 @@ async def get_biofuels_prices(
 
 
 @commodity_router.get("/emissions/allowances", response_model=List[CommodityPriceResponse])
-@create_cache_decorator(ttl_seconds=60)  # 1 minute cache for real-time data
+@create_cache_decorator("emissions_allowances", CacheStrategy.REALTIME)
 async def get_emissions_allowances(
     start_date: date = Query(..., description="Start date for price data"),
     end_date: date = Query(..., description="End date for price data"),
@@ -714,7 +715,7 @@ async def get_emissions_allowances(
 
 
 @commodity_router.get("/renewables/certificates", response_model=List[CommodityPriceResponse])
-@create_cache_decorator(ttl_seconds=3600)  # 1 hour cache
+@create_cache_decorator("renewable_certificates", CacheStrategy.STATIC)
 async def get_renewable_certificates(
     start_date: date = Query(..., description="Start date for price data"),
     end_date: date = Query(..., description="End date for price data"),
@@ -775,7 +776,7 @@ async def get_renewable_certificates(
 
 
 @commodity_router.get("/benchmarks/comparison", response_model=BenchmarkComparisonResponse)
-@create_cache_decorator(ttl_seconds=300)  # 5 minute cache
+@create_cache_decorator("benchmarks_comparison", CacheStrategy.SEMI_STATIC)
 async def compare_benchmarks(
     benchmark: str = Query(..., description="Primary benchmark commodity"),
     comparison_commodities: List[str] = Query(..., description="Commodities to compare"),
@@ -846,7 +847,7 @@ async def compare_benchmarks(
 
 
 @commodity_router.get("/futures/curves", response_model=List[FuturesCurveResponse])
-@create_cache_decorator(ttl_seconds=1800)  # 30 minute cache
+@create_cache_decorator("futures_curves", CacheStrategy.SEMI_STATIC)
 async def get_futures_curves(
     commodities: List[str] = Query(..., description="Commodities to include"),
     as_of_date: date = Query(..., description="As-of date for curves")
@@ -908,10 +909,13 @@ async def get_futures_curves(
 @commodity_router.get("/specifications/{commodity_code}")
 async def get_commodity_specifications(
     commodity_code: str,
-    current_user: Dict[str, Any] = Depends(has_permission("read_commodity_specs"))
+    user: Dict[str, Any] = Depends(verify_token),
 ):
     """Get detailed specifications for a commodity."""
     try:
+        # Authorization: require role or permission
+        if not has_permission(user, "read_commodity_specs"):
+            raise HTTPException(status_code=403, detail="Forbidden")
         clickhouse = await get_clickhouse_client()
 
         # Query commodity specifications
@@ -939,4 +943,124 @@ async def get_commodity_specifications(
 
     except Exception as e:
         logger.error(f"Error fetching commodity specifications: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Generic, unified commodity endpoints
+
+class UnifiedPriceTick(BaseModel):
+    timestamp: datetime
+    commodity: str
+    price: float
+    price_type: str
+    location: Optional[str]
+    volume: Optional[float]
+    currency: str
+    unit: str
+    source: str
+
+
+@commodity_router.get("/{commodity}/prices", response_model=List[UnifiedPriceTick])
+@create_cache_decorator("commodity_prices", CacheStrategy.REALTIME)
+async def get_commodity_prices(
+    commodity: str,
+    start_time: datetime = Query(...),
+    end_time: datetime = Query(...),
+    price_type: Optional[str] = Query(None),
+    location: Optional[str] = Query(None),
+    source: Optional[str] = Query(None),
+    limit: int = Query(10000, ge=1, le=200000)
+):
+    try:
+        await check_entitlement("commodity_prices")
+        ch = get_clickhouse_client()
+        sql, params = build_price_query(
+            commodity=commodity,
+            start_date=start_time,
+            end_date=end_time,
+            price_type=price_type,
+            location=location,
+            source=source,
+            limit=limit,
+        )
+        rows = ch.execute(sql, params)
+        return [
+            UnifiedPriceTick(
+                timestamp=row[0],
+                commodity=row[1],
+                location=row[2],
+                price_type=row[3],
+                price=row[4],
+                volume=row[5],
+                currency=row[6],
+                unit=row[7],
+                source=row[8],
+            )
+            for row in rows
+        ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching commodity prices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@commodity_router.get("/{commodity}/curves", response_model=List[FuturesCurveResponse])
+@create_cache_decorator("commodity_curves", CacheStrategy.SEMI_STATIC)
+async def get_commodity_curves(
+    commodity: str,
+    as_of_date: date = Query(...),
+    exchange: Optional[str] = Query(None),
+):
+    try:
+        await check_entitlement("futures_data_access")
+        ch = await get_clickhouse_client()
+        sql, params = build_curve_query(commodity=commodity, as_of_date=as_of_date, exchange=exchange)
+        result = await ch.fetch(sql, parameters=params) if hasattr(ch, "fetch") else ch.execute(sql, params)
+        return [
+            FuturesCurveResponse(
+                commodity_code=row[0] if isinstance(row, (list, tuple)) else row["commodity_code"],
+                as_of_date=row[1] if isinstance(row, (list, tuple)) else row["as_of_date"],
+                contract_month=row[2] if isinstance(row, (list, tuple)) else row["contract_month"],
+                settlement_price=row[3] if isinstance(row, (list, tuple)) else row["settlement_price"],
+                open_interest=row[4] if isinstance(row, (list, tuple)) else row["open_interest"],
+                volume=row[5] if isinstance(row, (list, tuple)) else row["volume"],
+                exchange=row[6] if isinstance(row, (list, tuple)) else row["exchange"],
+            )
+            for row in result
+        ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching commodity curves: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@commodity_router.get("/{commodity}/benchmarks")
+@create_cache_decorator("commodity_benchmarks", CacheStrategy.SEMI_STATIC)
+async def get_commodity_benchmarks(
+    commodity: str,
+    peers: List[str] = Query(..., description="Peer instruments for comparison"),
+):
+    try:
+        await check_entitlement("benchmark_data_access")
+        ch = get_clickhouse_client()
+        all_instruments = [commodity] + peers
+        sql, params = build_latest_snapshot_query(all_instruments)
+        rows = ch.execute(sql, params)
+        prices = {rid[0]: rid[1] for rid in rows}
+        if commodity not in prices:
+            raise HTTPException(status_code=404, detail=f"Benchmark {commodity} not found")
+        benchmark_price = prices[commodity]
+        diffs = {k: v - benchmark_price for k, v in prices.items() if k != commodity}
+        return {
+            "benchmark": commodity,
+            "comparison_prices": prices,
+            "price_differentials": diffs,
+            "timestamp": datetime.now(),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching commodity benchmarks: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -4,7 +4,7 @@ WebSocket stream manager for real-time data distribution.
 import asyncio
 import json
 import logging
-from typing import Dict, Set, Optional
+from typing import Dict, Set, Optional, List
 from fastapi import WebSocket
 from aiokafka import AIOKafkaConsumer
 import avro.schema
@@ -15,10 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class StreamManager:
-    """Manage WebSocket connections and real-time data streaming.
+    """Manage real-time data streaming to WebSocket and SSE subscribers.
 
     Maintains bidirectional maps of connections/subscriptions and runs a
     Kafka consumer loop to fan out Avro-encoded messages to subscribers.
+    Supports subscriptions by instrument, commodity, and wildcard (all).
     """
 
     def __init__(self):
@@ -26,6 +27,18 @@ class StreamManager:
         self.connections: Dict[WebSocket, Set[str]] = {}
         # Instrument ID -> subscribed WebSockets
         self.subscriptions: Dict[str, Set[WebSocket]] = {}
+        # Commodity type -> subscribed WebSockets
+        self.commodity_ws_subscriptions: Dict[str, Set[WebSocket]] = {}
+        # Wildcard (all) WebSocket subscribers
+        self.all_ws_subscribers: Set[WebSocket] = set()
+
+        # SSE (HTTP) queue subscribers
+        # Instrument ID -> set of asyncio.Queue objects
+        self.instrument_queues: Dict[str, Set[asyncio.Queue]] = {}
+        # Commodity type -> set of asyncio.Queue objects
+        self.commodity_queues: Dict[str, Set[asyncio.Queue]] = {}
+        # Wildcard (all) SSE queue subscribers
+        self.all_queues: Set[asyncio.Queue] = set()
         self._kafka_task = None
         self._kafka_consumer: Optional[AIOKafkaConsumer] = None
         self._kafka_bootstrap_servers = "kafka:9092"
@@ -50,21 +63,35 @@ class StreamManager:
         }
         """)
     
-    async def register(self, websocket: WebSocket, instrument_ids: list[str]):
+    async def register(self, websocket: WebSocket, instrument_ids: List[str], commodity_types: Optional[List[str]] = None, subscribe_all: bool = False):
         """Register a WebSocket connection with subscriptions.
 
         Args:
             websocket: FastAPI WebSocket instance.
             instrument_ids: List of instrument IDs to subscribe to.
+            commodity_types: Optional list of commodity types to subscribe to.
+            subscribe_all: If True, receive all updates.
         """
         self.connections[websocket] = set(instrument_ids)
-        
+
         for inst_id in instrument_ids:
             if inst_id not in self.subscriptions:
                 self.subscriptions[inst_id] = set()
             self.subscriptions[inst_id].add(websocket)
-        
-        logger.info(f"Registered WebSocket with {len(instrument_ids)} subscriptions")
+
+        if commodity_types:
+            for c in commodity_types:
+                if c not in self.commodity_ws_subscriptions:
+                    self.commodity_ws_subscriptions[c] = set()
+                self.commodity_ws_subscriptions[c].add(websocket)
+
+        if subscribe_all:
+            self.all_ws_subscribers.add(websocket)
+
+        logger.info(
+            f"Registered WebSocket with {len(instrument_ids)} instrument subscriptions, "
+            f"{len(commodity_types or [])} commodity subscriptions, all={subscribe_all}"
+        )
         
         # Start Kafka consumer if not running
         if self._kafka_task is None:
@@ -74,13 +101,18 @@ class StreamManager:
         """Unregister a WebSocket connection and clean up subscriptions."""
         if websocket in self.connections:
             instrument_ids = self.connections[websocket]
-            
+
             for inst_id in instrument_ids:
                 if inst_id in self.subscriptions:
                     self.subscriptions[inst_id].discard(websocket)
                     if not self.subscriptions[inst_id]:
                         del self.subscriptions[inst_id]
-            
+
+            # Remove from commodity and all maps
+            for cset in list(self.commodity_ws_subscriptions.values()):
+                cset.discard(websocket)
+            self.all_ws_subscribers.discard(websocket)
+
             del self.connections[websocket]
             logger.info("Unregistered WebSocket")
     
@@ -91,19 +123,93 @@ class StreamManager:
             instrument_id: Key for subscriber lookup.
             data: JSON-serializable payload to send.
         """
+        # WebSocket by instrument
         if instrument_id in self.subscriptions:
             disconnected = []
-            
+
             for websocket in self.subscriptions[instrument_id]:
                 try:
                     await websocket.send_json(data)
                 except Exception as e:
                     logger.error(f"Error sending to WebSocket: {e}")
                     disconnected.append(websocket)
-            
-            # Clean up disconnected sockets
+
             for websocket in disconnected:
                 await self.unregister(websocket)
+
+        # SSE queues by instrument
+        if instrument_id in self.instrument_queues:
+            for q in list(self.instrument_queues[instrument_id]):
+                try:
+                    q.put_nowait(data)
+                except Exception:
+                    # Drop if receiver is slow/full
+                    pass
+
+        # Wildcard recipients (WebSocket and SSE)
+        for websocket in list(self.all_ws_subscribers):
+            try:
+                await websocket.send_json(data)
+            except Exception:
+                await self.unregister(websocket)
+        for q in list(self.all_queues):
+            try:
+                q.put_nowait(data)
+            except Exception:
+                pass
+
+    async def broadcast_commodity(self, commodity_type: Optional[str], data: dict):
+        """Broadcast data to commodity-based subscribers if type provided."""
+        if not commodity_type:
+            return
+
+        # WebSocket by commodity
+        if commodity_type in self.commodity_ws_subscriptions:
+            disconnected = []
+            for websocket in self.commodity_ws_subscriptions[commodity_type]:
+                try:
+                    await websocket.send_json(data)
+                except Exception as e:
+                    logger.error(f"Error sending to WebSocket: {e}")
+                    disconnected.append(websocket)
+            for websocket in disconnected:
+                await self.unregister(websocket)
+
+        # SSE queues by commodity
+        if commodity_type in self.commodity_queues:
+            for q in list(self.commodity_queues[commodity_type]):
+                try:
+                    q.put_nowait(data)
+                except Exception:
+                    pass
+
+    async def register_http(self, queue: asyncio.Queue, instrument_ids: List[str], commodity_types: Optional[List[str]] = None, subscribe_all: bool = False):
+        """Register an HTTP (SSE) subscriber represented by an asyncio.Queue."""
+        for inst_id in instrument_ids:
+            if inst_id not in self.instrument_queues:
+                self.instrument_queues[inst_id] = set()
+            self.instrument_queues[inst_id].add(queue)
+
+        if commodity_types:
+            for c in commodity_types:
+                if c not in self.commodity_queues:
+                    self.commodity_queues[c] = set()
+                self.commodity_queues[c].add(queue)
+
+        if subscribe_all:
+            self.all_queues.add(queue)
+
+    async def unregister_http(self, queue: asyncio.Queue):
+        """Unregister an HTTP (SSE) subscriber queue."""
+        for inst_id in list(self.instrument_queues.keys()):
+            self.instrument_queues[inst_id].discard(queue)
+            if not self.instrument_queues[inst_id]:
+                del self.instrument_queues[inst_id]
+        for c in list(self.commodity_queues.keys()):
+            self.commodity_queues[c].discard(queue)
+            if not self.commodity_queues[c]:
+                del self.commodity_queues[c]
+        self.all_queues.discard(queue)
     
     async def _consume_kafka(self):
         """Consume messages from Kafka and broadcast to subscribers."""
@@ -137,9 +243,16 @@ class StreamManager:
 
                             # Extract instrument_id for routing
                             instrument_id = data.get("instrument_id")
+                            commodity_type = data.get("commodity_type")
                             if instrument_id:
                                 # Broadcast to all subscribers of this instrument
                                 await self.broadcast(instrument_id, {
+                                    "type": "price_tick",
+                                    "data": data,
+                                    "timestamp": data.get("event_time")
+                                })
+                                # Also broadcast to commodity subscribers if available
+                                await self.broadcast_commodity(commodity_type, {
                                     "type": "price_tick",
                                     "data": data,
                                     "timestamp": data.get("event_time")

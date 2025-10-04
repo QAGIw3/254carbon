@@ -52,9 +52,9 @@ class Instrument(ObjectType):
     metadata = graphene.JSONString()
 
     # Relationships
-    latest_price = graphene.Field('PricePoint')
-    price_history = graphene.List('PricePoint', limit=graphene.Int(), start_time=graphene.DateTime(), end_time=graphene.DateTime())
-    forward_curve = graphene.List('CurvePoint', scenario_id=graphene.String(), as_of_date=graphene.DateTime())
+    latest_price = graphene.Field(lambda: PricePoint)
+    price_history = graphene.List(lambda: PricePoint, limit=graphene.Int(), start_time=graphene.DateTime(), end_time=graphene.DateTime())
+    forward_curve = graphene.List(lambda: CurvePoint, scenario_id=graphene.String(), as_of_date=graphene.DateTime())
 
 
 class Market(ObjectType):
@@ -83,7 +83,7 @@ class Scenario(ObjectType):
     updated_at = graphene.DateTime()
 
     # Relationships
-    runs = graphene.List('ScenarioRun', limit=graphene.Int())
+    runs = graphene.List(lambda: ScenarioRun, limit=graphene.Int())
 
 
 class ScenarioRun(ObjectType):

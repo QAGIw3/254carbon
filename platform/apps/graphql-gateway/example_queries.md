@@ -199,6 +199,113 @@ query CoalTransportCosts {
 }
 ```
 
+## Correlation Pairs
+
+```graphql
+query CorrelationPairs {
+  analytics {
+    correlationPairs(
+      instruments: ["NG1", "NG2", "NG3"]
+      start: "2024-01-01"
+      end: "2024-03-01"
+      minSamples: 45
+      limit: 100
+    ) {
+      date
+      instrument1
+      instrument2
+      correlation
+      sampleCount
+    }
+  }
+}
+```
+
+## Correlation Matrix
+
+```graphql
+query CorrelationMatrix {
+  analytics {
+    correlationMatrix(
+      instruments: ["NG1", "NG2", "NG3"]
+      minSamples: 45
+    ) {
+      date
+      instruments
+      coefficients
+    }
+  }
+}
+```
+
+## Volatility Surface
+
+```graphql
+query VolatilitySurface {
+  analytics {
+    volatilitySurface(
+      instruments: ["NG1", "NG2"]
+      start: "2023-10-01"
+      end: "2024-03-01"
+      limit: 500
+    ) {
+      asOfDate
+      instrumentId
+      vol30d
+      vol90d
+      vol365d
+    }
+  }
+}
+```
+
+## Seasonality Decomposition
+
+```graphql
+query SeasonalityDecomposition {
+  analytics {
+    seasonalityDecomposition(
+      instrumentId: "NG1"
+      method: "stl"
+      start: "2023-03-01"
+      end: "2024-03-01"
+      limit: 180
+    ) {
+      snapshotDate
+      trend
+      seasonal
+      residual
+    }
+    seasonalityDecompositionLatest(instrumentId: "NG1", method: "stl") {
+      snapshotDate
+      trend
+      seasonal
+      residual
+    }
+  }
+}
+```
+
+## Research Queries
+
+```graphql
+query ResearchQuery {
+  analytics {
+    listResearchQueries
+    researchQuery(
+      input: {
+        queryId: LIST_NOTEBOOKS
+        params: { status: "published" }
+        limit: 25
+      }
+    ) {
+      columns
+      values
+    }
+  }
+}
+```
+
 ## Pipeline Congestion Forecast
 
 ```graphql
@@ -260,3 +367,92 @@ query SeasonalDemandForecast {
 3. **Strongly typed schema** - automatic documentation and validation
 4. **Introspection** - explore API interactively
 5. **Great tooling** - GraphQL Playground, Apollo Client, etc.
+
+## Carbon Price Forecasts
+
+```graphql
+query CarbonForecasts {
+  carbonPriceForecasts(market: "eua", horizonDays: 365, limit: 30) {
+    market
+    forecastDate
+    forecastPrice
+    std
+    drivers
+    modelVersion
+  }
+}
+```
+
+## Compliance Costs
+
+```graphql
+query ComplianceCosts {
+  complianceCosts(market: "eua", start: "2025-01-01", limit: 10) {
+    asOfDate
+    sector
+    totalEmissions
+    costPerTonne
+    totalComplianceCost
+    details
+  }
+}
+```
+
+## Decarbonization Pathways
+
+```graphql
+query Pathways {
+  decarbonizationPathways(sector: "power", scenario: "ambitious", limit: 5) {
+    asOfDate
+    targetYear
+    annualReductionRate
+    targetAchieved
+    emissionsTrajectory
+    technologyAnalysis
+  }
+}
+```
+
+## Renewable Adoption Forecast
+
+```graphql
+query RenewableAdoption {
+  renewableAdoption(technology: "solar", limit: 10) {
+    asOfDate
+    forecastYear
+    capacityGw
+    policySupport
+    economicMultipliers
+  }
+}
+```
+
+## Stranded Asset Risk
+
+```graphql
+query StrandedAssets {
+  strandedAssetRisk(assetType: "coal_generation", limit: 5) {
+    asOfDate
+    assetValue
+    strandedValue
+    strandedRatio
+    riskLevel
+    details
+  }
+}
+```
+
+## Policy Scenario Impacts
+
+```graphql
+query PolicyImpacts {
+  policyScenarioImpacts(scenario: "HighPolicyTightening", limit: 20) {
+    asOfDate
+    scenario
+    entity
+    metric
+    value
+    details
+  }
+}
+```

@@ -1,0 +1,187 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ml-nightly-carbon-analytics
+  namespace: market-intelligence
+spec:
+  schedule: "0 2 * * *"  # Nightly at 02:00 UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: ml-nightly-carbon-analytics
+            component: ml-analytics
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: job
+            image: 254carbon/ml-service:latest
+            imagePullPolicy: IfNotPresent
+            command:
+            - python
+            - -c
+            - |
+              from platform.apps.ml_service.jobs import run_nightly_carbon_jobs
+              run_nightly_carbon_jobs()
+            env:
+            - name: CLICKHOUSE_HOST
+              value: "clickhouse"
+            - name: CLICKHOUSE_PORT
+              value: "9000"
+            - name: KAFKA_BOOTSTRAP
+              value: "kafka:9092"
+            - name: RUN_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "750m"
+              limits:
+                memory: "2Gi"
+                cpu: "1"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ml-weekly-transition-analytics
+  namespace: market-intelligence
+spec:
+  schedule: "30 3 * * 1"  # Weekly on Monday at 03:30 UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: ml-weekly-transition-analytics
+            component: ml-analytics
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: job
+            image: 254carbon/ml-service:latest
+            imagePullPolicy: IfNotPresent
+            command:
+            - python
+            - -c
+            - |
+              from platform.apps.ml_service.jobs import run_weekly_transition_jobs
+              run_weekly_transition_jobs()
+            env:
+            - name: CLICKHOUSE_HOST
+              value: "clickhouse"
+            - name: CLICKHOUSE_PORT
+              value: "9000"
+            - name: RUN_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "750m"
+              limits:
+                memory: "2Gi"
+                cpu: "1"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ml-weekly-carbon-compliance
+  namespace: market-intelligence
+spec:
+  schedule: "0 4 * * 4"  # Weekly on Thursday at 04:00 UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: ml-weekly-carbon-compliance
+            component: ml-analytics
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: job
+            image: 254carbon/ml-service:latest
+            imagePullPolicy: IfNotPresent
+            command:
+            - python
+            - -c
+            - |
+              from platform.apps.ml_service.jobs import run_weekly_carbon_compliance_jobs
+              run_weekly_carbon_compliance_jobs()
+            env:
+            - name: CLICKHOUSE_HOST
+              value: "clickhouse"
+            - name: CLICKHOUSE_PORT
+              value: "9000"
+            - name: KAFKA_BOOTSTRAP
+              value: "kafka:9092"
+            - name: RUN_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "750m"
+              limits:
+                memory: "2Gi"
+                cpu: "1"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ml-monthly-stranded-asset
+  namespace: market-intelligence
+spec:
+  schedule: "0 5 1 * *"  # First day of month at 05:00 UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: ml-monthly-stranded-asset
+            component: ml-analytics
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: job
+            image: 254carbon/ml-service:latest
+            imagePullPolicy: IfNotPresent
+            command:
+            - python
+            - -c
+            - |
+              from platform.apps.ml_service.jobs import run_monthly_stranded_asset_job
+              run_monthly_stranded_asset_job()
+            env:
+            - name: CLICKHOUSE_HOST
+              value: "clickhouse"
+            - name: CLICKHOUSE_PORT
+              value: "9000"
+            - name: RUN_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "750m"
+              limits:
+                memory: "2Gi"
+                cpu: "1"

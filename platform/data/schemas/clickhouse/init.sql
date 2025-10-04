@@ -467,6 +467,442 @@ ENGINE = ReplacingMergeTree(created_at)
 PARTITION BY toYYYYMM(forecast_date)
 ORDER BY (region, forecast_date, scenario_id, model_version);
 
+CREATE TABLE IF NOT EXISTS market_intelligence.refining_crack_optimization
+(
+    as_of_date Date,
+    region LowCardinality(String),
+    refinery_id Nullable(LowCardinality(String)),
+    crack_type LowCardinality(String),
+    crude_code LowCardinality(String),
+    gasoline_price Float64,
+    diesel_price Float64,
+    jet_price Nullable(Float64),
+    crack_spread Float64,
+    margin_per_bbl Float64,
+    optimal_yields String,
+    constraints String,
+    diagnostics Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (region, as_of_date, crack_type, crude_code, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.refinery_yield_model
+(
+    as_of_date Date,
+    crude_type LowCardinality(String),
+    process_config String,
+    yields String,
+    value_per_bbl Float64,
+    operating_cost Float64,
+    net_value Float64,
+    diagnostics Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (crude_type, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.product_demand_elasticity
+(
+    as_of_date Date,
+    product LowCardinality(String),
+    region Nullable(LowCardinality(String)),
+    method LowCardinality(String),
+    elasticity Float64,
+    r_squared Nullable(Float64),
+    own_or_cross LowCardinality(String),
+    product_pair Nullable(LowCardinality(String)),
+    data_points UInt32,
+    diagnostics Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (product, region, as_of_date, method, own_or_cross, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.transport_fuel_substitution
+(
+    as_of_date Date,
+    region LowCardinality(String),
+    metric LowCardinality(String),
+    value Float64,
+    details String,
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (region, metric, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.rin_price_forecast
+(
+    as_of_date Date,
+    rin_category LowCardinality(String),
+    horizon_days UInt16,
+    forecast_date Date,
+    forecast_price Float64,
+    std Nullable(Float64),
+    drivers Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(forecast_date)
+ORDER BY (rin_category, forecast_date, horizon_days, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.biodiesel_diesel_spread
+(
+    as_of_date Date,
+    region Nullable(LowCardinality(String)),
+    mean_gross_spread Float64,
+    mean_net_spread Float64,
+    spread_volatility Float64,
+    arbitrage_opportunities UInt32,
+    diagnostics Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (region, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.carbon_intensity_results
+(
+    as_of_date Date,
+    fuel_type LowCardinality(String),
+    pathway LowCardinality(String),
+    total_ci Float64,
+    base_emissions Float64,
+    transport_emissions Float64,
+    land_use_emissions Float64,
+    ci_per_mj Float64,
+    assumptions String,
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (fuel_type, pathway, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.renewables_policy_impact
+(
+    as_of_date Date,
+    policy LowCardinality(String),
+    entity LowCardinality(String),
+    metric LowCardinality(String),
+    value Float64,
+    details String,
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (policy, entity, metric, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.carbon_price_forecast
+(
+    as_of_date Date,
+    market LowCardinality(String),
+    horizon_days UInt16,
+    forecast_date Date,
+    forecast_price Float64,
+    std Nullable(Float64),
+    drivers Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(forecast_date)
+ORDER BY (market, forecast_date, horizon_days, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.carbon_compliance_costs
+(
+    as_of_date Date,
+    market LowCardinality(String),
+    sector LowCardinality(String),
+    total_emissions Float64,
+    average_price Float64,
+    cost_per_tonne Float64,
+    total_compliance_cost Float64,
+    details Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (market, sector, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.carbon_leakage_risk
+(
+    as_of_date Date,
+    sector LowCardinality(String),
+    domestic_price Float64,
+    international_price Float64,
+    price_differential Float64,
+    trade_exposure Float64,
+    emissions_intensity Float64,
+    leakage_risk_score Float64,
+    risk_level LowCardinality(String),
+    details Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (sector, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.decarbonization_pathways
+(
+    as_of_date Date,
+    sector LowCardinality(String),
+    policy_scenario LowCardinality(String),
+    target_year UInt16,
+    annual_reduction_rate Float64,
+    cumulative_emissions Float64,
+    target_achieved UInt8,
+    emissions_trajectory Nullable(String),
+    technology_analysis Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (sector, policy_scenario, target_year, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.renewable_adoption_forecast
+(
+    as_of_date Date,
+    technology LowCardinality(String),
+    forecast_year Date,
+    capacity_gw Float64,
+    policy_support Float64,
+    economic_multipliers Nullable(String),
+    assumptions Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(forecast_year)
+ORDER BY (technology, forecast_year, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.stranded_asset_risk
+(
+    as_of_date Date,
+    asset_type LowCardinality(String),
+    asset_value Float64,
+    carbon_cost_pv Float64,
+    stranded_value Float64,
+    stranded_ratio Float64,
+    remaining_lifetime UInt16,
+    risk_level LowCardinality(String),
+    details Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (asset_type, as_of_date, model_version);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.policy_scenario_impacts
+(
+    as_of_date Date,
+    scenario LowCardinality(String),
+    entity LowCardinality(String),
+    metric LowCardinality(String),
+    value Float64,
+    details Nullable(String),
+    model_version LowCardinality(String) DEFAULT 'v1',
+    created_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (scenario, entity, metric, as_of_date, model_version);
+
+ALTER TABLE market_intelligence.carbon_price_forecast
+    ADD INDEX IF NOT EXISTS idx_carbon_price_market market TYPE set(32) GRANULARITY 4;
+ALTER TABLE market_intelligence.carbon_price_forecast
+    ADD INDEX IF NOT EXISTS idx_carbon_price_forecast_date forecast_date TYPE minmax GRANULARITY 4;
+ALTER TABLE market_intelligence.carbon_compliance_costs
+    ADD INDEX IF NOT EXISTS idx_compliance_market market TYPE set(32) GRANULARITY 4;
+ALTER TABLE market_intelligence.carbon_compliance_costs
+    ADD INDEX IF NOT EXISTS idx_compliance_sector sector TYPE set(64) GRANULARITY 4;
+ALTER TABLE market_intelligence.carbon_leakage_risk
+    ADD INDEX IF NOT EXISTS idx_leakage_sector sector TYPE set(64) GRANULARITY 4;
+ALTER TABLE market_intelligence.decarbonization_pathways
+    ADD INDEX IF NOT EXISTS idx_decarb_sector sector TYPE set(64) GRANULARITY 4;
+ALTER TABLE market_intelligence.decarbonization_pathways
+    ADD INDEX IF NOT EXISTS idx_decarb_scenario policy_scenario TYPE set(64) GRANULARITY 4;
+ALTER TABLE market_intelligence.renewable_adoption_forecast
+    ADD INDEX IF NOT EXISTS idx_renewable_adoption_tech technology TYPE set(64) GRANULARITY 4;
+ALTER TABLE market_intelligence.stranded_asset_risk
+    ADD INDEX IF NOT EXISTS idx_stranded_asset_type asset_type TYPE set(64) GRANULARITY 4;
+ALTER TABLE market_intelligence.policy_scenario_impacts
+    ADD INDEX IF NOT EXISTS idx_policy_scenario scenario TYPE set(64) GRANULARITY 4;
+ALTER TABLE market_intelligence.policy_scenario_impacts
+    ADD INDEX IF NOT EXISTS idx_policy_entity entity TYPE set(64) GRANULARITY 4;
+ALTER TABLE market_intelligence.policy_scenario_impacts
+    ADD INDEX IF NOT EXISTS idx_policy_metric metric TYPE set(128) GRANULARITY 4;
+
+-- Portfolio, arbitrage, and research analytics tables
+CREATE TABLE IF NOT EXISTS market_intelligence.portfolio_optimization_runs
+(
+    run_id UUID,
+    portfolio_id String,
+    as_of_date Date,
+    method LowCardinality(String),
+    params JSON,
+    weights JSON,
+    metrics JSON,
+    created_at DateTime64(3, 'UTC') DEFAULT now64(3),
+    updated_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (portfolio_id, as_of_date, run_id);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.cross_market_arbitrage
+(
+    as_of_date Date,
+    commodity1 LowCardinality(String),
+    commodity2 LowCardinality(String),
+    instrument1 LowCardinality(String),
+    instrument2 LowCardinality(String),
+    mean_spread Float64,
+    spread_volatility Float64,
+    transport_cost Float64,
+    storage_cost Float64,
+    net_profit Float64,
+    direction LowCardinality(String),
+    confidence Float64,
+    period String,
+    metadata JSON,
+    created_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (commodity1, commodity2, as_of_date, instrument1, instrument2);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.portfolio_risk_metrics
+(
+    as_of_date Date,
+    portfolio_id String,
+    run_id UUID,
+    volatility Float64,
+    variance Float64,
+    var_95 Float64,
+    cvar_95 Float64,
+    max_drawdown Float64,
+    beta Nullable(Float64),
+    diversification_benefit Float64,
+    exposures JSON,
+    created_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (portfolio_id, as_of_date, run_id);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.portfolio_stress_results
+(
+    as_of_date Date,
+    portfolio_id String,
+    run_id UUID,
+    scenario_id String,
+    scenario JSON,
+    metrics JSON,
+    severity LowCardinality(String),
+    probability Float64,
+    created_at DateTime64(3, 'UTC') DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(created_at)
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (portfolio_id, scenario_id, as_of_date, run_id);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.research_notebooks
+(
+    notebook_id String,
+    title String,
+    author String,
+    status LowCardinality(String),
+    path String,
+    tags Array(String),
+    created_at DateTime DEFAULT now(),
+    executed_at Nullable(DateTime),
+    artifacts JSON,
+    metadata JSON
+)
+ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (notebook_id, status);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.research_experiments
+(
+    experiment_id String,
+    name String,
+    model_type LowCardinality(String),
+    dataset String,
+    parameters JSON,
+    status LowCardinality(String),
+    mlflow_run_id Nullable(String),
+    started_at DateTime DEFAULT now(),
+    completed_at Nullable(DateTime),
+    results JSON
+)
+ENGINE = ReplacingMergeTree(started_at)
+ORDER BY (experiment_id, status, started_at);
+
+CREATE TABLE IF NOT EXISTS market_intelligence.research_datasets
+(
+    dataset_id String,
+    name String,
+    description Nullable(String),
+    storage_uri String,
+    schema JSON,
+    source LowCardinality(String),
+    lineage_ids Array(String),
+    tags Array(String),
+    created_at DateTime DEFAULT now(),
+    updated_at Nullable(DateTime)
+)
+ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (dataset_id, source);
+
+ALTER TABLE market_intelligence.portfolio_optimization_runs
+    ADD INDEX IF NOT EXISTS idx_portfolio_runs_portfolio portfolio_id TYPE bloom_filter GRANULARITY 4;
+ALTER TABLE market_intelligence.portfolio_optimization_runs
+    ADD INDEX IF NOT EXISTS idx_portfolio_runs_date as_of_date TYPE minmax GRANULARITY 4;
+ALTER TABLE market_intelligence.cross_market_arbitrage
+    ADD INDEX IF NOT EXISTS idx_arbitrage_date as_of_date TYPE minmax GRANULARITY 4;
+ALTER TABLE market_intelligence.cross_market_arbitrage
+    ADD INDEX IF NOT EXISTS idx_arbitrage_confidence confidence TYPE minmax GRANULARITY 4;
+ALTER TABLE market_intelligence.portfolio_risk_metrics
+    ADD INDEX IF NOT EXISTS idx_risk_portfolio portfolio_id TYPE bloom_filter GRANULARITY 4;
+ALTER TABLE market_intelligence.portfolio_risk_metrics
+    ADD INDEX IF NOT EXISTS idx_risk_run run_id TYPE bloom_filter GRANULARITY 4;
+ALTER TABLE market_intelligence.portfolio_stress_results
+    ADD INDEX IF NOT EXISTS idx_stress_portfolio portfolio_id TYPE bloom_filter GRANULARITY 4;
+ALTER TABLE market_intelligence.portfolio_stress_results
+    ADD INDEX IF NOT EXISTS idx_stress_scenario scenario_id TYPE bloom_filter GRANULARITY 4;
+ALTER TABLE market_intelligence.portfolio_stress_results
+    ADD INDEX IF NOT EXISTS idx_stress_date as_of_date TYPE minmax GRANULARITY 4;
+ALTER TABLE market_intelligence.research_notebooks
+    ADD INDEX IF NOT EXISTS idx_notebook_status status TYPE set(16) GRANULARITY 4;
+ALTER TABLE market_intelligence.research_notebooks
+    ADD INDEX IF NOT EXISTS idx_notebook_author author TYPE bloom_filter GRANULARITY 4;
+ALTER TABLE market_intelligence.research_experiments
+    ADD INDEX IF NOT EXISTS idx_experiment_status status TYPE set(16) GRANULARITY 4;
+ALTER TABLE market_intelligence.research_experiments
+    ADD INDEX IF NOT EXISTS idx_experiment_model model_type TYPE set(32) GRANULARITY 4;
+ALTER TABLE market_intelligence.research_experiments
+    ADD INDEX IF NOT EXISTS idx_experiment_mlflow mlflow_run_id TYPE bloom_filter GRANULARITY 4;
+ALTER TABLE market_intelligence.research_datasets
+    ADD INDEX IF NOT EXISTS idx_dataset_tags tags TYPE bloom_filter GRANULARITY 4;
+ALTER TABLE market_intelligence.research_datasets
+    ADD INDEX IF NOT EXISTS idx_dataset_source source TYPE set(32) GRANULARITY 4;
+
 -- Aggregations for research dashboards
 CREATE MATERIALIZED VIEW IF NOT EXISTS market_intelligence.mv_commodity_decomposition_daily
 ENGINE = AggregatingMergeTree()
@@ -494,6 +930,59 @@ SELECT
     count() AS observation_count
 FROM market_intelligence.volatility_regimes
 GROUP BY month, instrument_id, regime_label;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS market_intelligence.mv_arbitrage_daily_summary
+ENGINE = ReplacingMergeTree()
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (commodity1, commodity2, as_of_date)
+AS
+SELECT
+    as_of_date,
+    commodity1,
+    commodity2,
+    count() AS opportunity_count,
+    avg(net_profit) AS avg_net_profit,
+    avg(confidence) AS avg_confidence,
+    max(net_profit) AS max_net_profit
+FROM market_intelligence.cross_market_arbitrage
+GROUP BY as_of_date, commodity1, commodity2;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS market_intelligence.mv_portfolio_risk_daily
+ENGINE = ReplacingMergeTree()
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (portfolio_id, as_of_date)
+AS
+SELECT
+    as_of_date,
+    portfolio_id,
+    argMax(run_id, created_at) AS run_id,
+    argMax(volatility, created_at) AS volatility,
+    argMax(variance, created_at) AS variance,
+    argMax(var_95, created_at) AS var_95,
+    argMax(cvar_95, created_at) AS cvar_95,
+    argMax(max_drawdown, created_at) AS max_drawdown,
+    argMax(beta, created_at) AS beta,
+    argMax(diversification_benefit, created_at) AS diversification_benefit,
+    argMax(exposures, created_at) AS exposures
+FROM market_intelligence.portfolio_risk_metrics
+GROUP BY as_of_date, portfolio_id;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS market_intelligence.mv_stress_result_daily
+ENGINE = ReplacingMergeTree()
+PARTITION BY toYYYYMM(as_of_date)
+ORDER BY (portfolio_id, scenario_id, as_of_date)
+AS
+SELECT
+    as_of_date,
+    portfolio_id,
+    scenario_id,
+    argMax(run_id, created_at) AS run_id,
+    argMax(severity, created_at) AS severity,
+    avg(probability) AS avg_probability,
+    argMax(metrics, created_at) AS metrics,
+    argMax(scenario, created_at) AS scenario
+FROM market_intelligence.portfolio_stress_results
+GROUP BY as_of_date, portfolio_id, scenario_id;
 
 -- Commodity-specific indexes
 ALTER TABLE market_intelligence.futures_curves ADD INDEX IF NOT EXISTS idx_commodity commodity_code TYPE bloom_filter GRANULARITY 4;
@@ -730,8 +1219,16 @@ CREATE OR REPLACE VIEW ch.fundamentals_series AS
     SELECT * FROM market_intelligence.fundamentals_series;
 CREATE OR REPLACE VIEW ch.commodity_decomposition AS
     SELECT * FROM market_intelligence.commodity_decomposition;
+CREATE OR REPLACE VIEW ch.mv_commodity_decomposition_daily AS
+    SELECT * FROM market_intelligence.mv_commodity_decomposition_daily;
+CREATE OR REPLACE VIEW ch.commodity_volatility_surface AS
+    SELECT * FROM market_intelligence.commodity_volatility_surface;
+CREATE OR REPLACE VIEW ch.commodity_correlations AS
+    SELECT * FROM market_intelligence.commodity_correlations;
 CREATE OR REPLACE VIEW ch.volatility_regimes AS
     SELECT * FROM market_intelligence.volatility_regimes;
+CREATE OR REPLACE VIEW ch.mv_volatility_regime_share_monthly AS
+    SELECT * FROM market_intelligence.mv_volatility_regime_share_monthly;
 CREATE OR REPLACE VIEW ch.supply_demand_metrics AS
     SELECT * FROM market_intelligence.supply_demand_metrics;
 CREATE OR REPLACE VIEW ch.weather_impact AS
@@ -756,6 +1253,72 @@ CREATE OR REPLACE VIEW ch.quality_specifications AS
     SELECT * FROM market_intelligence.quality_specifications;
 CREATE OR REPLACE VIEW ch.futures_curves AS
     SELECT * FROM market_intelligence.futures_curves;
+
+CREATE OR REPLACE VIEW ch.refining_crack_optimization AS
+    SELECT * FROM market_intelligence.refining_crack_optimization;
+
+CREATE OR REPLACE VIEW ch.refinery_yield_model AS
+    SELECT * FROM market_intelligence.refinery_yield_model;
+
+CREATE OR REPLACE VIEW ch.product_demand_elasticity AS
+    SELECT * FROM market_intelligence.product_demand_elasticity;
+
+CREATE OR REPLACE VIEW ch.transport_fuel_substitution AS
+    SELECT * FROM market_intelligence.transport_fuel_substitution;
+
+CREATE OR REPLACE VIEW ch.rin_price_forecast AS
+    SELECT * FROM market_intelligence.rin_price_forecast;
+
+CREATE OR REPLACE VIEW ch.biodiesel_diesel_spread AS
+    SELECT * FROM market_intelligence.biodiesel_diesel_spread;
+
+CREATE OR REPLACE VIEW ch.carbon_intensity_results AS
+    SELECT * FROM market_intelligence.carbon_intensity_results;
+
+CREATE OR REPLACE VIEW ch.renewables_policy_impact AS
+    SELECT * FROM market_intelligence.renewables_policy_impact;
+
+CREATE OR REPLACE VIEW ch.carbon_price_forecast AS
+    SELECT * FROM market_intelligence.carbon_price_forecast;
+
+CREATE OR REPLACE VIEW ch.carbon_compliance_costs AS
+    SELECT * FROM market_intelligence.carbon_compliance_costs;
+
+CREATE OR REPLACE VIEW ch.carbon_leakage_risk AS
+    SELECT * FROM market_intelligence.carbon_leakage_risk;
+
+CREATE OR REPLACE VIEW ch.decarbonization_pathways AS
+    SELECT * FROM market_intelligence.decarbonization_pathways;
+
+CREATE OR REPLACE VIEW ch.renewable_adoption_forecast AS
+    SELECT * FROM market_intelligence.renewable_adoption_forecast;
+
+CREATE OR REPLACE VIEW ch.stranded_asset_risk AS
+    SELECT * FROM market_intelligence.stranded_asset_risk;
+
+CREATE OR REPLACE VIEW ch.policy_scenario_impacts AS
+    SELECT * FROM market_intelligence.policy_scenario_impacts;
+
+CREATE OR REPLACE VIEW ch.portfolio_optimization_runs AS
+    SELECT * FROM market_intelligence.portfolio_optimization_runs;
+
+CREATE OR REPLACE VIEW ch.cross_market_arbitrage AS
+    SELECT * FROM market_intelligence.cross_market_arbitrage;
+
+CREATE OR REPLACE VIEW ch.portfolio_risk_metrics AS
+    SELECT * FROM market_intelligence.portfolio_risk_metrics;
+
+CREATE OR REPLACE VIEW ch.portfolio_stress_results AS
+    SELECT * FROM market_intelligence.portfolio_stress_results;
+
+CREATE OR REPLACE VIEW ch.research_notebooks AS
+    SELECT * FROM market_intelligence.research_notebooks;
+
+CREATE OR REPLACE VIEW ch.research_experiments AS
+    SELECT * FROM market_intelligence.research_experiments;
+
+CREATE OR REPLACE VIEW ch.research_datasets AS
+    SELECT * FROM market_intelligence.research_datasets;
 
 -- Kafka landing tables for commodities ingestion
 CREATE TABLE IF NOT EXISTS market_intelligence.market_price_ticks_kafka

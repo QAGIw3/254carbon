@@ -17,11 +17,14 @@ def test_websocket_subscribe_dev(client: TestClient):
         ws.send_json({
             "type": "subscribe",
             "instruments": ["MISO.HUB.INDIANA"],
+            "commodities": ["oil"],
+            "all": False,
             "api_key": "dev-key"
         })
         msg = ws.receive_json()
         assert msg["type"] == "subscribed"
         assert "instruments" in msg
+        assert "commodities" in msg
 
 
 def test_websocket_rejects_without_token_when_prod(client: TestClient, monkeypatch):

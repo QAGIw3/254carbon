@@ -367,6 +367,30 @@ ENGINE = Distributed('market_cluster', 'market_intelligence', 'forward_curve_poi
 CREATE TABLE IF NOT EXISTS ch.fundamentals_series_dist AS market_intelligence.fundamentals_series
 ENGINE = Distributed('market_cluster', 'market_intelligence', 'fundamentals_series', cityHash64(entity_id, variable));
 
+CREATE TABLE IF NOT EXISTS ch.refining_crack_optimization_dist AS market_intelligence.refining_crack_optimization
+ENGINE = Distributed('market_cluster', 'market_intelligence', 'refining_crack_optimization', cityHash64(region, crack_type, as_of_date));
+
+CREATE TABLE IF NOT EXISTS ch.refinery_yield_model_dist AS market_intelligence.refinery_yield_model
+ENGINE = Distributed('market_cluster', 'market_intelligence', 'refinery_yield_model', cityHash64(crude_type, as_of_date));
+
+CREATE TABLE IF NOT EXISTS ch.product_demand_elasticity_dist AS market_intelligence.product_demand_elasticity
+ENGINE = Distributed('market_cluster', 'market_intelligence', 'product_demand_elasticity', cityHash64(product, region, as_of_date));
+
+CREATE TABLE IF NOT EXISTS ch.transport_fuel_substitution_dist AS market_intelligence.transport_fuel_substitution
+ENGINE = Distributed('market_cluster', 'market_intelligence', 'transport_fuel_substitution', cityHash64(region, metric, as_of_date));
+
+CREATE TABLE IF NOT EXISTS ch.rin_price_forecast_dist AS market_intelligence.rin_price_forecast
+ENGINE = Distributed('market_cluster', 'market_intelligence', 'rin_price_forecast', cityHash64(rin_category, forecast_date, horizon_days));
+
+CREATE TABLE IF NOT EXISTS ch.biodiesel_diesel_spread_dist AS market_intelligence.biodiesel_diesel_spread
+ENGINE = Distributed('market_cluster', 'market_intelligence', 'biodiesel_diesel_spread', cityHash64(region, as_of_date));
+
+CREATE TABLE IF NOT EXISTS ch.carbon_intensity_results_dist AS market_intelligence.carbon_intensity_results
+ENGINE = Distributed('market_cluster', 'market_intelligence', 'carbon_intensity_results', cityHash64(fuel_type, pathway, as_of_date));
+
+CREATE TABLE IF NOT EXISTS ch.renewables_policy_impact_dist AS market_intelligence.renewables_policy_impact
+ENGINE = Distributed('market_cluster', 'market_intelligence', 'renewables_policy_impact', cityHash64(policy, entity, as_of_date));
+
 -- =========================================================================
 -- OPTIMIZATION NOTES
 -- =========================================================================

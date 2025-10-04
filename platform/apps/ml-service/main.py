@@ -33,7 +33,13 @@ from models import PriceForecastModel, ModelRegistry
 from training import ModelTrainer
 from retraining_pipeline import RetrainingPipeline
 from research_api import router as research_router
+from refining_api import router as refining_router
+from renewables_api import router as renewables_router
 from supply_chain_api import router as supply_chain_router
+from portfolio_api import router as portfolio_router
+from arbitrage_api import router as arbitrage_router
+from transition_api import router as transition_router
+from carbon_api import router as carbon_router
 from multimodal_dataset import MultiModalDataset
 
 logging.basicConfig(level=logging.INFO)
@@ -57,6 +63,12 @@ retraining_pipeline = RetrainingPipeline()
 
 app.include_router(research_router)
 app.include_router(supply_chain_router)
+app.include_router(refining_router)
+app.include_router(renewables_router)
+app.include_router(portfolio_router)
+app.include_router(arbitrage_router)
+app.include_router(transition_router)
+app.include_router(carbon_router)
 
 
 class ForecastRequest(BaseModel):

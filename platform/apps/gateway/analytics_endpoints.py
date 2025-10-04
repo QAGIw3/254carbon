@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from auth import verify_token, has_permission
 from db import get_clickhouse_client
-from cache import create_cache_decorator
+from cache import create_cache_decorator, CacheStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class PortfolioOptimizationResponse(BaseModel):
 
 
 @analytics_router.get("/correlations/matrix", response_model=CorrelationMatrixResponse)
-@create_cache_decorator(ttl_seconds=3600)  # 1 hour cache
+@create_cache_decorator("correlation_matrix", CacheStrategy.STATIC)
 async def get_correlation_matrix(
     commodities: List[str] = Query(..., description="Commodities to include in correlation analysis"),
     lookback_days: int = Query(default=90, description="Lookback period in days"),
@@ -130,7 +130,7 @@ async def get_correlation_matrix(
 
 
 @analytics_router.get("/volatility/surface/{commodity}", response_model=VolatilitySurfaceResponse)
-@create_cache_decorator(ttl_seconds=1800)  # 30 minute cache
+@create_cache_decorator("vol_surface", CacheStrategy.SEMI_STATIC)
 async def get_volatility_surface(
     commodity: str,
     horizons: List[int] = Query(default=[30, 90, 180, 365], description="Time horizons for volatility"),
@@ -204,7 +204,7 @@ async def get_volatility_surface(
 
 
 @analytics_router.get("/seasonality/{commodity}", response_model=SeasonalityResponse)
-@create_cache_decorator(ttl_seconds=7200)  # 2 hour cache
+@create_cache_decorator("seasonality", CacheStrategy.STATIC)
 async def get_seasonality_analysis(
     commodity: str,
     analysis_period: str = Query(default="3_years", description="Analysis period"),

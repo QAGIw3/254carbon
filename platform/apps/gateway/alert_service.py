@@ -9,17 +9,26 @@ from typing import Dict, List, Optional
 from dataclasses import dataclass
 import json
 
-from fastapi import BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 import sys
 import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
+
+# Local imports
+from auth import verify_token
+from metrics import track_request
+from entitlements import check_entitlement
+from db import get_clickhouse_client
 import db
 from cache import CacheStrategy
 
 logger = logging.getLogger(__name__)
+
+# Alerts API router
+alerts_router = APIRouter(prefix="/api/v1/miso/alerts")
 
 
 @dataclass
@@ -83,36 +92,40 @@ class AlertManager:
             await self.load_alerts_from_db()
 
         try:
-            clickhouse = await db.get_clickhouse_client()
+            ch_client = get_clickhouse_client()
 
             # Get recent price data for all monitored nodes
             recent_prices_query = """
                 SELECT
                     instrument_id,
-                    value as price,
+                    value AS price,
                     event_time,
-                    STDDEV(value) OVER (
+                    stddevPop(value) OVER (
                         PARTITION BY instrument_id
                         ORDER BY event_time
                         ROWS BETWEEN 10 PRECEDING AND CURRENT ROW
-                    ) as price_volatility
+                    ) AS price_volatility
                 FROM market_intelligence.market_price_ticks
                 WHERE market = 'MISO'
-                    AND event_time >= now() - INTERVAL 5 MINUTE
+                  AND event_time >= now() - INTERVAL 5 MINUTE
                 ORDER BY instrument_id, event_time DESC
             """
 
-            recent_prices = await clickhouse.fetch_all(recent_prices_query)
+            recent_prices = ch_client.execute(recent_prices_query)
 
             # Group by instrument_id for easier processing
             price_data = {}
             for row in recent_prices:
-                if row['instrument_id'] not in price_data:
-                    price_data[row['instrument_id']] = []
-                price_data[row['instrument_id']].append({
-                    'price': row['price'],
-                    'timestamp': row['event_time'],
-                    'volatility': row['price_volatility']
+                instrument_id = row[0]
+                price = row[1]
+                ts = row[2]
+                volatility = row[3]
+                if instrument_id not in price_data:
+                    price_data[instrument_id] = []
+                price_data[instrument_id].append({
+                    'price': price,
+                    'timestamp': ts,
+                    'volatility': volatility,
                 })
 
             # Check each alert
@@ -197,30 +210,44 @@ class AlertManager:
     async def send_alerts(self, triggered_alerts: List[Dict]):
         """Send triggered alerts via email/notification system."""
         try:
-            for alert in triggered_alerts:
-                # Here you would integrate with your notification system
-                # (email, SMS, Slack, etc.)
+            if not triggered_alerts:
+                return
 
-                logger.info(f"Price alert triggered: {alert['reason']} for node {alert['node_id']}")
+            pool = await db.get_postgres_pool()
+            async with pool.acquire() as conn:
+                for alert in triggered_alerts:
+                    # Here you would integrate with your notification system
+                    # (email, SMS, Slack, etc.)
+                    logger.info(
+                        f"Price alert triggered: {alert['reason']} for node {alert['node_id']}"
+                    )
 
-                # Store alert in database
-                pool = await db.get_postgres_pool()
-                async with pool.acquire() as conn:
-                    await conn.execute("""
+                    # Store alert in database
+                    await conn.execute(
+                        """
                         INSERT INTO miso_alert_history
                         (alert_id, user_id, node_id, alert_type, threshold,
                          current_price, reason, triggered_at)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-                    """, alert['alert_id'], alert['user_id'], alert['node_id'],
-                         alert['alert_type'], alert['threshold'], alert['current_price'],
-                         alert['reason'])
+                        """,
+                        alert['alert_id'],
+                        alert['user_id'],
+                        alert['node_id'],
+                        alert['alert_type'],
+                        alert['threshold'],
+                        alert['current_price'],
+                        alert['reason'],
+                    )
 
-                # Update alert's last triggered time in database
-                await conn.execute("""
-                    UPDATE miso_price_alerts
-                    SET last_triggered = NOW()
-                    WHERE alert_id = $1
-                """, alert['alert_id'])
+                    # Update alert's last triggered time in database
+                    await conn.execute(
+                        """
+                        UPDATE miso_price_alerts
+                        SET last_triggered = NOW()
+                        WHERE alert_id = $1
+                        """,
+                        alert['alert_id'],
+                    )
 
         except Exception as e:
             logger.error(f"Error sending alerts: {e}")
@@ -265,7 +292,7 @@ async def run_alert_monitoring():
 
 # API endpoints for alert management
 
-@app.get("/api/v1/miso/alerts/history")
+@alerts_router.get("/history")
 async def get_alert_history(
     limit: int = Query(50, description="Number of alerts to return"),
     user=Depends(verify_token),
@@ -290,7 +317,7 @@ async def get_alert_history(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@app.post("/api/v1/miso/alerts/test")
+@alerts_router.post("/test")
 async def test_price_alert(
     node_id: str = Query(..., description="Node ID to test alert for"),
     user=Depends(verify_token),
@@ -303,19 +330,19 @@ async def test_price_alert(
 
     try:
         # Get current price for the node
-        clickhouse = await get_clickhouse_client()
+        ch_client = get_clickhouse_client()
 
         query = """
-            SELECT value as price, event_time
-            FROM ch.market_price_ticks
-            WHERE market = 'MISO' AND instrument_id = $1
+            SELECT value AS price, event_time
+            FROM market_intelligence.market_price_ticks
+            WHERE market = %(market)s AND instrument_id = %(node_id)s
             ORDER BY event_time DESC
             LIMIT 1
         """
 
-        result = await clickhouse.fetch_one(query, node_id)
+        rows = ch_client.execute(query, {"market": "MISO", "node_id": node_id})
 
-        if not result:
+        if not rows:
             raise HTTPException(status_code=404, detail="No price data found for node")
 
         # Create test alert
@@ -324,9 +351,9 @@ async def test_price_alert(
             "user_id": user.get("sub"),
             "node_id": node_id,
             "alert_type": "test",
-            "threshold": result['price'],
-            "current_price": result['price'],
-            "reason": f"Test alert for node {node_id} at price ${result['price']:.2f}",
+            "threshold": rows[0][0],
+            "current_price": rows[0][0],
+            "reason": f"Test alert for node {node_id} at price ${rows[0][0]:.2f}",
             "timestamp": datetime.utcnow().isoformat()
         }
 
@@ -344,7 +371,7 @@ async def test_price_alert(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@app.get("/api/v1/miso/alerts/status")
+@alerts_router.get("/status")
 async def get_alert_status(user=Depends(verify_token)):
     """Get status of price alert system."""
     track_request("get_alert_status")

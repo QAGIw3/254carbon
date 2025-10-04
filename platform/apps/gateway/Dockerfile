@@ -20,6 +20,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 
 EXPOSE 8000
 
-# Use uvicorn with reload for development
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
+# Start uvicorn (no reload) for containerized runtime
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
 

@@ -9,7 +9,7 @@ from datetime import datetime
 
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +36,12 @@ class UXOptimizationMiddleware(BaseHTTPMiddleware):
 
             # Add timing headers for frontend loading states
             response.headers["X-Request-ID"] = request_id
-            response.headers["X-Processing-Time"] = f"{processing_time".3f"}s"
+            response.headers["X-Processing-Time"] = f"{processing_time:.3f}s"
 
             # Add loading state hints based on processing time
             if processing_time > self.slow_request_threshold:
                 response.headers["X-Loading-State"] = "slow"
-                logger.warning(f"Slow request detected: {request.url.path} took {processing_time".3f"}s")
+                logger.warning(f"Slow request detected: {request.url.path} took {processing_time:.3f}s")
             else:
                 response.headers["X-Loading-State"] = "fast"
 
@@ -60,7 +60,7 @@ class UXOptimizationMiddleware(BaseHTTPMiddleware):
                     "code": e.status_code,
                     "message": e.detail,
                     "request_id": request_id,
-                    "processing_time": f"{processing_time".3f"}s",
+                    "processing_time": f"{processing_time:.3f}s",
                     "timestamp": datetime.utcnow().isoformat(),
                     "path": str(request.url.path),
                     "method": request.method
@@ -91,7 +91,7 @@ class UXOptimizationMiddleware(BaseHTTPMiddleware):
                     "code": 500,
                     "message": "An unexpected error occurred. Please try again.",
                     "request_id": request_id,
-                    "processing_time": f"{processing_time".3f"}s",
+                    "processing_time": f"{processing_time:.3f}s",
                     "timestamp": datetime.utcnow().isoformat(),
                     "path": str(request.url.path),
                     "method": request.method,
@@ -219,7 +219,7 @@ async def create_progressive_response(
         "chunk_size": items_per_chunk,
         "chunks_available": (total_items + items_per_chunk - 1) // items_per_chunk,
         "supports_progressive": True,
-        "estimated_load_time": f"{(total_items / items_per_chunk) * 0.5".1f"} seconds",
+        "estimated_load_time": f"{((total_items / items_per_chunk) * 0.5):.1f} seconds",
         "suggestions": [
             "Use pagination for large datasets",
             "Consider filtering to reduce data size",

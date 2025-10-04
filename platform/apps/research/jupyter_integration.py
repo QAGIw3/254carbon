@@ -164,6 +164,159 @@ class JupyterIntegration:
                     ]
                 }
             ]
+        if template == "portfolio_optimization":
+            return [
+                {
+                    'cell_type': 'markdown',
+                    'metadata': {},
+                    'source': [
+                        '# Portfolio Optimization Workflow\n',
+                        '\n',
+                        'This notebook calls the ML service portfolio optimizer and stores results for further analysis.'
+                    ]
+                },
+                {
+                    'cell_type': 'code',
+                    'execution_count': None,
+                    'metadata': {},
+                    'outputs': [],
+                    'source': [
+                        'import json\n',
+                        'import os\n',
+                        'from pathlib import Path\n',
+                        'import requests\n',
+                        'import pandas as pd\n',
+                        '\n',
+                        'ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://ml-service:8000")\n',
+                        'payload = {\n',
+                        '    "instrument_ids": ["NG.FUT.JAN25", "NG.FUT.FEB25", "NG.FUT.MAR25"],\n',
+                        '    "constraints": {"max_weight": 0.4, "target_return": None},\n',
+                        '    "method": "mean_variance",\n',
+                        '    "risk_free_rate": 0.02,\n',
+                        '    "persist": False,\n',
+                        '}\n',
+                        'response = requests.post(f"{ML_SERVICE_URL}/api/v1/portfolio/optimize", json=payload, timeout=30)\n',
+                        'response.raise_for_status()\n',
+                        'result = response.json()\n',
+                        '\n',
+                        'artifact_dir = Path("artifacts")\n',
+                        'artifact_dir.mkdir(exist_ok=True)\n',
+                        'with open(artifact_dir / "portfolio_optimization_result.json", "w") as f:\n',
+                        '    json.dump(result, f, indent=2)\n',
+                        '\n',
+                        'weights = pd.Series(result.get("weights", {}), name="weight")\n',
+                        'display(weights.to_frame())\n',
+                        'print("Portfolio metrics:", json.dumps(result.get("portfolio_metrics", {}), indent=2))\n',
+                        'print("Risk metrics:", json.dumps(result.get("risk_metrics", {}), indent=2))\n'
+                    ]
+                }
+            ]
+        if template == "cross_market_arbitrage":
+            return [
+                {
+                    'cell_type': 'markdown',
+                    'metadata': {},
+                    'source': [
+                        '# Cross-Market Arbitrage Scan\n',
+                        '\n',
+                        'Detect arbitrage opportunities using the ML service arbitrage API.'
+                    ]
+                },
+                {
+                    'cell_type': 'code',
+                    'execution_count': None,
+                    'metadata': {},
+                    'outputs': [],
+                    'source': [
+                        'import json\n',
+                        'import os\n',
+                        'from pathlib import Path\n',
+                        'import requests\n',
+                        'import pandas as pd\n',
+                        '\n',
+                        'ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://ml-service:8000")\n',
+                        'payload = {\n',
+                        '    "instruments": [\n',
+                        '        {"commodity": "NG", "instrument_ids": ["NG.FUT.JAN25", "NG.FUT.MAR25"]},\n',
+                        '        {"commodity": "LNG", "instrument_ids": ["LNG.SEA.JAN25", "LNG.EU.MAR25"]}\n',
+                        '    ],\n',
+                        '    "arbitrage_threshold": 0.05,\n',
+                        '    "persist": False\n',
+                        '}\n',
+                        'response = requests.post(f"{ML_SERVICE_URL}/api/v1/arbitrage/detect", json=payload, timeout=60)\n',
+                        'response.raise_for_status()\n',
+                        'result = response.json()\n',
+                        '\n',
+                        'artifact_dir = Path("artifacts")\n',
+                        'artifact_dir.mkdir(exist_ok=True)\n',
+                        'with open(artifact_dir / "arbitrage_opportunities.json", "w") as f:\n',
+                        '    json.dump(result, f, indent=2)\n',
+                        '\n',
+                        'opportunities = pd.DataFrame(result.get("opportunities", []))\n',
+                        'display(opportunities)\n',
+                        'print("Total opportunities detected:", result.get("total_opportunities"))\n'
+                    ]
+                }
+            ]
+        if template == "portfolio_risk_analysis":
+            return [
+                {
+                    'cell_type': 'markdown',
+                    'metadata': {},
+                    'source': [
+                        '# Portfolio Risk Analysis\n',
+                        '\n',
+                        'Request integrated risk metrics and stress testing results from the risk service.'
+                    ]
+                },
+                {
+                    'cell_type': 'code',
+                    'execution_count': None,
+                    'metadata': {},
+                    'outputs': [],
+                    'source': [
+                        'import json\n',
+                        'import os\n',
+                        'from pathlib import Path\n',
+                        'import requests\n',
+                        '\n',
+                        'RISK_SERVICE_URL = os.getenv("RISK_SERVICE_URL", "http://risk-service:8000")\n',
+                        'risk_payload = {\n',
+                        '    "positions": [\n',
+                        '        {"instrument_id": "NG.FUT.JAN25", "quantity": 10},\n',
+                        '        {"instrument_id": "NG.FUT.FEB25", "quantity": 8}\n',
+                        '    ],\n',
+                        '    "methods": ["historical", "parametric"],\n',
+                        '    "persist": False\n',
+                        '}\n',
+                        'risk_response = requests.post(f"{RISK_SERVICE_URL}/api/v1/risk/metrics", json=risk_payload, timeout=60)\n',
+                        'risk_response.raise_for_status()\n',
+                        'risk_result = risk_response.json()\n',
+                        '\n',
+                        'stress_payload = {\n',
+                        '    "positions": risk_payload["positions"],\n',
+                        '    "scenarios": [\n',
+                        '        {"id": "shock_down", "type": "price_shock", "shock_pct": -25},\n',
+                        '        {"id": "vol_spike", "type": "volatility_spike", "vol_multiplier": 1.5}\n',
+                        '    ],\n',
+                        '    "persist": False\n',
+                        '}\n',
+                        'stress_response = requests.post(f"{RISK_SERVICE_URL}/api/v1/risk/stress", json=stress_payload, timeout=60)\n',
+                        'stress_response.raise_for_status()\n',
+                        'stress_result = stress_response.json()\n',
+                        '\n',
+                        'artifact_dir = Path("artifacts")\n',
+                        'artifact_dir.mkdir(exist_ok=True)\n',
+                        'with open(artifact_dir / "portfolio_risk_metrics.json", "w") as f:\n',
+                        '    json.dump(risk_result, f, indent=2)\n',
+                        'with open(artifact_dir / "portfolio_stress_results.json", "w") as f:\n',
+                        '    json.dump(stress_result, f, indent=2)\n',
+                        '\n',
+                        'print("Risk metrics:", json.dumps(risk_result.get("methods", {}), indent=2))\n',
+                        'print("Stress results:", json.dumps(stress_result.get("results", []), indent=2))\n'
+                    ]
+                }
+            ]
 
         return []  # Default empty cells
 
@@ -341,7 +494,8 @@ class ExperimentRegistry:
         name: str,
         model_type: str,
         dataset: str,
-        parameters: Dict[str, Any]
+        parameters: Dict[str, Any],
+        mlflow_run_id: Optional[str] = None
     ) -> str:
         """Register a new experiment."""
         experiment_id = f"EXP_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -356,7 +510,10 @@ class ExperimentRegistry:
             'status': 'registered',
             'results': {},
             'execution_time': None,
-            'notebook_id': None
+            'notebook_id': None,
+            'mlflow_run_id': mlflow_run_id,
+            'started_at': None,
+            'completed_at': None
         }
 
         self.experiments[experiment_id] = experiment
@@ -365,11 +522,31 @@ class ExperimentRegistry:
         logger.info(f"Registered experiment: {experiment_id}")
         return experiment_id
 
+    def mark_experiment_running(
+        self,
+        experiment_id: str,
+        mlflow_run_id: Optional[str] = None
+    ) -> None:
+        """Mark experiment as running."""
+        experiment = self.experiments.get(experiment_id)
+        if not experiment:
+            logger.warning(f"Experiment {experiment_id} not found")
+            return
+
+        experiment['status'] = 'running'
+        experiment['started_at'] = datetime.now()
+        if mlflow_run_id is not None:
+            experiment['mlflow_run_id'] = mlflow_run_id
+        self._save_registry()
+        logger.info(f"Experiment {experiment_id} marked as running")
+
     def update_experiment_results(
         self,
         experiment_id: str,
         results: Dict[str, Any],
-        execution_time: Optional[float] = None
+        execution_time: Optional[float] = None,
+        status: str = 'completed',
+        mlflow_run_id: Optional[str] = None
     ) -> None:
         """Update experiment results."""
         if experiment_id not in self.experiments:
@@ -377,9 +554,11 @@ class ExperimentRegistry:
             return
 
         self.experiments[experiment_id]['results'] = results
-        self.experiments[experiment_id]['status'] = 'completed'
+        self.experiments[experiment_id]['status'] = status
         self.experiments[experiment_id]['execution_time'] = execution_time
         self.experiments[experiment_id]['completed_at'] = datetime.now()
+        if mlflow_run_id is not None:
+            self.experiments[experiment_id]['mlflow_run_id'] = mlflow_run_id
 
         self._save_registry()
         logger.info(f"Updated results for experiment: {experiment_id}")

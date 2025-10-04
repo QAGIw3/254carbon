@@ -49,6 +49,14 @@ metadata:
     # Rate limiting
     nginx.ingress.kubernetes.io/limit-rps: "100"
     nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    # Path-specific limits for streaming and exports
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      # Tighter limits for export creation
+      if ($request_uri ~* ^/api/v1/research/export/jobs) {
+        set $limit_rate 50k;
+      }
+      # Allow long-lived SSE/WS
+      proxy_read_timeout 3600s;
     
     # Connection limits per IP
     nginx.ingress.kubernetes.io/limit-connections: "50"

@@ -32,6 +32,33 @@ LNG_METRICS = {
     "lng_departures_24h_count": {"value_min": 0, "value_max": 500},
 }
 
+REFINED_PRODUCTS_METRICS = {
+    "OIL.RBOB": {"value_min": 0.5, "value_max": 7.5},
+    "OIL.ULSD": {"value_min": 0.5, "value_max": 7.5},
+    "OIL.JET": {"value_min": 0.5, "value_max": 7.5},
+    "OIL.HEATOIL": {"value_min": 0.5, "value_max": 6.5},
+    "OIL.WTI": {"value_min": 20, "value_max": 200},
+    "OIL.BRENT": {"value_min": 20, "value_max": 220},
+    "BIO.BIODIESEL": {"value_min": 1.0, "value_max": 8.0},
+}
+
+RIN_PRICE_METRICS = {
+    "RIN.D4": {"value_min": 0.2, "value_max": 5.0},
+    "RIN.D5": {"value_min": 0.1, "value_max": 4.0},
+    "RIN.D6": {"value_min": 0.05, "value_max": 3.0},
+}
+
+TRANSPORT_FUNDAMENTALS_METRICS = {
+    "gasoline_demand": {"value_min": 3000, "value_max": 12000},
+    "diesel_demand": {"value_min": 1500, "value_max": 8000},
+    "jet_fuel_demand": {"value_min": 500, "value_max": 4000},
+    "ethanol_blending_rate": {"value_min": 0, "value_max": 20},
+    "biodiesel_blending_rate": {"value_min": 0, "value_max": 20},
+    "gdp_proxy_index": {"value_min": 50, "value_max": 200},
+    "ev_adoption_index": {"value_min": 0, "value_max": 200},
+    "padd_refinery_utilization": {"value_min": 20, "value_max": 100},
+}
+
 GAS_STORAGE_METRICS = {
     "ng_storage_level_gwh": {"value_min": 0, "value_max": 2_000_000},
     "ng_storage_pct_full": {"value_min": 0, "value_max": 100},
@@ -47,6 +74,33 @@ SUPPLY_CHAIN_METRICS = {
     "pipeline_congestion_probability": {"value_min": 0, "value_max": 1},
     "seasonal_demand_forecast_mw": {"value_min": 0, "value_max": 15_000_000},
     "seasonal_peak_risk_score": {"value_min": 0, "value_max": 1},
+}
+
+CARBON_PRICE_METRICS = {
+    "CARBON.EUA": {"value_min": 0, "value_max": 200},
+    "CARBON.CCA": {"value_min": 0, "value_max": 120},
+    "CARBON.RGGI": {"value_min": 0, "value_max": 60},
+    "CARBON.UKETS": {"value_min": 0, "value_max": 220},
+}
+
+COMPLIANCE_COST_METRICS = {
+    "compliance_cost_total": {"value_min": 0, "value_max": 5_000_000_000},
+    "cost_per_tonne": {"value_min": 0, "value_max": 500},
+}
+
+LEAKAGE_RISK_METRICS = {
+    "leakage_risk_score": {"value_min": 0, "value_max": 1},
+    "price_differential": {"value_min": -200, "value_max": 200},
+}
+
+STRANDED_ASSET_METRICS = {
+    "stranded_ratio": {"value_min": 0, "value_max": 1},
+    "carbon_cost_pv": {"value_min": 0, "value_max": 10_000_000_000},
+}
+
+RENEWABLE_CAPACITY_METRICS = {
+    "renewable_capacity_gw": {"value_min": 0, "value_max": 20_000},
+    "policy_support": {"value_min": 0, "value_max": 5},
 }
 
 
@@ -71,6 +125,14 @@ class DataQualityFramework:
             'lng': LNG_METRICS,
             'gas_storage': GAS_STORAGE_METRICS,
             'supply_chain': SUPPLY_CHAIN_METRICS,
+            'refined_products': REFINED_PRODUCTS_METRICS,
+            'rins': RIN_PRICE_METRICS,
+            'transport_fundamentals': TRANSPORT_FUNDAMENTALS_METRICS,
+            'carbon_prices': CARBON_PRICE_METRICS,
+            'compliance_costs': COMPLIANCE_COST_METRICS,
+            'carbon_leakage': LEAKAGE_RISK_METRICS,
+            'stranded_assets': STRANDED_ASSET_METRICS,
+            'renewable_transition': RENEWABLE_CAPACITY_METRICS,
         }
 
     def validate_cross_source_data(

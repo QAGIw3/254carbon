@@ -396,3 +396,27 @@ mypy carbon254/
 
 MIT License - see LICENSE file for details
 
+## Exports and Streaming
+
+- Exports
+```python
+from carbon254 import CarbonClient
+from datetime import date
+client = CarbonClient()
+job = client.create_export_job(dataset_id="energy_prices", start_date=date(2024,1,1), end_date=date(2024,1,31), fmt="parquet")
+status = client.get_export_status(job["job_id"])  # poll until completed
+url = client.get_export_download_url(job["job_id"])  # presigned URL
+```
+
+- WebSocket streaming
+```python
+async for tick in client.stream_prices(["MISO.HUB.INDIANA"], commodities=["oil"], subscribe_all=False, callback=None):
+    print(tick)
+```
+
+- SSE streaming
+```python
+for event in client.stream_prices_sse(instruments=["MISO.HUB.INDIANA"], commodities=["oil"]):
+    print(event)
+```
+
