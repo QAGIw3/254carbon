@@ -1,0 +1,211 @@
+{
+  "dashboard": {
+    "title": "Multi-Source Redundancy Router",
+    "tags": ["routing", "redundancy", "data-quality"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Routing Decisions by Strategy",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(routing_decisions_total[5m])",
+            "legendFormat": "{{strategy}} - {{metric_key}}"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Average Routing Confidence",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "routing_confidence_avg",
+            "legendFormat": "{{metric_key}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 1
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Source Trust Scores",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "source_trust_score",
+            "legendFormat": "{{source_id}} - {{metric_key}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 0.55, "color": "yellow"},
+                {"value": 0.8, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Synthetic Fallback Ratio",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "synthetic_fallback_ratio",
+            "legendFormat": "{{metric_key}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.1, "color": "yellow"},
+                {"value": 0.2, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Circuit Breaker States",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "circuit_breaker_state",
+            "legendFormat": "{{source_id}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"type": "value", "value": 0, "text": "Closed"},
+              {"type": "value", "value": 1, "text": "Half-Open"},
+              {"type": "value", "value": 2, "text": "Open"}
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 2, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Source Response Latency (p95)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(source_response_latency_seconds_bucket[5m]))",
+            "legendFormat": "{{source_id}} - {{metric_key}}"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Active Sources Count",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "active_sources_count",
+            "legendFormat": "{{metric_key}}"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Routing Decision Latency",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(routing_decision_latency_seconds_bucket[5m]))",
+            "legendFormat": "p95 - {{strategy}}"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(routing_decision_latency_seconds_bucket[5m]))",
+            "legendFormat": "p99 - {{strategy}}"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Source Health Updates",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "rate(source_health_updates_total[5m])",
+            "legendFormat": "{{source_id}} - {{metric_key}}"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Source Freshness Lag",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+        "targets": [
+          {
+            "expr": "source_freshness_lag_seconds",
+            "legendFormat": "{{source_id}} - {{metric_key}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 120, "color": "yellow"},
+                {"value": 180, "color": "red"}
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Circuit Breaker Events",
+          "datasource": "Prometheus",
+          "expr": "changes(circuit_breaker_state[1m])",
+          "tagKeys": "source_id"
+        }
+      ]
+    }
+  }
+}
