@@ -7,6 +7,10 @@ Portal: https://www.census.gov/data/developers/data-sets.html
 Live mode queries the Census API (e.g., decennial P.L. 94-171, ACS) using
 configurable dataset paths, variables, and geographic filters, then maps to
 canonical series such as population and housing_units.
+
+Data Flow
+---------
+Census API → JSON arrays → canonical demographics → Kafka
 """
 import logging
 import time

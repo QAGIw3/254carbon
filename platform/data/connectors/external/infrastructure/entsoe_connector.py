@@ -6,6 +6,10 @@ Portal: https://transparency.entsoe.eu/
 
 This scaffold emits representative observations and is structured to accept
 real API credentials using the official ENTSO-E API when configured.
+
+Data Flow
+---------
+ENTSO-E Web API → XML/JSON time series → canonical fundamentals → Kafka
 """
 import logging
 import time

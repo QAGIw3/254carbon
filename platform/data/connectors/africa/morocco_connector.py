@@ -1,11 +1,15 @@
 """
 Morocco Power Market Connector
 
-Integrates with Morocco's renewable-focused power system:
+Integrates with Morocco's renewable‑focused power system:
 - Noor solar complex (world's largest CSP)
 - Wind energy expansion
 - Spain interconnection (exports to Europe)
 - Natural gas imports
+
+Data Flow
+---------
+ONEE feeds (or mocks) → normalize (MAD/MWh, local time→UTC) → canonical schema → Kafka
 """
 import logging
 from datetime import datetime, timedelta
@@ -150,4 +154,3 @@ class MoroccoConnector(Ingestor):
 if __name__ == "__main__":
     connector = MoroccoConnector({"source_id": "morocco_onee"})
     connector.run()
-

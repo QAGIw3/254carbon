@@ -6,6 +6,10 @@ Portal: https://data.oecd.org/
 
 Production: Use OECD SDMX/JSON APIs; this scaffold emits unemployment and
 trade balance metrics for integration testing.
+
+Data Flow
+---------
+OECD SDMX/CSV → indicator series → canonical fundamentals → Kafka
 """
 import logging
 import time

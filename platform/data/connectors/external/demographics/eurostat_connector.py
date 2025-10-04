@@ -8,6 +8,10 @@ Live mode supports two paths:
 - SDMX JSON (preferred when available): Eurostat v2.1 SDMX-JSON endpoint
   https://ec.europa.eu/eurostat/wdds/rest/data/v2.1/json/en/{dataset}?...
 - Bulk CSV/TSV downloads (TSV) from the Eurostat bulk download service.
+
+Data Flow
+---------
+Eurostat SDMX/TSV → indicator series → canonical demographics → Kafka
 """
 import csv
 import io

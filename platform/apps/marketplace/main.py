@@ -45,6 +45,10 @@ import stripe
 import hashlib
 import json
 
+# Prometheus metrics
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import Response
+
 # Configure root logger for concise operational visibility. In larger systems,
 # prefer structured logging (JSON) + correlation IDs to trace multi‑service calls.
 logging.basicConfig(level=logging.INFO)
@@ -55,6 +59,35 @@ app = FastAPI(
     title="API Marketplace",
     description="Third-party integration and monetization platform",
     version="1.0.0",
+)
+
+# Prometheus metrics
+marketplace_api_calls_total = Counter(
+    'marketplace_api_calls_total',
+    'Total API calls to marketplace endpoints',
+    ['endpoint', 'method', 'status']
+)
+
+marketplace_active_partners = Gauge(
+    'marketplace_active_partners',
+    'Number of active partners in marketplace'
+)
+
+marketplace_active_products = Gauge(
+    'marketplace_active_products',
+    'Number of active products in marketplace'
+)
+
+marketplace_api_latency = Histogram(
+    'marketplace_api_latency_seconds',
+    'API request latency',
+    ['endpoint']
+)
+
+marketplace_revenue_total = Gauge(
+    'marketplace_revenue_total',
+    'Total revenue this month (USD)',
+    ['partner_id']
 )
 
 
@@ -252,7 +285,16 @@ db = MarketplaceDB()
 @app.get("/health")
 async def health():
     """Lightweight liveness probe used by orchestration layers."""
+    # Update metrics
+    marketplace_active_partners.set(len([p for p in db.partners.values() if p.get('status') == 'approved']))
+    marketplace_active_products.set(len([p for p in db.products.values() if p.get('status') == 'active']))
     return {"status": "healthy"}
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.post("/api/v1/marketplace/partners/register", response_model=Partner)

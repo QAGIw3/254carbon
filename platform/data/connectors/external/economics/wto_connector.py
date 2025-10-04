@@ -6,6 +6,10 @@ Portal: https://timeseries.wto.org/
 
 Production: Use WTO API where available; this scaffold emits a generic
 tariff rate and trade policy index sample.
+
+Data Flow
+---------
+WTO API/CSV → trade indicators → canonical economics → Kafka
 """
 import logging
 import time

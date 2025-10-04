@@ -7,6 +7,10 @@ Portal: https://openinframap.org/
 Live mode uses Overpass API queries to summarize infrastructure within a
 bounding box or OSM area: total power line length (km), substation count,
 and pipeline length (km). Falls back to safe mocks otherwise.
+
+Data Flow
+---------
+Overpass/OSM → infra summaries (lines_km, substation_count, pipelines_km) → Kafka
 """
 import logging
 import time

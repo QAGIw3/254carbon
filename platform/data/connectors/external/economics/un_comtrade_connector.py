@@ -6,6 +6,10 @@ Portal: https://comtradeplus.un.org/
 
 Production: Use the Comtrade API for trade flows by HS codes; this scaffold
 emits a generic trade balance and export/import totals.
+
+Data Flow
+---------
+Comtrade API/CSV → trade flows → canonical economics → Kafka
 """
 import logging
 import time

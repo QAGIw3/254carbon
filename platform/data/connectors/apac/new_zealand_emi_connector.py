@@ -1,8 +1,14 @@
 """
 New Zealand EMI (Electricity Authority) Connector
 
-Fetches half-hourly spot prices from EMI APIs when API key is provided.
-Falls back to realistic simulated series when offline/unauthorized.
+Overview
+--------
+Fetches half‑hourly Final/Dispatch spot prices from EMI APIs when configured
+with an API key; otherwise emits realistic simulated series for development.
+
+Data Flow
+---------
+EMI API (or mocks) → parse series (island/node) → canonical tick schema → Kafka
 """
 import logging
 from datetime import datetime, timedelta, timezone
@@ -182,4 +188,3 @@ if __name__ == "__main__":
     }
     connector = NewZealandEMIConnector(cfg)
     connector.run()
-

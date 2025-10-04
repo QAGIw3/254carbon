@@ -6,6 +6,10 @@ Portal: https://fred.stlouisfed.org/
 
 Production: Integrate via FRED API (https://api.stlouisfed.org/fred/).
 This scaffold emits representative GDP and CPI values.
+
+Data Flow
+---------
+FRED API → series observations → canonical economics → Kafka
 """
 import logging
 import time

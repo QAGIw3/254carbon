@@ -2,10 +2,14 @@
 Korea Power Exchange (KPX) Connector
 
 Integrates with South Korean power market:
-- Cost-Based Pool (CBP) pricing
+- Cost‑Based Pool (CBP) pricing
 - System Marginal Price (SMP)
 - Renewable Energy Credits (REC)
 - Nuclear baseload (30%)
+
+Data Flow
+---------
+KPX feeds (or mocks) → SMP normalization (KRW/MWh, KST→UTC) → canonical schema → Kafka
 """
 import logging
 from datetime import datetime, timedelta
@@ -115,6 +119,5 @@ class KoreaKPXConnector(Ingestor):
 if __name__ == "__main__":
     connector = KoreaKPXConnector({"source_id": "korea_kpx"})
     connector.run()
-
 
 

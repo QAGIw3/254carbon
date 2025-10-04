@@ -1,11 +1,15 @@
 """
 South Africa Power Market Connector
 
-Eskom-dominated market with emerging competition:
-- Day-ahead pricing
-- Load shedding schedules  
+Eskom‑dominated market with emerging competition:
+- Day‑ahead pricing
+- Load shedding schedules
 - Renewable IPP integration
 - Southern African Power Pool (SAPP)
+
+Data Flow
+---------
+Eskom/SAPP feeds (or mocks) → normalize (ZAR/MWh, SAST→UTC) → canonical schema → Kafka
 """
 import logging
 from datetime import datetime, timedelta
@@ -114,6 +118,5 @@ class SouthAfricaConnector(Ingestor):
 if __name__ == "__main__":
     connector = SouthAfricaConnector({"source_id": "south_africa_eskom"})
     connector.run()
-
 
 

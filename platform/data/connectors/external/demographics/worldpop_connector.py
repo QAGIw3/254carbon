@@ -6,6 +6,10 @@ Portal: https://www.worldpop.org/
 
 Production: Typically uses download services (GeoTIFF) and raster stats.
 This scaffold emits country-level summaries.
+
+Data Flow
+---------
+WorldPop rasters/TSV → population aggregates → canonical demographics → Kafka
 """
 import logging
 import time

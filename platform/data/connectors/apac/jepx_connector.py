@@ -1,7 +1,14 @@
 """
 JEPX (Japan Electric Power Exchange) Connector
 
-Ingests spot market and futures prices from Japan's power exchange.
+Overview
+--------
+Ingests day‑ahead spot and forward market prices from Japan's power exchange,
+mapping to canonical schema with JPY currency and JST→UTC normalization.
+
+Data Flow
+---------
+JEPX API (or mocks) → parse area/period prices → canonical tick schema → Kafka
 """
 import logging
 from datetime import datetime, timedelta
@@ -219,4 +226,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = JEPXConnector(config)
         connector.run()
-

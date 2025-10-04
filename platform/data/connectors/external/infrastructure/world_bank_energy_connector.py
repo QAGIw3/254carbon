@@ -6,6 +6,10 @@ Catalog: https://datacatalog.worldbank.org/
 
 This scaffold emits sample indicators; production will use the World Bank
 API (e.g., https://api.worldbank.org/v2/) with indicator codes.
+
+Data Flow
+---------
+World Bank API → indicator series → canonical fundamentals → Kafka
 """
 import logging
 import time

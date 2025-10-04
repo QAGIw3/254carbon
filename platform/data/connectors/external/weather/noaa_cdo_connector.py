@@ -7,6 +7,10 @@ Portal: https://www.ncdc.noaa.gov/cdo-web/
 Production notes: Use token-based API (https://www.ncdc.noaa.gov/cdo-web/webservices/v2)
 with dataset IDs like GHCND, GSOM, GSOY etc. This scaffold emits mocked
 observations for temperature, wind, and precipitation.
+
+Data Flow
+---------
+NOAA CDO API → JSON time series → canonical weather series → Kafka
 """
 import logging
 import time
