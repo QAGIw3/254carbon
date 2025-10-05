@@ -1,11 +1,18 @@
 """
 Czech Republic OTE (Operátor trhu s elektřinou) Connector
 
-Integrates with Czech power exchange:
-- Day-ahead market
-- Intraday trading
-- Nuclear baseload (30%)
-- Cross-border with Slovakia, Austria, Germany
+Overview
+--------
+Publishes Czech day‑ahead/intraday indicators with nuclear baseload context and
+cross‑border coupling influences. This scaffold emits deterministic mock series.
+
+Data Flow
+---------
+OTE feeds (or mocks) → normalize (CZK/MWh, CET→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
 """
 import logging
 from datetime import datetime, timedelta
@@ -113,6 +120,5 @@ class CzechOTEConnector(Ingestor):
 if __name__ == "__main__":
     connector = CzechOTEConnector({"source_id": "czech_ote"})
     connector.run()
-
 
 

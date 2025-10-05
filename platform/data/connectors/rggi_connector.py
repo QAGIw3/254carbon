@@ -1,12 +1,26 @@
 """
 RGGI (Regional Greenhouse Gas Initiative) Connector
 
-Ingests carbon allowance data from the Regional Greenhouse Gas Initiative:
-- RGGI CO2 Allowance futures
-- RGGI auction results
-- State-specific allowance allocations
-- Compliance period tracking
-- Secondary market trading data
+Overview
+--------
+Publishes RGGI allowance market data (futures curves, auction results) and
+state-level context for the multi-state cap-and-trade program. This scaffold
+emits development-friendly values; integrate with ICE and RGGI feeds for prod.
+
+Data Flow
+---------
+ICE/RGGI feeds → normalize curves/auctions → canonical events → Kafka
+
+Configuration
+-------------
+- `ice_api_url` for futures, `rggi_auction_url` for auction docs/data.
+- `api_key` if provider requires auth.
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
+
+Operational Notes
+-----------------
+- Participating states are captured in `quality_spec` for downstream filtering.
+- Auction cadence is quarterly; align schedules accordingly in orchestration.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

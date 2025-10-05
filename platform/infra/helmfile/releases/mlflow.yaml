@@ -1,0 +1,17 @@
+backendStore:
+  database:
+    connection:
+      secretName: mlflow-db
+artifacts:
+  s3:
+    enabled: true
+    bucket: mlflow
+    endpoint: http://minio.data-platform.svc.cluster.local:9000
+    accessKey:
+      secretName: mlflow-minio
+    secretKey:
+      secretName: mlflow-minio
+ingress:
+  enabled: true
+  hosts:
+    - mlflow.{{ .Values.baseDomain }}

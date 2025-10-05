@@ -148,6 +148,30 @@ Ingress host: `254carbon.local`
 - Web Hub: `http://254carbon.local/web` (also `http://254carbon.local/`)
 - API Gateway: `http://254carbon.local/api` (OpenAPI docs at `/api/docs`)
 
+### Commodities Service Consolidation
+
+We consolidated multiple commodity-specific services into a single
+Commodities Service running on port `8012` with a unified surface at
+`/api/v1/commodities/*`.
+
+- New service: `platform/apps/commodities-service` (FastAPI)
+- Gateway proxy: forwards `/api/v1/commodities/*` to the commodities service
+- Ingress: routes the same prefix directly to the commodities service to reduce hops
+- Old singletons: `gas-service` and `battery-materials` were removed after migration
+- Back-compat: legacy gateway commodity endpoints remain, now carrying
+  `Deprecation`, `Sunset`, and `Link` headers to guide clients to the new paths
+
+Example new routes:
+
+- `GET /api/v1/commodities/gas/prices`
+- `GET /api/v1/commodities/oil/curves`
+- `GET /api/v1/commodities/coal/indices`
+- `GET /api/v1/commodities/biofuels/rin-prices`
+- `GET /api/v1/commodities/battery-materials/lithium`
+
+See `platform/apps/commodities-service/README.md` for details on env vars,
+caching, fallbacks, and testing.
+
 Configure local DNS for the Ingress IP:
 
 ```

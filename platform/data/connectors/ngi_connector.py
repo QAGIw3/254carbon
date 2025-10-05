@@ -1,11 +1,20 @@
 """
 Natural Gas Intelligence (NGI) Connector
 
-Ingests natural gas spot market data and regional hub prices from NGI:
-- Daily spot prices at major US hubs
-- Regional price assessments
-- Pipeline flow data and capacity information
-- Storage data and injection/withdrawal rates
+Overview
+--------
+Publishes NGI spot prices and regional hub assessments (Henry Hub, Chicago
+Citygate, Dominion South, SoCal Citygate), with optional pipeline/storage
+context. This scaffold emits deterministic values; wire to NGI feeds for prod.
+
+Data Flow
+---------
+NGI feeds → normalize per hub → canonical price events → Kafka
+
+Configuration
+-------------
+- `api_base_url`/`api_key`/auth for live integration
+- `kafka.topic`/`kafka.bootstrap_servers` for emission
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

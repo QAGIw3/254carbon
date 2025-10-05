@@ -1,0 +1,17 @@
+grafana:
+  ingress:
+    enabled: true
+    hosts:
+      - grafana.{{ .Environment.Values.baseDomain }}
+  sidecar:
+    dashboards:
+      enabled: true
+    datasources:
+      enabled: true
+prometheus:
+  ingress:
+    enabled: true
+    hosts:
+      - prometheus.{{ .Environment.Values.baseDomain }}
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false

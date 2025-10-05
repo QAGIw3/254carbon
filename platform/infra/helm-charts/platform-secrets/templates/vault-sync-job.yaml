@@ -1,0 +1,46 @@
+{{- if .Values.vaultSync.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: platform-secrets-vault-sync
+  namespace: data-platform
+  labels:
+    app.kubernetes.io/name: platform-secrets-vault-sync
+spec:
+  template:
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: {{ .Values.vaultSync.role | quote }}
+        vault.hashicorp.com/agent-inject-secret-airflow: {{ .Values.vaultSync.paths.airflow | quote }}
+        vault.hashicorp.com/agent-inject-template-airflow: |
+          {{`{{- with secret "`}}{{ .Values.vaultSync.paths.airflow }}{{`" -}}`}}
+          {{`{{ .Data.data.connection | toJSON }}`}}
+          {{`{{- end }}`}}
+        vault.hashicorp.com/agent-inject-secret-openmetadata: {{ .Values.vaultSync.paths.openmetadata | quote }}
+        vault.hashicorp.com/agent-inject-template-openmetadata: |
+          {{`{{- with secret "`}}{{ .Values.vaultSync.paths.openmetadata }}{{`" -}}`}}
+          {{`{{ .Data.data.password | toJSON }}`}}
+          {{`{{- end }}`}}
+        vault.hashicorp.com/agent-inject-secret-mlflow: {{ .Values.vaultSync.paths.mlflow | quote }}
+        vault.hashicorp.com/agent-inject-template-mlflow: |
+          {{`{{- with secret "`}}{{ .Values.vaultSync.paths.mlflow }}{{`" -}}`}}
+          {{`{{ .Data.data.connection | toJSON }}`}}
+          {{`{{- end }}`}}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: default
+      containers:
+        - name: sync
+          image: bitnami/kubectl:latest
+          command: ["/bin/sh","-c"]
+          args:
+            - >-
+              set -euo pipefail;
+              AF=$(cat /vault/secrets/airflow | tr -d '"');
+              OM=$(cat /vault/secrets/openmetadata | tr -d '"');
+              ML=$(cat /vault/secrets/mlflow | tr -d '"');
+              kubectl -n data-platform create secret generic airflow-postgres --from-literal=connection="$AF" --dry-run=client -o yaml | kubectl apply -f -;
+              kubectl -n data-platform create secret generic openmetadata-postgres --from-literal=password="$OM" --dry-run=client -o yaml | kubectl apply -f -;
+              kubectl -n data-platform create secret generic mlflow-postgres --from-literal=connection="$ML" --dry-run=client -o yaml | kubectl apply -f -;
+{{- end }}

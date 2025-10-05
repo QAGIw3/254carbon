@@ -16,6 +16,12 @@ Production Notes
 - NYISO public data often ships as daily CSVs with date‑partitioned paths.
 - Robust ingestion would iterate day directories, parse CSVs, and normalize to
   UTC.
+
+ Configuration
+ -------------
+ - `api_base`: NYISO API/MIS base
+ - `data_type`: `RT_LBMP` | `DA_LBMP` | `ICAP` | `AS` | `TCC`
+ - `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta

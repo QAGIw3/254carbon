@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-overview
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/name: grafana-dashboard
+    app.kubernetes.io/part-of: grafana
+    app.kubernetes.io/component: dashboard
+  namespace: platform-observability
+data:
+  overview.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "gnetId": null,
+      "graphTooltip": 0,
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Up Targets",
+          "targets": [
+            {"expr": "sum(up)", "refId": "A"}
+          ],
+          "options": {"reduceOptions": {"calcs": ["sum"]}},
+          "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0}
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 36,
+      "style": "dark",
+      "tags": ["overview"],
+      "templating": {"list": []},
+      "time": {"from": "now-15m", "to": "now"},
+      "timezone": "",
+      "title": "Overview",
+      "uid": "overview",
+      "version": 1
+    }

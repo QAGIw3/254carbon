@@ -1,0 +1,6 @@
+apiVersion: v2
+name: platform-secrets
+version: 0.1.0
+description: Render Kubernetes Secrets for platform components from CI environment variables
+appVersion: "1.0.0"
+type: application

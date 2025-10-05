@@ -73,13 +73,17 @@ class IntelligenceEngine:
     """Routes queries to appropriate AI services."""
     
     def __init__(self):
+        # Updated to use consolidated services
         self.services = {
-            "copilot": "http://ai-copilot:8017",
-            "nlp": "http://nlp-service:8014",
-            "ml": "http://ml-service:8006",
-            "risk": "http://risk-service:8008",
+            "ai": "http://ai-service:8020",  # Consolidated: copilot, nlp, regtech
+            "analytics": "http://analytics-service:8008",  # Consolidated: ml, risk, decomposition, insights, satellite, quantum
             "signals": "http://signals-service:8016",
         }
+        # Legacy endpoints for backwards compatibility
+        self.services["copilot"] = self.services["ai"]
+        self.services["nlp"] = self.services["ai"]
+        self.services["ml"] = self.services["analytics"]
+        self.services["risk"] = self.services["analytics"]
     
     async def process_query(
         self,
@@ -134,11 +138,11 @@ class IntelligenceEngine:
             return QueryType.CONVERSATIONAL
     
     async def _call_copilot(self, query: str, language: str) -> Dict:
-        """Call AI Copilot service."""
+        """Call AI Copilot service (via consolidated AI service)."""
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(
-                    f"{self.services['copilot']}/api/v1/copilot/chat",
+                    f"{self.services['ai']}/api/v1/copilot/chat",
                     json={"query": query, "language": language},
                     timeout=30.0
                 )

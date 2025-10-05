@@ -16,6 +16,13 @@ Production wiring
 - API base: https://api.pjm.com/api/v1
 - Header: Ocp‑Apim‑Subscription‑Key: <key>
 - Endpoints: rt_hrl_lmps, da_hrl_lmps, capacity_market_results, ancillary
+
+ Configuration
+ -------------
+ - `api_base`: PJM API base (default above)
+ - `api_key`: Subscription key for PJM API
+ - `market_type`: `RT` | `DA` | `CAPACITY` | `AS`
+ - `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta, timezone

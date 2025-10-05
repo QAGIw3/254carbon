@@ -1,8 +1,22 @@
 """
 SPP (Southwest Power Pool) Connector
 
-Ingests Real-Time and Day-Ahead LMP, Integrated Markets prices,
-and Operating Reserve data from SPP.
+Overview
+--------
+Publishes Real‑Time and Day‑Ahead LMPs, Integrated Marketplace prices, and
+Operating Reserve metrics from SPP. This scaffold emits deterministic values
+unless wired to SPP Marketplace APIs.
+
+Data Flow
+---------
+SPP Marketplace API (or mocks) → normalize per product → canonical events → Kafka
+
+Configuration
+-------------
+- `api_base`: SPP Marketplace base URL
+- `api_key`: Subscription key if required
+- `market_type`: `RT` | `DA` | `IM` | `OR`
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta

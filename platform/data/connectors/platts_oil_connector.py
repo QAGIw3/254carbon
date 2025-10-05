@@ -1,12 +1,21 @@
 """
 Platts Oil Assessments Connector
 
-Ingests physical oil market assessments from S&P Global Platts for:
-- Dated Brent
-- Dubai/Oman
-- WTI (Cushing, Houston)
-- Regional differentials
-- Physical crude assessments
+Overview
+--------
+Publishes physical crude assessments (Dated Brent, Dubai/Oman, WTI Cushing/
+Houston) and regional differentials from S&P Global Platts. This scaffold emits
+deterministic mock values for development; integrate with Platts feeds for
+production.
+
+Data Flow
+---------
+Platts feed → normalize assessment (by grade/location) → canonical price events → Kafka
+
+Configuration
+-------------
+- `api_base_url`/`api_key` for live queries
+- `kafka.topic`/`kafka.bootstrap_servers` for emission
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

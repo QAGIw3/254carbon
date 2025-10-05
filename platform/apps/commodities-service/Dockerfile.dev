@@ -1,0 +1,33 @@
+FROM python:3.11-slim
+
+#
+# Development Dockerfile for the commodities-service
+# - Hot reload enabled via uvicorn --reload
+# - PYTHONPATH allows importing platform/shared
+#
+
+ARG SERVICE_PATH=platform/apps/commodities-service
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app:/app/platform
+
+WORKDIR /app
+
+# Install pinned dependencies
+COPY ${SERVICE_PATH}/requirements.txt requirements.txt
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt \
+    && pip install uvicorn[standard] watchdog
+
+# Copy service source and shared utilities for local reloads
+COPY ${SERVICE_PATH} /app
+COPY platform/shared /app/platform/shared
+
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8012
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8012", "--reload"]

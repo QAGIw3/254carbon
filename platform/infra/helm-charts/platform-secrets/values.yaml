@@ -1,0 +1,15 @@
+static:
+  enabled: false
+vaultSync:
+  enabled: true
+  role: platform-secrets
+  paths:
+    airflow: secret/data/airflow/postgres
+    openmetadata: secret/data/openmetadata/postgres
+    mlflow: secret/data/mlflow/postgres
+airflow:
+  connection: ""
+openmetadata:
+  password: ""
+mlflow:
+  connection: ""

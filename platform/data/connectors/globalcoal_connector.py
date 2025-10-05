@@ -1,13 +1,26 @@
 """
 globalCOAL Coal Price Indices Connector
 
-Ingests coal price indices from globalCOAL (formerly Global Coal):
-- API2 (Northwest Europe) - Main European benchmark
-- API4 (South Africa) - South African export benchmark
-- API5 (Colombia) - Colombian export benchmark
-- API6 (Australia) - Australian export benchmark
-- NEWC (Newcastle, Australia) - Physical coal prices
-- Richards Bay (South Africa) - Physical coal prices
+Overview
+--------
+Publishes coal price indices and related physical assessments from globalCOAL,
+including API2, API4, NEWC, and Richards Bay references. This scaffold emits
+deterministic mock values for development; integrate with provider APIs for prod.
+
+Data Flow
+---------
+globalCOAL feed → normalize per index/location → canonical price events → Kafka
+
+Configuration
+-------------
+- `api_base_url`/`api_key` and auth fields for live integration.
+- Index specifications registered in `_register_coal_index_specifications`.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- Capture calorific/sulfur/ash specs in `quality_spec` to enable heat‑content
+  normalization and differential analysis downstream.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

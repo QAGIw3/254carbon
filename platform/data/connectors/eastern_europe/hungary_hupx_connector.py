@@ -1,7 +1,18 @@
 """
 Hungary HUPX (Hungarian Power Exchange) Connector
 
-Day-ahead and intraday markets with regional coupling
+Overview
+--------
+Publishes Hungarian day‑ahead/intraday indicators with regional coupling
+context. This scaffold emits deterministic mock series aligned to HUF and CET.
+
+Data Flow
+---------
+HUPX feeds (or mocks) → normalize (HUF/MWh, CET→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
 """
 import logging
 from datetime import datetime, timedelta
@@ -99,6 +110,5 @@ class HungaryHUPXConnector(Ingestor):
 if __name__ == "__main__":
     connector = HungaryHUPXConnector({"source_id": "hungary_hupx"})
     connector.run()
-
 
 

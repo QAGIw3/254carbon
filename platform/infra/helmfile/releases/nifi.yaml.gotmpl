@@ -1,0 +1,11 @@
+persistence:
+  enabled: true
+  size: 100Gi
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+ingress:
+  enabled: true
+  hosts:
+    - nifi.{{ .Environment.Values.baseDomain }}

@@ -16,6 +16,12 @@ Operational Notes
 - SPP cadence is 15 minutes; timestamps here normalize to interval‑ending.
 - ORDC scarcity adders are simplified; production should compute from ERCOT’s
   reserve curves and LOLP inputs.
+
+ Configuration
+ -------------
+ - `api_base`: ERCOT public reports API base
+ - `data_type`: `SPP` | `HUB` | `ORDC` | `RESOURCE`
+ - `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta

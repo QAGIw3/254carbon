@@ -1,11 +1,28 @@
 """
 Mexico CENACE (Centro Nacional de Control de Energía) Connector
 
-Ingests Mexican electricity market data including:
-- PML (Precio Marginal Local) - Nodal prices
-- Day-ahead and real-time markets
-- Ancillary services
-- CEL (Certificados de Energías Limpias) - Clean Energy Certificates
+Overview
+--------
+Publishes Mexican power market data including nodal PMLs for Day‑Ahead (MDA)
+and Real‑Time (MTR) markets, ancillary services, and Clean Energy Certificates
+(CEL). This scaffold emits deterministic mock values unless wired to CENACE
+endpoints.
+
+Data Flow
+---------
+CENACE API (or mocks) → normalize per region/node (SIN/BCA/BCS) → canonical events → Kafka
+
+Configuration
+-------------
+- `api_base`: CENACE API base (default https://www.cenace.gob.mx/api).
+- `market_type`: `MDA` (Day‑Ahead) | `MTR` (Real‑Time) | `CEL`.
+- `region`: Grid region filter `SIN` | `BCA` | `BCS` | `ALL`.
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
+
+Operational Notes
+-----------------
+- PML decomposition is emitted as energy/congestion/loss components for
+  analytics parity with other ISO connectors.
 """
 import logging
 from datetime import datetime, timedelta
@@ -320,4 +337,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = MexicoCENACEConnector(config)
         connector.run()
-

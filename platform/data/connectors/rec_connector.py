@@ -1,12 +1,26 @@
 """
 REC (Renewable Energy Certificate) Connector
 
-Ingests Renewable Energy Certificate pricing and trading data:
-- State-specific REC markets (CA, TX, NE, etc.)
-- Class I vs Class II RECs
-- Solar RECs (SRECs)
-- Wind RECs
-- Compliance vs voluntary REC markets
+Overview
+--------
+Publishes REC pricing and trading data across compliance and voluntary markets
+with state/region registries (WREGIS, NEPOOL, PJM GATS, ERCOT). This scaffold
+emits deterministic mock values while documenting how to map diverse REC types.
+
+Data Flow
+---------
+Registry/market sources → normalize per registry/class → canonical events → Kafka
+
+Configuration
+-------------
+- `api_key`/source URLs when integrating with registry/exchange datasets.
+- Contract specifications registered per region/class in `_register_rec_specifications`.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- Represent REC class (Class I/II), technology, and vintage in `quality_spec`
+  for downstream RPS and portfolio analytics.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-buckets-init
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:latest
+          command: ["/bin/sh","-c"]
+          args:
+            - >-
+              mc alias set myminio {{ .Values.minio.endpoint }} $(cat /creds/accesskey) $(cat /creds/secretkey) --api s3v4 &&
+              for b in {{- range $i, $b := .Values.buckets }} {{ $b }}{{ end }} ; do
+                mc mb -p myminio/$b || true ;
+              done
+          volumeMounts:
+            - name: creds
+              mountPath: /creds
+              readOnly: true
+      volumes:
+        - name: creds
+          projected:
+            sources:
+              - secret:
+                  name: {{ .Values.minio.accessKeySecretName }}
+                  items:
+                    - key: accesskey
+                      path: accesskey
+              - secret:
+                  name: {{ .Values.minio.secretKeySecretName }}
+                  items:
+                    - key: secretkey
+                      path: secretkey

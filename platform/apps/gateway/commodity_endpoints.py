@@ -14,7 +14,7 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import List, Optional, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from pydantic import BaseModel
 
 from auth import verify_token, has_permission
@@ -25,11 +25,25 @@ from commodity_query import build_price_query, build_curve_query, build_latest_s
 
 logger = logging.getLogger(__name__)
 
-# Create router
+def _add_deprecation_headers(response: Response):
+    """Attach deprecation headers to legacy commodity routes.
+
+    Signals clients to migrate to the consolidated commodities-service.
+    - Deprecation: true (RFC-8594)
+    - Sunset: target retirement date (RFC-8594 as IMF-fixdate)
+    - Link: successor endpoint prefix
+    """
+    # Target: retain for 1–2 releases; adjust date as needed during rollout.
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "Wed, 31 Dec 2025 00:00:00 GMT"
+    response.headers["Link"] = '</api/v1/commodities>; rel="successor-version"'
+
+
+# Create router (legacy gateway commodity endpoints retained for back-compat)
 commodity_router = APIRouter(
     prefix="/api/v1/commodities",
     tags=["commodities"],
-    dependencies=[Depends(verify_token)]
+    dependencies=[Depends(verify_token), Depends(_add_deprecation_headers)]
 )
 
 

@@ -1,15 +1,24 @@
 """
 South Africa Power Market Connector
 
-Eskom‑dominated market with emerging competition:
-- Day‑ahead pricing
-- Load shedding schedules
-- Renewable IPP integration
-- Southern African Power Pool (SAPP)
+Overview
+--------
+Publishes South African power market indicators (system energy price proxy,
+load shedding context) for Eskom‑dominated conditions with growing IPP share.
+This scaffold emits deterministic mock values aligned to SAST and ZAR units.
 
 Data Flow
 ---------
 Eskom/SAPP feeds (or mocks) → normalize (ZAR/MWh, SAST→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
+
+Operational Notes
+-----------------
+- Incorporates simple load shedding and coal baseload effects in the mock to
+  exercise downstream models under constrained supply scenarios.
 """
 import logging
 from datetime import datetime, timedelta
@@ -118,5 +127,4 @@ class SouthAfricaConnector(Ingestor):
 if __name__ == "__main__":
     connector = SouthAfricaConnector({"source_id": "south_africa_eskom"})
     connector.run()
-
 

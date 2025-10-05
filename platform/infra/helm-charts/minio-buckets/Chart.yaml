@@ -1,0 +1,6 @@
+apiVersion: v2
+name: minio-buckets
+version: 0.1.0
+description: Create required MinIO buckets via a Kubernetes Job
+appVersion: "1.0.0"
+type: application

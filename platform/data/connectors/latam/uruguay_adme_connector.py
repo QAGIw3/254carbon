@@ -1,15 +1,19 @@
 """
 Uruguay ADME (Administración del Mercado Eléctrico) Connector
 
-Uruguay's renewable‑dominant market:
-- 98% renewable electricity
-- Wind power leadership
-- Cross‑border with Argentina and Brazil
-- Real‑time market
+Overview
+--------
+Publishes Uruguay’s renewable‑dominant market indicators (spot proxy) with high
+wind penetration and cross‑border flows. This scaffold emits deterministic
+mock series aligned to UYT and UYU.
 
 Data Flow
 ---------
-ADME feeds (or mocks) → normalize to canonical tick schema → Kafka topic(s)
+ADME feeds (or mocks) → normalize (UYU/MWh, UYT→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
 """
 import logging
 from datetime import datetime, timedelta
@@ -121,5 +125,4 @@ class UruguayADMEConnector(Ingestor):
 if __name__ == "__main__":
     connector = UruguayADMEConnector({"source_id": "uruguay_adme"})
     connector.run()
-
 

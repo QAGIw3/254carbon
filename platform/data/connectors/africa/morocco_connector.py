@@ -1,15 +1,25 @@
 """
 Morocco Power Market Connector
 
-Integrates with Morocco's renewable‑focused power system:
-- Noor solar complex (world's largest CSP)
-- Wind energy expansion
-- Spain interconnection (exports to Europe)
-- Natural gas imports
+Overview
+--------
+Publishes Morocco power market indicators with emphasis on CSP/solar and wind
+integration as well as Spain interconnection. This scaffold emits deterministic
+mock series aligned to local conditions and currencies.
 
 Data Flow
 ---------
 ONEE feeds (or mocks) → normalize (MAD/MWh, local time→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `api_base`: ONEE/market data base if integrating live.
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
+
+Operational Notes
+-----------------
+- Models CSP diurnal patterns and interconnection effects in the synthetic
+  series to aid evaluation of renewable integration scenarios.
 """
 import logging
 from datetime import datetime, timedelta

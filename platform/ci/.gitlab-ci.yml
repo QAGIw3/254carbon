@@ -79,14 +79,20 @@ build:images:
     - docker build -t 254carbon/scenario-engine:$CI_COMMIT_SHA platform/apps/scenario-engine
     - docker build -t 254carbon/download-center:$CI_COMMIT_SHA platform/apps/download-center
     - docker build -t 254carbon/report-service:$CI_COMMIT_SHA platform/apps/report-service
+    - docker build -t 254carbon/commodities-service:$CI_COMMIT_SHA \
+        -f platform/apps/commodities-service/Dockerfile \
+        --build-arg SERVICE_PATH=platform/apps/commodities-service .
     - docker push 254carbon/gateway:$CI_COMMIT_SHA
     - docker push 254carbon/curve-service:$CI_COMMIT_SHA
     - docker push 254carbon/scenario-engine:$CI_COMMIT_SHA
     - docker push 254carbon/download-center:$CI_COMMIT_SHA
     - docker push 254carbon/report-service:$CI_COMMIT_SHA
+    - docker push 254carbon/commodities-service:$CI_COMMIT_SHA
     # Tag gateway :dev for ArgoCD dev tracking
     - docker tag 254carbon/gateway:$CI_COMMIT_SHA 254carbon/gateway:dev
     - docker push 254carbon/gateway:dev
+    - docker tag 254carbon/commodities-service:$CI_COMMIT_SHA 254carbon/commodities-service:dev
+    - docker push 254carbon/commodities-service:dev
   only:
     - main
 
@@ -97,6 +103,7 @@ scan:security:
   script:
     - trivy image 254carbon/gateway:$CI_COMMIT_SHA
     - trivy image 254carbon/curve-service:$CI_COMMIT_SHA
+    - trivy image 254carbon/commodities-service:$CI_COMMIT_SHA
   allow_failure: true
   only:
     - main
@@ -131,3 +138,15 @@ deploy:production:
   when: manual
   only:
     - main
+
+infra:deploy:dev:
+  stage: deploy
+  image: ghcr.io/helmfile/helmfile:latest
+  variables:
+    HELMFILE_ENV: dev
+  script:
+    - cd platform/infra/helmfile
+    - helmfile repos
+    - helmfile -e ${HELMFILE_ENV} sync --interactive=false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

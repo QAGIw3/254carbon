@@ -1,15 +1,18 @@
 """
 Colombia XM Connector
 
-Integrates with Colombian wholesale electricity market:
-- Spot market (Bolsa de Energía)
-- Hydro‑thermal optimization
-- El Niño/La Niña impacts
-- Reliability charge
+Overview
+--------
+Publishes Colombian market indicators (spot proxy) shaped by hydro‑thermal
+optimization and ENSO cycles. This scaffold emits deterministic mock series.
 
 Data Flow
 ---------
-XM feeds (or mocks) → normalize to canonical tick schema → Kafka topic(s)
+XM feeds (or mocks) → normalize (COP/MWh, COT→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
 """
 import logging
 from datetime import datetime, timedelta

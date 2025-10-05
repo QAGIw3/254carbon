@@ -1,0 +1,14 @@
+postgres:
+  host: postgresql.market-intelligence.svc.cluster.local
+  port: 5432
+  airflow:
+    connectionSecretName: airflow-postgres
+    connectionSecretKey: connection
+  openmetadata:
+    database: openmetadata
+    username: openmetadata
+    connectionSecretName: openmetadata-postgres
+    connectionSecretKey: password
+  mlflow:
+    connectionSecretName: mlflow-postgres
+    connectionSecretKey: connection

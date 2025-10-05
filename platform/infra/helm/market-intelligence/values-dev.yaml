@@ -28,12 +28,14 @@ services:
   api-gateway:
     image:
       registry: ""
+      repository: gateway
+      tag: "dev-20251004-16"
     replicas: 1
     env:
       - name: ENABLE_GRAPHQL
         value: "true"
       - name: ENABLE_ANALYTICS
-        value: "true"
+        value: "false"
       - name: ENABLE_RESEARCH
         value: "true"
       - name: ENABLE_ALERTS
@@ -94,6 +96,7 @@ services:
     image:
       registry: ""
     replicas: 1
+    port: 8005
     resources:
       limits:
         cpu: 500m
@@ -113,6 +116,27 @@ services:
       requests:
         cpu: 125m
         memory: 128Mi
+
+  # Development defaults for the commodities service (LOCAL_DEV enabled)
+  commodities-service:
+    image:
+      registry: ""
+    replicas: 1
+    port: 8012
+    env:
+      - name: CLICKHOUSE_HOST
+        value: "clickhouse"
+      - name: REDIS_HOST
+        value: "redis"
+      - name: LOCAL_DEV
+        value: "true"
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
 
   web-hub:
     image:
@@ -141,4 +165,3 @@ pdb:
 # Relaxed monitoring for dev
 monitoring:
   enabled: false
-

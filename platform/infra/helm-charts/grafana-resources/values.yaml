@@ -1,0 +1,1 @@
+prometheusUrl: http://kube-prometheus-stack-prometheus.platform-observability.svc.cluster.local:9090

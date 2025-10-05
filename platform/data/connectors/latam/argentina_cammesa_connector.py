@@ -10,6 +10,11 @@ and gas influences (e.g., Vaca Muerta).
 Data Flow
 ---------
 CAMMESA feeds (or mocks) → canonical mapping → Kafka topic(s)
+ 
+Configuration
+-------------
+- `api_base`: CAMMESA API base
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta

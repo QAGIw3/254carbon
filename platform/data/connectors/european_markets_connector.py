@@ -1,13 +1,21 @@
 """
 European Power Markets Connector
 
-Ingests data from major European power exchanges:
-- EPEX Spot (France, Germany, Netherlands, Belgium, Austria, Switzerland)
-- Nord Pool (Nordic and Baltic countries)
-- Poland Power Exchange (TGE)
-- Eastern European markets
+Overview
+--------
+Publishes data from key European exchanges (EPEX, Nord Pool, TGE) for day‑ahead
+and intraday products, mapped to the canonical schema with timezone/currency
+handling. This scaffold emits deterministic series when not wired to live APIs.
 
-Supports day-ahead, intraday, and balancing markets.
+Data Flow
+---------
+Exchange APIs (or mocks) → parse per market/region → canonical events → Kafka
+
+Configuration
+-------------
+- `market`: `EPEX` | `NORDPOOL` | `TGE`
+- `api_base`: Exchange API base (varies by market)
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta, timezone

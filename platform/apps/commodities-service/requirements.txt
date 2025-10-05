@@ -1,0 +1,22 @@
+#
+# Runtime dependencies for the commodities-service
+# - fastapi/uvicorn: API framework and ASGI server
+# - clickhouse-driver: synchronous CH client (queried via executor wrappers)
+# - asyncpg: optional Postgres metadata/entitlement reads
+# - redis: backing store for shared CacheManager
+# - httpx/PyJWT: auth/JWKS and optional http client usage
+# - numpy: lightweight synthetic data generation for dev parity
+# - pydantic: response models and validation
+# - requests: used by Dockerfile HEALTHCHECK snippet
+#
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+clickhouse-driver==0.2.9
+asyncpg==0.29.0
+redis==5.0.1
+httpx==0.26.0
+PyJWT==2.8.0
+python-dotenv==1.0.1
+numpy==1.26.4
+pydantic==1.10.14
+requests==2.31.0

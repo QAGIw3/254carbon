@@ -1,0 +1,6 @@
+apiVersion: v2
+name: grafana-resources
+version: 0.1.0
+description: Provision Grafana datasources and dashboards via ConfigMaps
+appVersion: "1.0.0"
+type: application

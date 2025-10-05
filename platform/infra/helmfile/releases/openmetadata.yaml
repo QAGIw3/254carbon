@@ -1,0 +1,17 @@
+ingestion:
+  enabled: true
+server:
+  ingress:
+    enabled: true
+    hosts:
+      - openmetadata.{{ .Values.baseDomain }}
+config:
+  database:
+    host: ${OPENMETADATA_DB_HOST:?set via env}
+    port: 5432
+    username: ${OPENMETADATA_DB_USER:?}
+    password: ${OPENMETADATA_DB_PASS:?}
+    database: ${OPENMETADATA_DB_NAME:?}
+  eventHandler:
+    kafka:
+      bootstrapServers: kafka.data-platform.svc.cluster.local:9092

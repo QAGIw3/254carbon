@@ -1,12 +1,21 @@
 """
 RNG (Renewable Natural Gas) Connector
 
-Ingests Renewable Natural Gas pricing and market data:
-- RNG production costs and pricing
-- LCFS (Low Carbon Fuel Standard) credits
-- RINs pricing for RNG pathways
-- Pipeline injection and transportation
-- Environmental attribute trading
+Overview
+--------
+Publishes RNG pricing and related credit markets (LCFS, RINs) alongside
+environmental attributes. This scaffold emits deterministic mock series; wire
+to production and registry feeds for live operation.
+
+Data Flow
+---------
+Provider/registry feeds → normalize per product/credit → canonical events → Kafka
+
+Configuration
+-------------
+- `production_data_url`, `lcfs_registry_url`, `api_key` for live usage.
+- Product/credit specs registered in `_register_rng_specifications`.
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

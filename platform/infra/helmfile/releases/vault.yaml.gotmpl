@@ -1,0 +1,22 @@
+server:
+  ha:
+    enabled: true
+  dataStorage:
+    enabled: true
+    size: 32Gi
+  auditStorage:
+    enabled: true
+    size: 10Gi
+  ingress:
+    enabled: true
+    hosts:
+      - vault.{{ .Environment.Values.baseDomain }}
+  service:
+    type: ClusterIP
+injector:
+  enabled: true
+ui:
+  enabled: true
+serverTelemetry:
+  serviceMonitor:
+    enabled: true

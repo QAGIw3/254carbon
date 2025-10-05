@@ -10,6 +10,12 @@ scaffold emits mock data until wired to IESO Data Directory endpoints.
 Data Flow
 ---------
 IESO feeds (or mocks) → canonical mapping → Kafka topic(s)
+
+ Configuration
+ -------------
+ - `api_base`: IESO API/Data Directory base
+ - `data_type`: `HOEP` | `PREDISPATCH` | `INTERTIE` | `DEMAND`
+ - `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta

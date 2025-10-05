@@ -10,6 +10,11 @@ Integrates with South Korean power market:
 Data Flow
 ---------
 KPX feeds (or mocks) → SMP normalization (KRW/MWh, KST→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `api_base`: KPX API base (if integrating live)
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta
@@ -119,5 +124,4 @@ class KoreaKPXConnector(Ingestor):
 if __name__ == "__main__":
     connector = KoreaKPXConnector({"source_id": "korea_kpx"})
     connector.run()
-
 

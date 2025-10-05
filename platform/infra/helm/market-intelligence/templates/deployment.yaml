@@ -51,6 +51,12 @@ spec:
                 {{- toYaml $env.valueFrom | nindent 16 }}
               {{- end }}
             {{- end }}
+            # Inject commodities-service URL into the gateway for seamless
+            # proxying of consolidated commodity endpoints.
+            {{- if and (eq $serviceName "api-gateway") (index $.Values.services "commodities-service") }}
+            - name: COMMODITIES_SERVICE_URL
+              value: "http://{{ include "market-intelligence.fullname" $ }}-commodities-service:{{ index (index $.Values.services "commodities-service") "port" }}"
+            {{- end }}
           resources:
             {{- toYaml $serviceConfig.resources | nindent 12 }}
           livenessProbe:
@@ -121,6 +127,12 @@ spec:
                 {{- toYaml $env.valueFrom | nindent 16 }}
               {{- end }}
             {{- end }}
+            # Green deployment container receives the same proxy ENV for
+            # blue/green cutovers without reconfiguration.
+            {{- if and (eq $serviceName "api-gateway") (index $.Values.services "commodities-service") }}
+            - name: COMMODITIES_SERVICE_URL
+              value: "http://{{ include "market-intelligence.fullname" $ }}-commodities-service:{{ index (index $.Values.services "commodities-service") "port" }}"
+            {{- end }}
           resources:
             {{- toYaml $serviceConfig.resources | nindent 12 }}
           livenessProbe:
@@ -141,4 +153,3 @@ spec:
       {{- end }}
 {{- end }}
 {{- end }}
-

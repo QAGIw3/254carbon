@@ -1,0 +1,109 @@
+repositories:
+  - name: ingress-nginx
+    url: https://kubernetes.github.io/ingress-nginx
+  - name: jetstack
+    url: https://charts.jetstack.io
+  - name: hashicorp
+    url: https://helm.releases.hashicorp.com
+  - name: prometheus-community
+    url: https://prometheus-community.github.io/helm-charts
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+  - name: minio
+    url: https://charts.min.io
+  - name: cetic
+    url: https://cetic.github.io/helm-charts
+  - name: open-metadata
+    url: https://helm.open-metadata.org
+  - name: apache-airflow
+    url: https://airflow.apache.org
+
+environments:
+  dev:
+    values:
+      - environments/dev/values/common.yaml
+      - environments/dev/values-ingress.yaml
+      - environments/dev/values-vault.yaml
+      - environments/dev/values-postgres.yaml
+      - environments/dev/values-minio.yaml
+      - environments/dev/values-kafka.yaml
+      - environments/dev/values-observability.yaml
+      - environments/dev/values-nifi.yaml
+      - environments/dev/values-airflow.yaml
+      - environments/dev/values-openmetadata.yaml
+      - environments/dev/values-mlflow.yaml
+      - environments/dev/values-secrets.yaml
+
+releases:
+  - name: ingress-nginx
+    namespace: platform-ingress
+    createNamespace: true
+    chart: ingress-nginx/ingress-nginx
+    values: [releases/ingress-nginx.yaml.gotmpl]
+  - name: cert-manager
+    namespace: platform-ingress
+    createNamespace: true
+    chart: jetstack/cert-manager
+    installed: true
+    values: [releases/cert-manager.yaml]
+  - name: vault
+    namespace: platform-security
+    createNamespace: true
+    chart: hashicorp/vault
+    values: [releases/vault.yaml.gotmpl]
+  - name: kube-prometheus-stack
+    namespace: platform-observability
+    createNamespace: true
+    chart: prometheus-community/kube-prometheus-stack
+    values: [releases/kube-prom-stack.yaml.gotmpl]
+  - name: grafana-resources
+    namespace: platform-observability
+    createNamespace: true
+    chart: ../helm-charts/grafana-resources
+    values: [releases/grafana-resources.yaml]
+  - name: platform-secrets
+    namespace: data-platform
+    createNamespace: true
+    chart: ../helm-charts/platform-secrets
+    values: [releases/platform-secrets.yaml]
+  - name: platform-postgresql
+    namespace: data-platform
+    createNamespace: true
+    chart: bitnami/postgresql
+    installed: false
+    values: [releases/postgresql.yaml]
+  - name: minio
+    namespace: data-platform
+    createNamespace: true
+    chart: minio/minio
+    values: [releases/minio.yaml.gotmpl]
+  - name: minio-buckets-init
+    namespace: data-platform
+    createNamespace: true
+    chart: ../helm-charts/minio-buckets
+    values: [releases/minio-buckets.yaml]
+  - name: kafka
+    namespace: data-platform
+    createNamespace: true
+    chart: bitnami/kafka
+    values: [releases/kafka.yaml.gotmpl]
+  - name: nifi
+    namespace: data-platform
+    createNamespace: true
+    chart: cetic/nifi
+    values: [releases/nifi.yaml.gotmpl]
+  - name: airflow
+    namespace: data-platform
+    createNamespace: true
+    chart: apache-airflow/airflow
+    values: [releases/airflow.yaml.gotmpl]
+  - name: openmetadata
+    namespace: data-platform
+    createNamespace: true
+    chart: open-metadata/openmetadata
+    values: [releases/openmetadata.yaml.gotmpl]
+  - name: mlflow
+    namespace: data-platform
+    createNamespace: true
+    chart: bitnami/mlflow
+    values: [releases/mlflow.yaml.gotmpl]

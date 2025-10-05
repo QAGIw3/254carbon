@@ -1,12 +1,21 @@
 """
 SAF (Sustainable Aviation Fuel) Markets Connector
 
-Ingests Sustainable Aviation Fuel pricing and market data:
-- SAF production costs and pricing
-- SAF certificate trading (book-and-claim systems)
-- Carbon intensity scores and certification
-- Production capacity and utilization
-- Policy-driven demand forecasts
+Overview
+--------
+Publishes SAF fuel pricing and certificate (book‑and‑claim) markets, including
+carbon intensity and capacity signals. This scaffold emits deterministic mock
+series; integrate with production and registry feeds for live operation.
+
+Data Flow
+---------
+Provider/registry feeds → normalize per fuel/certificate → canonical events → Kafka
+
+Configuration
+-------------
+- `production_data_url`, `certificate_registry_url`, `api_key` for live usage.
+- Product/certificate specs in `_register_saf_specifications`.
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

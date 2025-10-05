@@ -55,6 +55,17 @@ services:
         cpu: 187m
         memory: 192Mi
 
+  # Staging replicas/resources for the commodities service
+  commodities-service:
+    replicas: 2
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
   web-hub:
     replicas: 1
     resources:
@@ -83,4 +94,3 @@ pdb:
 # Enable monitoring for staging
 monitoring:
   enabled: true
-

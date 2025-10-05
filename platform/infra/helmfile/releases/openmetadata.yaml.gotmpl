@@ -1,0 +1,25 @@
+ingestion:
+  enabled: true
+server:
+  ingress:
+    enabled: true
+    hosts:
+      - openmetadata.{{ .Environment.Values.baseDomain }}
+  extraEnvs:
+    - name: OPENMETADATA_DB_PASS
+      valueFrom:
+        secretKeyRef:
+          name: {{ .Environment.Values.postgres.openmetadata.connectionSecretName }}
+          key: {{ .Environment.Values.postgres.openmetadata.connectionSecretKey }}
+config:
+  database:
+    host: {{ .Environment.Values.postgres.host }}
+    port: {{ .Environment.Values.postgres.port }}
+    username: {{ .Environment.Values.postgres.openmetadata.username }}
+    password: ${OPENMETADATA_DB_PASS}
+    database: {{ .Environment.Values.postgres.openmetadata.database }}
+    dbScheme: postgres
+mysql:
+  enabled: false
+elasticsearch:
+  enabled: false

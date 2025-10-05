@@ -1,0 +1,4 @@
+primary:
+  persistence:
+    size: 50Gi
+# Release is disabled via helmfile installed: false

@@ -1,11 +1,20 @@
 """
 Kenya Power Market Connector
 
-Integrates with Kenya's renewable-leading power system:
-- Geothermal dominance (40% of grid)
-- Kenya Power spot purchases
-- M-KOPA distributed solar
-- East Africa Power Pool integration
+Overview
+--------
+Publishes market indicators aligned to Kenya’s renewable‑heavy system (notably
+geothermal baseload), simulating spot purchases and demand. This scaffold emits
+deterministic mock series aligned to EAT (UTC+3) and KES.
+
+Data Flow
+---------
+KPLC/EAPP feeds (or mocks) → normalize (KES/MWh, EAT→UTC) → canonical events → Kafka
+
+Configuration
+-------------
+- `api_base`: KPLC endpoint (if integrating live)
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta
@@ -151,4 +160,3 @@ class KenyaConnector(Ingestor):
 if __name__ == "__main__":
     connector = KenyaConnector({"source_id": "kenya_kplc"})
     connector.run()
-

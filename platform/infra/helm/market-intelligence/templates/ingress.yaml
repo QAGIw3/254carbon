@@ -23,7 +23,16 @@ spec:
   rules:
     - host: {{ .Values.ingress.host | quote }}
       http:
+        # Route commodity endpoints directly to the commodities service to
+        # minimize hop count, while keeping the rest of /api on the gateway.
         paths:
+          - path: /api/v1/commodities
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "market-intelligence.fullname" . }}-commodities-service
+                port:
+                  number: {{ index (index .Values.services "commodities-service") "port" }}
           - path: /api
             pathType: Prefix
             backend:

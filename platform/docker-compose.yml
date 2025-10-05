@@ -56,6 +56,16 @@ services:
     volumes:
       - kafka_data:/bitnami/kafka
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   minio:
     image: minio/minio:latest
     ports:
@@ -97,12 +107,41 @@ services:
       CLICKHOUSE_HOST: clickhouse
       KAFKA_BOOTSTRAP: kafka:9092
       PYTHONPATH: /app
+      COMMODITIES_SERVICE_URL: http://commodities-service:8012
     depends_on:
       postgres:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Consolidated commodities service (port 8012) with LOCAL_DEV bypass
+  commodities-service:
+    build:
+      context: ..
+      dockerfile: platform/apps/commodities-service/Dockerfile.dev
+      args:
+        SERVICE_PATH: platform/apps/commodities-service
+    ports:
+      - "8012:8012"
+    volumes:
+      - ..:/workspace
+    working_dir: /workspace/platform/apps/commodities-service
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/market_intelligence
+      CLICKHOUSE_HOST: clickhouse
+      REDIS_HOST: redis
+      LOCAL_DEV: "true"
+      PYTHONPATH: /workspace
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8012", "--reload"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 

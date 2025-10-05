@@ -162,7 +162,16 @@ app.include_router(create_report_router())
 
 # Include commodity-specific endpoints
 from commodity_endpoints import commodity_router
+from commodities_proxy import router as commodities_proxy_router
+
+# Legacy gateway commodity endpoints (kept for back-compat and broader API
+# surface). These continue to work alongside the new consolidated routes.
 app.include_router(commodity_router)
+
+# Consolidated commodities proxy:
+# Forwards /api/v1/commodities/* to the commodities-service while preserving
+# token verification and consistent API surface through the gateway.
+app.include_router(commodities_proxy_router)
 
 # Optionally include analytics endpoints
 if ENABLE_ANALYTICS:

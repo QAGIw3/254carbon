@@ -1,12 +1,21 @@
 """
 Poland TGE (Towarowa Giełda Energii) Connector
 
-Integrates with Polish power exchange:
-- Day-ahead market (RDN)
-- Intraday market (RDB)
-- Capacity market
-- Cross-border flows with Germany
-- Coal-to-gas transition tracking
+Overview
+--------
+Publishes Polish day‑ahead (RDN) and intraday (RDB) market indicators with
+context on cross‑border influence and fuel mix transition. This scaffold emits
+deterministic mock series aligned to CET and PLN units.
+
+Data Flow
+---------
+TGE feeds (or mocks) → normalize (PLN/MWh, CET→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `api_base`: TGE API base
+- `market_type`: `RDN` | `RDB`
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta
@@ -166,4 +175,3 @@ class PolandTGEConnector(Ingestor):
 if __name__ == "__main__":
     connector = PolandTGEConnector({"source_id": "poland_tge", "market_type": "RDN"})
     connector.run()
-

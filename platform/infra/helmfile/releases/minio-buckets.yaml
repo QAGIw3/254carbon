@@ -1,0 +1,8 @@
+buckets:
+  - mlflow
+  - openmetadata
+  - nifi
+minio:
+  endpoint: http://minio.data-platform.svc.cluster.local:9000
+  accessKeySecretName: mlflow-minio
+  secretKeySecretName: mlflow-minio

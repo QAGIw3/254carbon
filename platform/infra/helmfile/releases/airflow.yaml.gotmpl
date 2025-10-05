@@ -1,0 +1,19 @@
+executor: KubernetesExecutor
+airflow:
+  fernetKey: "${FERNET_KEY:?set via Vault injector}"
+  config:
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__KUBERNETES__NAMESPACE: "data-platform"
+web:
+  ingress:
+    enabled: true
+    hosts:
+      - airflow.{{ .Environment.Values.baseDomain }}
+postgresql:
+  enabled: false
+env:
+  - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+    valueFrom:
+      secretKeyRef:
+        name: {{ .Environment.Values.postgres.airflow.connectionSecretName }}
+        key: {{ .Environment.Values.postgres.airflow.connectionSecretKey }}

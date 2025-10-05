@@ -1,15 +1,20 @@
 """
 Peru COES (Comité de Operación Económica del Sistema) Connector
 
-Integrates with Peruvian power market:
-- Marginal cost pricing
-- Mining sector demand (30%)
-- Hydro seasonal variations
-- Natural gas from Camisea
+Overview
+--------
+Publishes Peruvian power indicators reflecting marginal cost dispatch, hydro
+seasonality, mining demand, and Camisea gas effects. This scaffold emits
+deterministic mock series aligned to PET and PEN units.
 
 Data Flow
 ---------
-COES feeds (or mocks) → normalize to canonical tick schema → Kafka topic(s)
+COES feeds (or mocks) → normalize (PEN/MWh, PET→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `api_base`: COES API base (if integrating live)
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta

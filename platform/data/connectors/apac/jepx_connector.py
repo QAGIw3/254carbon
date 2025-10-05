@@ -9,6 +9,13 @@ mapping to canonical schema with JPY currency and JST→UTC normalization.
 Data Flow
 ---------
 JEPX API (or mocks) → parse area/period prices → canonical tick schema → Kafka
+
+Configuration
+-------------
+- `api_base`: JEPX API base
+- `market_type`: `SPOT` | `1WEEK` | `1MONTH`
+- `area`: `SYSTEM` or specific areas (Tokyo, Kansai, etc.)
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta

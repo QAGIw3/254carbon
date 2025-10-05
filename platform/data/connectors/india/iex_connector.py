@@ -1,12 +1,21 @@
 """
 Indian Energy Exchange (IEX) Connector
 
-Integrates with India's premier power exchange covering:
-- Day-Ahead Market (DAM)
-- Real-Time Market (RTM) - hourly  
-- Term-Ahead Market (TAM)
-- Green Market (G-DAM, G-TAM)
-- Renewable Energy Certificates (REC)
+Overview
+--------
+Publishes IEX market data for DAM/RTM/TAM and green products (G‑DAM, G‑TAM),
+along with REC pricing. This scaffold emits deterministic mock series unless
+explicitly wired to IEX endpoints.
+
+Data Flow
+---------
+IEX APIs (or mocks) → normalize per market → canonical events → Kafka
+
+Configuration
+-------------
+- `api_base`: IEX API base
+- `market_type`: `DAM` | `RTM` | `TAM` | `G-DAM` | `G-TAM` | `REC`
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta
@@ -340,4 +349,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = IEXConnector(config)
         connector.run()
-

@@ -1,0 +1,15 @@
+replicaCount: 3
+kraft:
+  enabled: true
+listeners:
+  client:
+    protocol: PLAINTEXT
+metrics:
+  jmx:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+  kafka:
+    enabled: true
+    serviceMonitor:
+      enabled: true

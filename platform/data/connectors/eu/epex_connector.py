@@ -15,6 +15,13 @@ Production Notes
 ----------------
 - Align timestamps to the appropriate local timezone and convert to UTC.
 - Currency is EUR; conversions, if any, should occur downstream consistently.
+
+ Configuration
+ -------------
+ - `api_base`: EPEX API base
+ - `country`: `DE` | `FR` | `AT` | `CH` | `BE` | `NL`
+ - `auction_type`: `DA` (Day‑Ahead) | `ID` (Intraday)
+ - `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta

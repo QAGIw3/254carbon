@@ -1,0 +1,19 @@
+backendStore:
+  database:
+    connection:
+      secretName: {{ .Environment.Values.postgres.mlflow.connectionSecretName }}
+artifacts:
+  s3:
+    enabled: true
+    bucket: mlflow
+    endpoint: http://minio.data-platform.svc.cluster.local:9000
+    accessKey:
+      secretName: mlflow-minio
+    secretKey:
+      secretName: mlflow-minio
+ingress:
+  enabled: true
+  hosts:
+    - mlflow.{{ .Environment.Values.baseDomain }}
+postgresql:
+  enabled: false

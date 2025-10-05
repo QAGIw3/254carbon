@@ -1,0 +1,25 @@
+# AI Service Requirements
+# Consolidated from ai-copilot, nlp-service, regtech-ai
+
+# Web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+python-multipart==0.0.6
+websockets==12.0
+
+# LLM integrations
+openai==1.3.0
+anthropic==0.7.0
+tiktoken==0.5.1
+
+# Vector database / RAG
+chromadb==0.4.18
+langchain==0.0.340
+
+# HTTP client
+httpx==0.25.0
+
+# Utilities
+python-dateutil==2.8.2
+

@@ -9,6 +9,14 @@ with an API key; otherwise emits realistic simulated series for development.
 Data Flow
 ---------
 EMI API (or mocks) → parse series (island/node) → canonical tick schema → Kafka
+
+Configuration
+-------------
+- `api_base`: EMI API base (Azure APIM)
+- `series`: `final_price` | `dispatch_price`
+- `scope`: `island` | `node`; `island` values: `NI` | `SI`
+- `api_key`: Optional subscription key for live usage
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta, timezone

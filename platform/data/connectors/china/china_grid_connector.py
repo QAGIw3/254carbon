@@ -1,12 +1,22 @@
 """
 China National Grid Corporation Power Market Connector
 
-Integrates with China's complex multi-tier electricity market:
-- Beijing & Guangzhou power exchanges
-- 8 regional power grids
-- Provincial spot markets
-- National carbon ETS
-- Green electricity certificates (GEC)
+Overview
+--------
+Publishes indicators spanning national/regional/provincial spot markets, carbon
+ETS, and Green Electricity Certificates (GEC). This scaffold emits deterministic
+mock series; wire to exchange/regulatory endpoints for production.
+
+Data Flow
+---------
+CSPEX/market/regulator feeds (or mocks) → normalize (CNY/MWh, CST→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `api_base`: Exchange/market API base
+- `exchange`: `BEIJING` | `GUANGZHOU`
+- `region`: `EAST` | `NORTH` | `NORTHEAST` | `NORTHWEST` | `CENTRAL` | `SOUTH`
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta
@@ -299,4 +309,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = ChinaGridConnector(config)
         connector.run()
-

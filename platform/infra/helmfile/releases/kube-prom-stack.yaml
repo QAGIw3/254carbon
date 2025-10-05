@@ -1,0 +1,10 @@
+grafana:
+  ingress:
+    enabled: true
+    hosts:
+      - grafana.{{ .Values.baseDomain }}
+prometheus:
+  ingress:
+    enabled: true
+    hosts:
+      - prometheus.{{ .Values.baseDomain }}

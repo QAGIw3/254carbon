@@ -1,7 +1,19 @@
 """
 Romania OPCOM Connector
 
-Day-ahead market with rapid renewable growth
+Overview
+--------
+Publishes Romania day‑ahead market indicators amid rapid renewable growth and
+regional coupling. This scaffold emits deterministic mock series aligned to RON
+and EET/UTC normalization.
+
+Data Flow
+---------
+OPCOM feeds (or mocks) → normalize (RON/MWh, EET→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
 """
 import logging
 from datetime import datetime, timedelta
@@ -103,6 +115,5 @@ class RomaniaOPCOMConnector(Ingestor):
 if __name__ == "__main__":
     connector = RomaniaOPCOMConnector({"source_id": "romania_opcom"})
     connector.run()
-
 
 

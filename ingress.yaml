@@ -17,6 +17,15 @@ spec:
   - host: 254carbon.local
     http:
       paths:
+      # Direct commodity endpoints path routed to the consolidated service
+      # to minimize hops (gateway still proxies the same prefix internally).
+      - path: /api/v1/commodities
+        pathType: Prefix
+        backend:
+          service:
+            name: commodities-service
+            port:
+              number: 8012
       - path: /api
         pathType: Prefix
         backend:

@@ -1,15 +1,19 @@
 """
 Chile CEN (Coordinador Eléctrico Nacional) Connector
 
-Chilean power market with unified national system:
-- Marginal cost pricing
-- Copper mining demand (30%)
-- Solar Atacama Desert
-- Hydro‑thermal coordination
+Overview
+--------
+Publishes Chilean market indicators (marginal cost proxy) for a unified system
+influenced by copper mining demand and high solar penetration. This scaffold
+emits deterministic mock series aligned to CLT and CLP units.
 
 Data Flow
 ---------
-CEN feeds (or mocks) → normalize to canonical tick schema → Kafka topic(s)
+CEN feeds (or mocks) → normalize (CLP/MWh, CLT→UTC) → canonical schema → Kafka
+
+Configuration
+-------------
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
 """
 import logging
 from datetime import datetime, timedelta
@@ -117,5 +121,4 @@ class ChileCENConnector(Ingestor):
 if __name__ == "__main__":
     connector = ChileCENConnector({"source_id": "chile_cen"})
     connector.run()
-
 

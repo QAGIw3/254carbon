@@ -1,0 +1,2 @@
+installCRDs: true
+# TODO: add ClusterIssuer (LetsEncrypt HTTP01) once DNS is in place

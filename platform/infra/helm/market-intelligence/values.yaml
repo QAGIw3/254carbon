@@ -46,7 +46,7 @@ services:
       repository: api-gateway
       tag: "1.0.0"
       pullPolicy: IfNotPresent
-    replicas: 3
+    replicas: 1
     port: 8000
     resources:
       limits:
@@ -123,10 +123,10 @@ services:
     image:
       registry: 254carbon
       repository: backtesting-service
-      tag: "1.0.0"
+      tag: "1.0.1"
       pullPolicy: IfNotPresent
     replicas: 2
-    port: 8003
+    port: 8005
     resources:
       limits:
         cpu: 1000m
@@ -151,6 +151,50 @@ services:
       requests:
         cpu: 250m
         memory: 256Mi
+
+  # Consolidated commodities service (gas, oil, coal, biofuels, battery)
+  commodities-service:
+    enabled: true
+    image:
+      registry: 254carbon
+      repository: commodities-service
+      tag: "1.0.0"
+      pullPolicy: IfNotPresent
+    replicas: 2
+    port: 8012
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+    # Minimal runtime environment for read-only CH access and Redis cache
+    env:
+      - name: ENVIRONMENT
+        value: "production"
+      - name: DATABASE_URL
+        valueFrom:
+          secretKeyRef:
+            name: market-intelligence-secrets
+            key: database-url
+      - name: CLICKHOUSE_HOST
+        value: "clickhouse"
+      - name: REDIS_HOST
+        value: "redis"
+    # Liveness and readiness tuned for fast failure detection
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 8012
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: 8012
+      initialDelaySeconds: 10
+      periodSeconds: 5
 
   web-hub:
     enabled: true
@@ -227,4 +271,3 @@ ingress:
 serviceAccount:
   create: false
   name: ""
-

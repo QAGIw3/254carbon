@@ -20,6 +20,13 @@ Notes
 - The consolidated table response provides a ref date and `HourAndMin` field
   in America/New_York; we convert to UTC.
 - MISORTWD fields `MCC`/`MLC` map to congestion/loss components.
+
+ Configuration
+ -------------
+ - `api_base`: MISORTWD Data Broker base URL
+ - `market_type`: `RT` (5‑min nodal) | `DA` (Ex‑Ante hubs)
+ - `timeout_seconds`, `max_retries`, `retry_backoff_base`: HTTP behavior
+ - `kafka.topic`/`kafka.bootstrap_servers`: Emission settings
 """
 import logging
 from datetime import datetime, timedelta, timezone

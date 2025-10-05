@@ -1,0 +1,10 @@
+executor: KubernetesExecutor
+airflow:
+  fernetKey: "${FERNET_KEY:?set via Vault injector}"
+  config:
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+web:
+  ingress:
+    enabled: true
+    hosts:
+      - airflow.{{ .Values.baseDomain }}
