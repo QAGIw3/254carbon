@@ -1,0 +1,78 @@
+# Updated Ingress Configuration
+# Routes traffic to API Gateway and Streaming Service
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform-ingress
+  namespace: market-intelligence
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "streaming-service"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+  - host: api.254carbon.local
+    http:
+      paths:
+      # REST API routes to API Gateway
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 8000
+      
+      # WebSocket streaming routes to Streaming Service
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: streaming-service
+            port:
+              number: 8001
+      
+      # SSE streaming routes to Streaming Service
+      - path: /sse
+        pathType: Prefix
+        backend:
+          service:
+            name: streaming-service
+            port:
+              number: 8001
+      
+      # Health checks route to API Gateway
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 8000
+      
+      # Cache management routes to API Gateway
+      - path: /api/v1/cache
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 8000
+      
+      # Microservices (internal only, typically not exposed via ingress)
+      # Auth Service - port 8010 (internal)
+      # Entitlements Service - port 8011 (internal)
+      # Metrics Service - port 8012 (internal for collection, expose /metrics for Prometheus)
+      
+      # Optional: Expose metrics for Prometheus scraping
+      - path: /metrics
+        pathType: Exact
+        backend:
+          service:
+            name: metrics-service
+            port:
+              number: 8012
+

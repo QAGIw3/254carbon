@@ -1,0 +1,265 @@
+# All Services Deployment
+# Deploy all new microservices at once
+
+---
+# Auth Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: market-intelligence
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+      - name: auth-service
+        image: qagiw3/auth-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8010
+        env:
+        - name: KEYCLOAK_URL
+          value: http://keycloak:8080/auth/realms/254carbon
+        - name: KEYCLOAK_AUDIENCE
+          value: market-intelligence-api
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: market-intelligence
+spec:
+  selector:
+    app: auth-service
+  ports:
+  - port: 8010
+    targetPort: 8010
+  type: ClusterIP
+
+---
+# Entitlements Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: entitlements-service
+  namespace: market-intelligence
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: entitlements-service
+  template:
+    metadata:
+      labels:
+        app: entitlements-service
+    spec:
+      containers:
+      - name: entitlements-service
+        image: qagiw3/entitlements-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8011
+        env:
+        - name: DATABASE_URL
+          value: postgresql://postgres:postgres@postgresql:5432/market_intelligence
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: entitlements-service
+  namespace: market-intelligence
+spec:
+  selector:
+    app: entitlements-service
+  ports:
+  - port: 8011
+    targetPort: 8011
+  type: ClusterIP
+
+---
+# Metrics Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-service
+  namespace: market-intelligence
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: metrics-service
+  template:
+    metadata:
+      labels:
+        app: metrics-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8012"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: metrics-service
+        image: qagiw3/metrics-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8012
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-service
+  namespace: market-intelligence
+spec:
+  selector:
+    app: metrics-service
+  ports:
+  - port: 8012
+    targetPort: 8012
+  type: ClusterIP
+
+---
+# API Gateway
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: market-intelligence
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: qagiw3/api-gateway:v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          value: postgresql://postgres:postgres@postgresql:5432/market_intelligence
+        - name: CLICKHOUSE_HOST
+          value: clickhouse
+        - name: REDIS_URL
+          value: redis://redis-cluster:6379
+        - name: AUTH_SERVICE_URL
+          value: http://auth-service:8010
+        - name: ENTITLEMENTS_SERVICE_URL
+          value: http://entitlements-service:8011
+        - name: METRICS_SERVICE_URL
+          value: http://metrics-service:8012
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: market-intelligence
+spec:
+  selector:
+    app: api-gateway
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: ClusterIP
+
+---
+# Streaming Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streaming-service
+  namespace: market-intelligence
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: streaming-service
+  template:
+    metadata:
+      labels:
+        app: streaming-service
+    spec:
+      containers:
+      - name: streaming-service
+        image: qagiw3/streaming-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8001
+        env:
+        - name: DATABASE_URL
+          value: postgresql://postgres:postgres@postgresql:5432/market_intelligence
+        - name: CLICKHOUSE_HOST
+          value: clickhouse
+        - name: KAFKA_BOOTSTRAP
+          value: kafka:9092
+        - name: ENABLE_KAFKA
+          value: "true"
+        - name: AUTH_SERVICE_URL
+          value: http://auth-service:8010
+        - name: ENTITLEMENTS_SERVICE_URL
+          value: http://entitlements-service:8011
+        - name: METRICS_SERVICE_URL
+          value: http://metrics-service:8012
+        - name: LOCAL_DEV
+          value: "false"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: streaming-service
+  namespace: market-intelligence
+spec:
+  selector:
+    app: streaming-service
+  ports:
+  - port: 8001
+    targetPort: 8001
+  type: ClusterIP
+
