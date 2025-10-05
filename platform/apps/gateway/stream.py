@@ -7,9 +7,12 @@ import logging
 from typing import Dict, Set, Optional, List
 from fastapi import WebSocket
 import os
-try:
-    from aiokafka import AIOKafkaConsumer
-except Exception:  # pragma: no cover
+if os.getenv("ENABLE_KAFKA", "false").lower() == "true":
+    try:
+        from aiokafka import AIOKafkaConsumer  # type: ignore
+    except Exception:  # pragma: no cover
+        AIOKafkaConsumer = None
+else:
     AIOKafkaConsumer = None
 import avro.schema
 import avro.io

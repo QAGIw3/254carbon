@@ -1,12 +1,27 @@
 """
 EU ETS (European Union Emissions Trading System) Connector
 
-Ingests carbon allowance and futures data from the EU ETS:
-- EUA (European Union Allowance) futures
-- EUAA (European Union Aviation Allowance) futures
-- CER (Certified Emission Reduction) futures
-- ERU (Emission Reduction Unit) futures
-- Daily auction results and settlement prices
+Overview
+--------
+Publishes carbon allowance pricing and futures curves for the EU ETS — covering
+EUA, EUAA, and related instruments. This scaffold documents contract metadata
+and emits development-friendly series; wire to exchange/provider endpoints for
+production.
+
+Data Flow
+---------
+Exchange/provider (EEX/ICE) → normalize curves/auctions → canonical events → Kafka
+
+Configuration
+-------------
+- `eex_api_url` / `ice_api_url`: Provider API base URLs.
+- `api_key`: Credentials for live queries where required.
+- Contract specifications are registered in `_register_eu_ets_contracts`.
+
+Operational Notes
+-----------------
+- Compliance period and sector coverage live in `quality_spec` and can be used
+  downstream to filter instruments for attribution/hedging workflows.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

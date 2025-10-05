@@ -1,12 +1,26 @@
 """
 ICE Natural Gas Futures Connector
 
-Ingests natural gas futures data from Intercontinental Exchange (ICE) for:
-- Henry Hub (US)
-- TTF (Netherlands)
-- NBP (UK)
-- JKM (Japan/Korea Marker)
-- Other European gas hubs
+Overview
+--------
+Publishes natural gas futures curves for Henry Hub, TTF, NBP, JKM, and other
+regional hubs. This scaffold emits representative values for development; wire
+to ICE feeds for production.
+
+Data Flow
+---------
+ICE feed → normalize contracts → canonical curve/price events → Kafka
+
+Configuration
+-------------
+- `api_base_url`/`api_key`/auth fields for live mode; `realtime_enabled`.
+- Contract specifications registered in `_register_gas_contract_specifications`.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- Use base helpers for event creation/rollover to match other commodity
+  connectors and reduce divergence.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

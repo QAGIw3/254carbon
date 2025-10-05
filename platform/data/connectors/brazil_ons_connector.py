@@ -1,11 +1,26 @@
 """
 Brazil ONS (Operador Nacional do Sistema Elétrico) Connector
 
-Ingests Brazilian power market data including:
-- PLD (Preço de Liquidação das Diferenças) - Settlement prices
-- Hydro reservoir levels and inflows
-- Generation by source
-- Four submarkets (SE/CO, S, NE, N)
+Overview
+--------
+Publishes Brazilian power market indicators including PLD (settlement prices),
+hydro reservoir levels/inflows, and generation by source across four submarkets
+(SE/CO, S, NE, N). This scaffold emits deterministic mock series unless wired
+to ONS data endpoints.
+
+Data Flow
+---------
+ONS data (or mocks) → normalize per submarket/metric → canonical events → Kafka
+
+Configuration
+-------------
+- `api_base`/auth when integrating live ONS endpoints.
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
+
+Operational Notes
+-----------------
+- Brazil is hydro‑dominant; PLD shows strong seasonal behavior. The generator
+  reflects that pattern to aid downstream model testing.
 """
 import logging
 from datetime import datetime, timedelta
@@ -412,4 +427,3 @@ if __name__ == "__main__":
         logger.info(f"Testing {config['source_id']}")
         connector = BrazilONSConnector(config)
         connector.run()
-

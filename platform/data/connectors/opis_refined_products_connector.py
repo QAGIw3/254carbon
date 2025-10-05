@@ -1,13 +1,26 @@
 """
 OPIS Refined Products Pricing Connector
 
-Ingests refined petroleum products pricing data from Oil Price Information Service (OPIS):
-- Gasoline prices (regular, premium, diesel)
-- Diesel fuel pricing
-- Jet fuel/kerosene pricing
-- Regional rack prices
-- Wholesale terminal pricing
-- Retail fuel pricing
+Overview
+--------
+Publishes refined products pricing (gasoline, diesel, jet, heating oil) across
+key U.S. locations and rack types. This scaffold emits deterministic mock
+assessments; integrate with OPIS APIs for production.
+
+Data Flow
+---------
+OPIS API → normalize assessments (by product/location) → canonical price events → Kafka
+
+Configuration
+-------------
+- Product/location catalogs registered within the connector.
+- `api_base_url`/`api_key` for live mode.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- Construct location-specific `instrument_id` to differentiate markets
+  unambiguously for downstream analytics.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

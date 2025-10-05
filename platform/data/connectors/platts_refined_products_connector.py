@@ -1,13 +1,26 @@
 """
 Platts Refined Products Connector
 
-Ingests refined petroleum products assessments from S&P Global Platts:
-- Gasoline assessments (CBOB, RBOB)
-- Diesel fuel assessments (ULSD, Gasoil)
-- Jet fuel assessments (Jet A-1, Kerosene)
-- Naphtha and other light ends
-- Heavy fuel oil and residual fuels
-- Petrochemical feedstocks
+Overview
+--------
+Publishes refined products assessments (CBOB, gasoil, naphtha, fuel oil) with
+contract metadata and locations. This scaffold emits deterministic mock values;
+integrate with Platts feeds for production use.
+
+Data Flow
+---------
+Platts feed → normalize assessment (by product/location) → canonical price events → Kafka
+
+Configuration
+-------------
+- Product specification registry within `_register_platts_assessments`.
+- `api_base_url`/`api_key` for live queries.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- Maintain product- and location-specific `instrument_id` mapping for analytics
+  clarity; add differentials and forwards via additional helpers as needed.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

@@ -1,18 +1,32 @@
 """
 GIE AGSI+ Gas Storage Connector
---------------------------------
+---------------------------------
 
+Overview
+--------
 Fetches European gas storage transparency data from the Gas Infrastructure
-Europe (GIE) Aggregated Gas Storage Inventory (AGSI+) API.
+Europe (GIE) Aggregated Gas Storage Inventory (AGSI+) API. Emits canonical
+fundamentals for storage level, injections/withdrawals, and fullness.
 
-Capabilities
-~~~~~~~~~~~~
-- Facility, country, or EU-level granularity (configurable)
-- Emits canonical fundamentals events (market.fundamentals → ClickHouse)
-- Handles rate limits with retries/backoff
-- Persists checkpoints via base Ingestor
+Data Flow
+---------
+AGSI+ API → normalize facility/country/EU entries → canonical fundamentals → Kafka
 
-API reference: https://agsi.gie.eu/
+Configuration
+-------------
+- `api_base`: Base API endpoint (default: https://agsi.gie.eu/api/v1).
+- `api_key`: Required API key for AGSI+ access.
+- `granularity`: `facility` (default) | `country` | `eu`.
+- `entities`: Optional list of facility or country codes to filter.
+- `lookback_days`: Window used to determine start date when no checkpoint.
+- `include_rollups`: When `facility`, also emit country/EU aggregates.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- HTTP calls are retried with exponential backoff and surfaced on failure.
+- Units are normalized to GWh where feasible; unknown units are forwarded.
+- Checkpoints store the last event time to define the next window.
 """
 
 from __future__ import annotations
@@ -77,6 +91,7 @@ class AGSIConnector(Ingestor):
     # ------------------------------------------------------------------
 
     def discover(self) -> Dict[str, Any]:
+        """Describe exposed storage metrics and selected entities."""
         return {
             "source_id": self.source_id,
             "commodity_type": self.commodity_type.value,
@@ -97,6 +112,7 @@ class AGSIConnector(Ingestor):
         }
 
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
+        """Fetch storage rows and yield per-metric events (daily cadence)."""
         start, end = self._determine_window()
         logger.info(
             "Fetching AGSI+ data granularity=%s window=%s→%s entities=%s",
@@ -117,6 +133,7 @@ class AGSIConnector(Ingestor):
             yield from self._record_to_events(record)
 
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """Map a flattened storage record into the canonical event format."""
         ts: datetime = raw["as_of"]
         metric: str = raw["metric"]
         unit: str = raw["unit"]
@@ -147,7 +164,7 @@ class AGSIConnector(Ingestor):
         return payload
 
     def emit(self, events: Iterable[Dict[str, Any]]) -> int:
-        # Events coming from _record_to_events are already flattened dicts
+        """Emit flattened metric events (already normalized)."""
         return super().emit(events)
 
     def checkpoint(self, state: Dict[str, Any]) -> None:
@@ -195,6 +212,7 @@ class AGSIConnector(Ingestor):
         return start.replace(hour=0, minute=0, second=0, microsecond=0), end
 
     def _fetch_records(self, start: datetime, end: datetime) -> Iterator[StorageRecord]:
+        """Query AGSI+ endpoint and yield parsed StorageRecord entries."""
         params = self._build_params(start, end)
         endpoint = self._endpoint_for_granularity()
 
@@ -213,6 +231,7 @@ class AGSIConnector(Ingestor):
                 yield record
 
     def _build_params(self, start: datetime, end: datetime) -> Dict[str, Any]:
+        """Construct request parameters for the selected granularity/entities."""
         params: Dict[str, Any] = {
             "from": start.strftime("%Y-%m-%d"),
             "to": end.strftime("%Y-%m-%d"),

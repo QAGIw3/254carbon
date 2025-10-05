@@ -1,11 +1,28 @@
 """
 EIA Natural Gas Storage Connector
 
-Ingests weekly natural gas storage data from the U.S. Energy Information Administration (EIA):
-- Weekly storage levels by region (Eastern, Western, Producing)
-- Injection and withdrawal rates
-- Historical storage data for seasonal analysis
-- Storage capacity and utilization rates
+Overview
+--------
+Fetches weekly U.S. natural gas storage observations from the EIA (U.S. Energy
+Information Administration). In development this connector emits realistic,
+deterministic mocks; in production it should query EIA v2 series for weekly
+levels and compute injections/withdrawals.
+
+Data Flow
+---------
+EIA API (series-by-region) → normalize weekly levels and changes → canonical fundamentals → Kafka
+
+Configuration
+-------------
+- `eia_api_key`: Required for live EIA requests.
+- Series catalog is registered via `_register_eia_series` (can be extended).
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
+
+Operational Notes
+-----------------
+- EIA publishes weekly storage on Thursdays; `_pull_or_subscribe` aligns
+  the effective gas day to the most recent Thursday.
+- Values are expressed in Bcf; injections/withdrawals derived from weekly deltas.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

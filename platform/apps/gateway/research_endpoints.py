@@ -404,7 +404,7 @@ async def share_research_results(
 @research_router.get("/publications/search")
 async def search_research_publications(
     query: str = Query(..., description="Search query"),
-    filters: Dict[str, Any] = Query(default={}, description="Search filters"),
+    filters: Optional[str] = Query(None, description="JSON string with search filters"),
     limit: int = Query(default=20, description="Maximum results")
 ):
     """Search research publications and papers."""

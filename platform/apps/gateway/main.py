@@ -60,8 +60,11 @@ from caiso_compliance import caiso_compliance_router
 from ux_optimization import add_ux_middleware, add_loading_metadata, create_progressive_response
 from export_endpoints import schedule_export_cleanup
 
-# Optional GraphQL support (disabled by default)
+# Optional feature flags
 ENABLE_GRAPHQL = os.getenv("ENABLE_GRAPHQL", "false").lower() == "true"
+ENABLE_ANALYTICS = os.getenv("ENABLE_ANALYTICS", "false").lower() == "true"
+ENABLE_RESEARCH = os.getenv("ENABLE_RESEARCH", "false").lower() == "true"
+ENABLE_ALERTS = os.getenv("ENABLE_ALERTS", "false").lower() == "true"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -76,8 +79,19 @@ async def lifespan(app: FastAPI):
     """Lifecycle management for the application."""
     logger.info("Starting API Gateway...")
 
-    # Initialize database connections
-    await get_postgres_pool()
+    # Initialize database connections with retry/backoff (resilient dev startup)
+    max_attempts = 6
+    delay_seconds = 2
+    for attempt in range(1, max_attempts + 1):
+        try:
+            await get_postgres_pool()
+            break
+        except Exception as e:
+            logger.warning(f"Postgres init attempt {attempt}/{max_attempts} failed: {e}")
+            if attempt == max_attempts:
+                raise
+            await asyncio.sleep(delay_seconds)
+            delay_seconds = min(delay_seconds * 2, 30)
 
     # Start cache warming asynchronously without blocking startup
     from cache import start_cache_warmers_background
@@ -92,8 +106,10 @@ async def lifespan(app: FastAPI):
     # Start background tasks for MISO pilot features
     logger.info("Starting MISO pilot background services...")
 
-    # Start alert monitoring in background
-    alert_task = asyncio.create_task(run_alert_monitoring())
+    # Start alert monitoring in background (optional)
+    alert_task = None
+    if ENABLE_ALERTS:
+        alert_task = asyncio.create_task(run_alert_monitoring())
 
     # Start scheduled reports (run daily at 6 AM UTC)
     async def scheduled_reports_task():
@@ -119,7 +135,8 @@ async def lifespan(app: FastAPI):
 
     # Cancel background tasks on shutdown
     logger.info("Shutting down API Gateway...")
-    alert_task.cancel()
+    if alert_task:
+        alert_task.cancel()
     reports_task.cancel()
 
     # Cleanup connections
@@ -148,7 +165,6 @@ from commodity_endpoints import commodity_router
 app.include_router(commodity_router)
 
 # Optionally include analytics endpoints
-ENABLE_ANALYTICS = os.getenv("ENABLE_ANALYTICS", "false").lower() == "true"
 if ENABLE_ANALYTICS:
     from analytics_endpoints import analytics_router
     app.include_router(analytics_router)

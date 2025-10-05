@@ -2,17 +2,33 @@
 Global Energy Monitor Transmission Infrastructure Connector
 -----------------------------------------------------------
 
-Fetches transmission infrastructure data from Global Energy Monitor,
-including transmission lines, interconnectors, substations, and
-infrastructure projects.
+Overview
+--------
+Fetches transmission infrastructure data from Global Energy Monitor (GEM),
+including operational lines, interconnectors, substations, and projects.
+In this scaffold, representative samples are used to illustrate the mapping
+to canonical infrastructure events and network topology.
 
-Capabilities
-~~~~~~~~~~~~
-- Transmission line capacities and voltage levels
-- Cross-border interconnections
-- Infrastructure project tracking (planned/under construction)
-- Network topology data
-- Emits canonical infrastructure events
+Data Flow
+---------
+GEM API (or sample) → parse lines/projects/network → canonical fundamentals → Kafka
+
+Configuration
+-------------
+- `api_base`/`api_key`: GEM API settings (if integrating live).
+- `regions`: Regions to include in discovery and fetch.
+- `min_voltage_kv`: Filter for transmission voltage threshold.
+- `include_projects`: Toggle project ingestion.
+- `project_statuses`: Allowed statuses for project emissions.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- The current implementation uses representative data; replace fetch helpers
+  with live API calls when credentials and endpoints are finalized.
+- Voltage class classification aids aggregation/filters in downstream analytics.
+- The connector emits line capacity/voltage/length, basic project metrics, and
+  a topology skeleton for graph-based analyses.
 
 Data source: https://globalenergymonitor.org/
 """
@@ -129,7 +145,7 @@ class GEMTransmissionConnector(InfrastructureConnector):
         self._network_topology: Dict[str, Set[str]] = {}  # node_id -> connected_node_ids
     
     def discover(self) -> Dict[str, Any]:
-        """Discover available data streams."""
+        """Discover available data streams and coverage for observability."""
         
         return {
             "source_id": self.source_id,
@@ -168,7 +184,11 @@ class GEMTransmissionConnector(InfrastructureConnector):
         }
     
     def pull_or_subscribe(self) -> Iterator[Dict[str, Any]]:
-        """Fetch transmission infrastructure data."""
+        """Fetch or synthesize transmission infrastructure data events.
+
+        In live mode, replace sample generators with GEM API requests for lines,
+        projects, and network relationships, then map via the same helpers.
+        """
         
         logger.info(
             "Fetching GEM transmission data for regions=%s min_voltage=%s kV",
@@ -187,7 +207,7 @@ class GEMTransmissionConnector(InfrastructureConnector):
         yield from self._fetch_network_topology()
     
     def map_to_schema(self, raw: Dict[str, Any]) -> Dict[str, Any]:
-        """Map raw data to canonical schema."""
+        """Map raw line/project/network dicts to canonical event payloads."""
         
         data_type = raw.get("data_type")
         

@@ -2,16 +2,31 @@
 NREL RE Data Explorer Connector
 --------------------------------
 
-Fetches renewable energy resource data and project information from the
-National Renewable Energy Laboratory (NREL) RE Data Explorer API.
+Overview
+--------
+Fetches renewable energy resource data and project information from the NREL
+RE Data Explorer API. Provides resource assessments (solar, wind) and a catalog
+of projects for selected regions.
 
-Capabilities
-~~~~~~~~~~~~
-- Solar irradiance (GHI, DNI) and wind speed data by location
-- Existing renewable project database
-- Resource potential mapping
-- Handles geospatial queries and grid-based data
-- Emits canonical infrastructure events
+Data Flow
+---------
+RE Explorer API (or sample) → resource grid/projects → canonical fundamentals → Kafka
+
+Configuration
+-------------
+- `api_key`: Required for live API usage.
+- `regions`: List of region labels for discovery/coverage.
+- `resource_types`: e.g., solar_ghi, solar_dni, wind_speed_100m.
+- `include_projects`: Toggle project ingestion.
+- `grid_bounds`: Optional {lat_min, lat_max, lon_min, lon_max} to scope grids.
+- `lookback_days`: Used for recency checks in some resources.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- This scaffold emits representative data; replace fetch helpers with live API
+  requests and map responses via the provided mappers.
+- A simple in-memory cache avoids redundant API calls within a run.
 
 API reference: https://re-explorer.org/
 """

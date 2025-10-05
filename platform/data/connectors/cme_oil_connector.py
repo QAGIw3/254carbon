@@ -1,8 +1,25 @@
 """
 CME Group Oil Futures Connector
 
-Ingests oil futures data from CME Group for WTI, Brent, and other crude oil contracts.
-Supports real-time and historical data, contract specifications, and rollover logic.
+Overview
+--------
+Publishes crude oil futures curves (e.g., WTI, Brent) with contract metadata
+and rollover logic. This scaffold emits representative values for development;
+integrate with CME feeds for production.
+
+Data Flow
+---------
+CME feed → normalize contracts → canonical curve events → Kafka
+
+Configuration
+-------------
+- Contracts registered in helper (`_register_*`) with exchange/unit details.
+- `kafka.topic`/`kafka.bootstrap_servers` for event emission.
+
+Operational Notes
+-----------------
+- Use base `BaseCommodityConnector` helpers for curve emission and rollover
+  evaluation to ensure consistent mapping across commodity connectors.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

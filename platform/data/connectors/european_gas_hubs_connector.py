@@ -1,14 +1,27 @@
 """
 European Natural Gas Hubs Connector
 
-Ingests natural gas spot and forward prices from major European hubs:
-- TTF (Title Transfer Facility, Netherlands) - Main European benchmark
-- NBP (National Balancing Point, UK)
-- CEGH (Central European Gas Hub, Austria)
-- PSV (Punto di Scambio Virtuale, Italy)
-- PEG (Point d'Échange de Gaz, France)
-- Zeebrugge Hub (Belgium)
-- Gaspool/NCG (Germany)
+Overview
+--------
+Publishes spot (and optionally forward) price assessments for major European
+gas hubs, including TTF, NBP, CEGH, PSV, and PEG. This scaffold emits
+deterministic mock values suitable for development and testing.
+
+Data Flow
+---------
+Exchange/provider (ICE/EEX/etc.) → normalize assessments → canonical price events → Kafka
+
+Configuration
+-------------
+- Hub specifications are registered in `_register_european_hub_specifications`.
+- Units vary by hub (e.g., EUR/MWh vs GBP/therm); mapping handled in `_get_unit_for_hub`.
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
+
+Operational Notes
+-----------------
+- NBP values are converted from €/MWh benchmark to pence/therm using a rough
+  factor for illustrative purposes. Replace with precise conversion logic in
+  production, including FX and calorific assumptions.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

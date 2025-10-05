@@ -1,12 +1,26 @@
 """
 CME Biofuels Futures Connector
 
-Ingests biofuels futures data from Chicago Mercantile Exchange (CME):
-- Ethanol futures (EH) - Corn-based ethanol
-- Biodiesel futures (BD) - Soybean oil-based biodiesel
-- Renewable diesel futures (if available)
-- DDGS (Dried Distillers Grains with Solubles) futures
-- Corn oil futures
+Overview
+--------
+Publishes futures curves and prices for biofuels-related contracts (ethanol,
+biodiesel, DDGS). For development, emits deterministic mock curves; integrate
+with CME market data feeds for production.
+
+Data Flow
+---------
+CME feed → normalize contracts → canonical curve/price events → Kafka
+
+Configuration
+-------------
+- `api_base_url`/`api_key` and `realtime_enabled` for live queries.
+- Contract specifications are registered in `_register_biofuels_contract_specifications`.
+- `kafka.topic`/`kafka.bootstrap_servers` for emission.
+
+Operational Notes
+-----------------
+- Contract metadata in `quality_spec` helps downstream models (e.g., blending,
+  compliance) align instruments across sources.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date
@@ -21,15 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 class CMEBiofuelsConnector(Ingestor):
-    """
-    CME biofuels futures data connector.
-
-    Responsibilities:
-    - Ingest ethanol and biodiesel futures
-    - Handle contract rollover logic for biofuels
-    - Map CME data to canonical schema
-    - Support real-time and historical data
-    """
+    """CME biofuels futures data connector for ethanol/biodiesel/DDGS."""
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)

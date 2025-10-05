@@ -1,12 +1,25 @@
 """
-Argus/McCloskey Coal Price Assessments Connector
+Argus/McCloskey Coal Assessments Connector
 
-Ingests coal price assessments from Argus Media and McCloskey:
-- Physical coal prices at major ports
-- Regional coal assessments
-- Quality-adjusted pricing
-- Freight-inclusive assessments
-- Coal derivatives pricing
+Overview
+--------
+Publishes coal price assessments from Argus Media and McCloskey, including
+physical prices and regional indices. This scaffold emits deterministic mock
+assessments for development; swap to licensed feeds for production.
+
+Data Flow
+---------
+Provider (Argus/McCloskey) → normalize assessment → canonical price event → Kafka
+
+Configuration
+-------------
+- `kafka.topic`/`kafka.bootstrap_servers`: Emission settings.
+- Contract specifications registered via class setup; extend as needed.
+
+Operational Notes
+-----------------
+- Use location-specific instrument identifiers for assessments with distinct
+  delivery bases (e.g., ARA vs FOB Newcastle) to preserve analytics semantics.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date
@@ -21,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 class ArgusCoalConnector(Ingestor):
-    """
+    """Connector scaffold for Argus/McCloskey coal assessments."""
     Argus/McCloskey coal price assessments connector.
 
     Responsibilities:

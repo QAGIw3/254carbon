@@ -1,13 +1,26 @@
 """
 Voluntary Carbon Markets Connector
 
-Ingests voluntary carbon credit pricing from major registries and exchanges:
-- Gold Standard credits
-- Verra (VCS) credits
-- American Carbon Registry credits
-- Climate Action Reserve credits
-- Cross-registry price comparisons
-- Project-specific credit pricing
+Overview
+--------
+Publishes voluntary carbon credit pricing across major registries and standards
+(Gold Standard, Verra VCS, ACR, CAR). This scaffold emits deterministic values
+for development; integrate with exchange/registry feeds for production.
+
+Data Flow
+---------
+Registry/exchange feeds → normalize per-standard → canonical price events → Kafka
+
+Configuration
+-------------
+- Registry endpoints/keys for live mode.
+- Contract specs registered in `_register_voluntary_carbon_contracts`.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- Capture standard, methodology, and project-type metadata in `quality_spec`
+  to support downstream comparability and filtering.
 """
 import logging
 from datetime import datetime, timedelta, timezone, date

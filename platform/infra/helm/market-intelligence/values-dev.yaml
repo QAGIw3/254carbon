@@ -36,6 +36,28 @@ services:
         value: "true"
       - name: ENABLE_RESEARCH
         value: "true"
+      - name: ENABLE_ALERTS
+        value: "false"
+      - name: CLICKHOUSE_HOST
+        value: "clickhouse"
+      - name: CLICKHOUSE_PORT
+        value: "9000"
+    readinessProbe:
+      httpGet:
+        path: /health
+        port: 8000
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 2
+      failureThreshold: 6
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 8000
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 3
     resources:
       limits:
         cpu: 500m

@@ -16,6 +16,16 @@ Operational Notes
 -----------------
 - Enable live calls per‑endpoint via config flags (e.g., ``use_live_pool``) and
   fall back to mocks if upstream is unavailable.
+
+ Data Flow
+ ---------
+ AESO API (or mocks) → normalize per product (SMP/AIL/flows) → canonical events → Kafka
+
+ Configuration
+ -------------
+ - `api_base` and per-endpoint toggles for live vs. mock.
+ - `kafka.topic`/`kafka.bootstrap_servers` for emission.
+ - Optional auth header: `Authorization: Bearer <token>` or `x-api-key`.
 """
 import logging
 from datetime import datetime, timedelta, timezone

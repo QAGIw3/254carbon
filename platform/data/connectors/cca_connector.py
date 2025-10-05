@@ -1,12 +1,26 @@
 """
 California Carbon Allowances (CCA) Connector
 
-Ingests carbon allowance data from the California Cap-and-Trade Program:
-- CCA futures and options
-- Quarterly auction results
-- Compliance instrument trading
-- Offset credit pricing
-- Reserve tier pricing
+Overview
+--------
+Publishes CCA market data (futures, auctions, offsets) for the California
+Cap-and-Trade Program. This scaffold emits development-friendly payloads;
+integrate with exchange/provider APIs and CARB datasets for production.
+
+Data Flow
+---------
+Exchange/provider (ICE/CARB) → normalize curves/auctions → canonical events → Kafka
+
+Configuration
+-------------
+- Provider endpoints (ICE) and CARB auction sources when live.
+- Contract specifications registered in helper methods.
+- `kafka.topic`/`kafka.bootstrap_servers`.
+
+Operational Notes
+-----------------
+- Include program nuances (reserve tiers, offset eligibility) in `quality_spec`
+  for downstream analytics (compliance cost, inventory valuation).
 """
 import logging
 from datetime import datetime, timedelta, timezone, date
@@ -21,15 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 class CCAConnector(Ingestor):
-    """
-    California Carbon Allowances connector.
-
-    Responsibilities:
-    - Ingest CCA futures from ICE
-    - Handle auction results and compliance data
-    - Map California Cap-and-Trade data to canonical schema
-    - Track reserve tier pricing and offset credits
-    """
+    """CCA allowance connector scaffold with auctions and futures coverage."""
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
