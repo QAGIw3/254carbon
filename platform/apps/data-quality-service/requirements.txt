@@ -6,6 +6,6 @@ numpy==1.26.4
 scikit-learn==1.5.1
 scipy==1.13.1
 kafka-python==2.0.2
-openlineage-python==1.20.0
+openlineage-python==1.20.6
 pyyaml==6.0.2
 

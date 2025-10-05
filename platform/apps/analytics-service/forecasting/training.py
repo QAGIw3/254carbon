@@ -22,9 +22,18 @@ from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, r2_score
 
 # Transformer model imports
-from deep_learning import MultiCommodityTransformer
-from models import TransformerPriceForecastModel
-from multimodal_dataset import MultiModalDataset
+try:
+    from .deep_learning import MultiCommodityTransformer
+except Exception:
+    from deep_learning import MultiCommodityTransformer  # fallback
+try:
+    from .models import TransformerPriceForecastModel
+except Exception:
+    from models import TransformerPriceForecastModel  # fallback
+try:
+    from .multimodal_dataset import MultiModalDataset
+except Exception:
+    from multimodal_dataset import MultiModalDataset  # fallback
 
 logger = logging.getLogger(__name__)
 

@@ -95,6 +95,8 @@ services:
   backtesting-service:
     image:
       registry: ""
+      repository: backtesting-service
+      tag: "1.0.1"
     replicas: 1
     port: 8005
     resources:
