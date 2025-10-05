@@ -82,6 +82,40 @@ test:lmp-decomposition:
     changes:
       - platform/apps/lmp-decomposition-service/**/*
 
+test:libs-python:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - cd libs/python
+    - pip install poetry
+    - poetry install
+    - poetry run pytest
+  only:
+    changes:
+      - libs/python/**
+
+test:libs-js:
+  stage: test
+  image: node:20
+  script:
+    - cd libs/js
+    - npm install
+    - npm test
+  only:
+    changes:
+      - libs/js/**
+
+test:edge-gateway-contracts:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - pip install schemathesis httpx
+    - schemathesis run contracts/http/edge-gateway/openapi.yaml --checks=all
+  only:
+    changes:
+      - services/edge-gateway/**
+      - contracts/http/edge-gateway/**
+
 # ==============================================================================
 # BUILD STAGE
 # ==============================================================================

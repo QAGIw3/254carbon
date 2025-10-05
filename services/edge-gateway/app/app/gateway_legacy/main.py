@@ -1,0 +1,844 @@
+"""
+API Gateway Service
+
+Responsibilities
+- AuthN/Z via Keycloak OIDC and entitlement checks
+- Core REST endpoints: instruments, ticks, forward curves, fundamentals
+- WebSocket streaming of live market ticks with Kafka fan-out
+- UX optimization middleware and adaptive caching hooks
+- Background services (alerts, scheduled reports) managed in lifespan
+
+Design notes
+- Uses async DB clients (PostgreSQL, ClickHouse) and caches hot endpoints
+- Streams either mock or Kafka-backed data depending on environment
+- Splits MISO/CAISO specialized routers for clarity and pilots
+"""
+import asyncio
+import logging
+import os
+import sys
+from contextlib import asynccontextmanager
+from datetime import date, datetime, timedelta
+from typing import Optional
+
+import uvicorn
+from fastapi import FastAPI, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
+from fastapi import Request
+from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+# Import modules using absolute imports
+import sys
+import os
+
+# Add current directory to path for absolute imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# Use absolute imports
+from auth import verify_token, has_permission
+from db import get_clickhouse_client, get_postgres_pool
+from entitlements import check_entitlement
+from metrics import track_request, track_latency
+from stream import StreamManager
+from websocket_auth import verify_ws_token
+from cache import (
+    CacheStrategy,
+    cache_invalidate,
+    cache_response,
+    create_cache_decorator,
+    start_cache_warmers_background,
+    get_cache_manager,
+)
+from miso_endpoints import miso_router
+from report_service import create_report_router, run_scheduled_reports
+from alert_service import alerts_router, run_alert_monitoring
+from caiso_compliance import caiso_compliance_router
+from ux_optimization import add_ux_middleware, add_loading_metadata, create_progressive_response
+from export_endpoints import schedule_export_cleanup
+
+# Optional feature flags
+ENABLE_GRAPHQL = os.getenv("ENABLE_GRAPHQL", "false").lower() == "true"
+ENABLE_ANALYTICS = os.getenv("ENABLE_ANALYTICS", "false").lower() == "true"
+ENABLE_RESEARCH = os.getenv("ENABLE_RESEARCH", "false").lower() == "true"
+ENABLE_ALERTS = os.getenv("ENABLE_ALERTS", "false").lower() == "true"
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Stream manager for WebSocket connections
+stream_manager = StreamManager()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifecycle management for the application."""
+    logger.info("Starting API Gateway...")
+
+    # Initialize database connections with retry/backoff (resilient dev startup)
+    max_attempts = 6
+    delay_seconds = 2
+    for attempt in range(1, max_attempts + 1):
+        try:
+            await get_postgres_pool()
+            break
+        except Exception as e:
+            logger.warning(f"Postgres init attempt {attempt}/{max_attempts} failed: {e}")
+            if attempt == max_attempts:
+                raise
+            await asyncio.sleep(delay_seconds)
+            delay_seconds = min(delay_seconds * 2, 30)
+
+    # Start cache warming asynchronously without blocking startup
+    from cache import start_cache_warmers_background
+    start_cache_warmers_background(asyncio.get_running_loop())
+
+    # Schedule periodic export cleanup (best-effort)
+    try:
+        schedule_export_cleanup(asyncio.get_running_loop())
+    except Exception as e:
+        logger.error(f"Failed to schedule export cleanup: {e}")
+
+    # Start background tasks for MISO pilot features
+    logger.info("Starting MISO pilot background services...")
+
+    # Start alert monitoring in background (optional)
+    alert_task = None
+    if ENABLE_ALERTS:
+        alert_task = asyncio.create_task(run_alert_monitoring())
+
+    # Start scheduled reports (run daily at 6 AM UTC)
+    async def scheduled_reports_task():
+        while True:
+            now = datetime.utcnow()
+            # Run reports at 6 AM UTC daily
+            target_time = now.replace(hour=6, minute=0, second=0, microsecond=0)
+            if now >= target_time:
+                target_time = target_time + timedelta(days=1)
+
+            sleep_seconds = (target_time - now).total_seconds()
+            await asyncio.sleep(sleep_seconds)
+
+            try:
+                await run_scheduled_reports()
+            except Exception as e:
+                logger.error(f"Error running scheduled reports: {e}")
+
+    reports_task = asyncio.create_task(scheduled_reports_task())
+
+    logger.info("API Gateway started successfully")
+    yield
+
+    # Cancel background tasks on shutdown
+    logger.info("Shutting down API Gateway...")
+    if alert_task:
+        alert_task.cancel()
+    reports_task.cancel()
+
+    # Cleanup connections
+    await stream_manager.shutdown()
+
+
+# Create FastAPI application
+app = FastAPI(
+    title="254Carbon Market Intelligence API",
+    description="Real-time energy and commodity market data, curves, and forecasts",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# Include MISO-specific endpoints
+app.include_router(miso_router)
+
+# Include CAISO-specific endpoints
+app.include_router(caiso_compliance_router)
+
+# Include report endpoints
+app.include_router(create_report_router())
+
+# Include commodity-specific endpoints
+from commodity_endpoints import commodity_router
+from commodities_proxy import router as commodities_proxy_router
+
+# Legacy gateway commodity endpoints (kept for back-compat and broader API
+# surface). These continue to work alongside the new consolidated routes.
+app.include_router(commodity_router)
+
+# Consolidated commodities proxy:
+# Forwards /api/v1/commodities/* to the commodities-service while preserving
+# token verification and consistent API surface through the gateway.
+app.include_router(commodities_proxy_router)
+
+# Optionally include analytics endpoints
+if ENABLE_ANALYTICS:
+    from analytics_endpoints import analytics_router
+    app.include_router(analytics_router)
+
+# Include research endpoints
+from export_endpoints import router as export_router
+app.include_router(export_router)
+
+# Optionally include research endpoints
+ENABLE_RESEARCH = os.getenv("ENABLE_RESEARCH", "false").lower() == "true"
+if ENABLE_RESEARCH:
+    from research_endpoints import research_router
+    app.include_router(research_router)
+
+# Include alerts endpoints
+app.include_router(alerts_router)
+
+# Add UX optimization middleware
+add_ux_middleware(app)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Web Hub
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Models
+class HealthResponse(BaseModel):
+    status: str
+    timestamp: datetime
+    services: dict
+
+
+class InstrumentResponse(BaseModel):
+    instrument_id: str
+    market: str
+    product: str
+    location_code: str
+    timezone: str
+    unit: str
+    currency: str
+
+
+class TickResponse(BaseModel):
+    event_time: datetime
+    instrument_id: str
+    location_code: str
+    price_type: str
+    value: float
+    volume: Optional[float]
+    currency: str
+    unit: str
+    source: str
+
+
+class CurvePoint(BaseModel):
+    delivery_start: date
+    delivery_end: date
+    tenor_type: str
+    price: float
+    currency: str
+    unit: str
+
+
+# Health check
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint."""
+    services = {
+        "clickhouse": "healthy",
+        "postgres": "healthy",
+        "kafka": "healthy",
+    }
+    return HealthResponse(
+        status="healthy",
+        timestamp=datetime.utcnow(),
+        services=services,
+    )
+
+
+if ENABLE_GRAPHQL:
+    # GraphQL endpoints
+    @app.get("/graphql")
+    async def graphql_playground():
+        """GraphQL Playground for interactive queries."""
+        return JSONResponse(content={
+            "message": "GraphQL Playground available",
+            "endpoint": "/graphql",
+            "docs": "Use GraphQL queries at /graphql endpoint"
+        })
+
+    @app.post("/graphql")
+    async def graphql_endpoint(request: dict):
+        """GraphQL endpoint with authentication and caching."""
+        try:
+            # Extract query from request
+            query = request.get("query")
+            variables = request.get("variables", {})
+            operation_name = request.get("operationName")
+
+            if not query:
+                raise HTTPException(status_code=400, detail="Query is required")
+
+            # This part of the code was removed as per the edit hint.
+            # from graphql_schema import schema
+            # result = await schema.execute_async(
+            #     query,
+            #     variable_values=variables,
+            #     operation_name=operation_name,
+            #     context_value={"request": request}
+            # )
+
+            # # Handle errors
+            # if result.errors:
+            #     logger.error(f"GraphQL errors: {result.errors}")
+            #     raise HTTPException(status_code=400, detail=str(result.errors[0]))
+
+            # return JSONResponse(content=result.data)
+            # Placeholder for actual GraphQL execution
+            return JSONResponse(content={"message": "GraphQL endpoint is enabled but not fully implemented."})
+
+        except Exception as e:
+            logger.error(f"GraphQL execution error: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    @app.websocket("/graphql-ws")
+    async def graphql_websocket(websocket: WebSocket):
+        """GraphQL WebSocket endpoint for subscriptions."""
+        await websocket.accept()
+
+        try:
+            while True:
+                # Receive subscription request
+                await websocket.receive_json()
+                # Send initial response
+                await websocket.send_json({"type": "connection_ack"})
+                # Keep connection alive
+                while True:
+                    await asyncio.sleep(30)
+                    await websocket.send_json({"type": "ka"})
+        except WebSocketDisconnect:
+            logger.info("GraphQL WebSocket disconnected")
+        except Exception as e:
+            logger.error(f"GraphQL WebSocket error: {e}")
+
+
+# Cache statistics endpoint (for monitoring)
+@app.get("/api/v1/cache/stats")
+async def get_cache_stats(user=Depends(verify_token)):
+    """Get Redis cache statistics."""
+    track_request("get_cache_stats")
+
+    try:
+        manager = get_cache_manager()
+        stats = await manager.get_stats()
+
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow(),
+            "stats": stats
+        }
+    except Exception as e:
+        logger.error(f"Error fetching cache stats: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Cache warming endpoint (for manual cache warming)
+@app.post("/api/v1/cache/warm")
+async def warm_cache(
+    pattern: Optional[str] = None,
+    user=Depends(verify_token),
+):
+    """Warm cache for specified patterns or all patterns."""
+    track_request("warm_cache")
+
+    try:
+        manager = get_cache_manager()
+
+        if pattern:
+            # Warm specific pattern
+            success = await manager.warm_cache(pattern)
+            return {
+                "status": "success" if success else "failed",
+                "pattern": pattern,
+                "timestamp": datetime.utcnow()
+            }
+        else:
+            # Warm all patterns
+            results = await manager.warm_all_cache()
+            return {
+                "status": "completed",
+                "results": results,
+                "timestamp": datetime.utcnow()
+            }
+    except Exception as e:
+        logger.error(f"Error warming cache: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Instruments endpoint
+@app.get("/api/v1/instruments", response_model=list[InstrumentResponse])
+@cache_response("instruments", CacheStrategy.SEMI_STATIC)
+async def get_instruments(
+    market: Optional[str] = None,
+    product: Optional[str] = None,
+    user=Depends(verify_token),
+):
+    """Get available instruments."""
+    track_request("get_instruments")
+    
+    try:
+        pool = await get_postgres_pool()
+        async with pool.acquire() as conn:
+            query = "SELECT * FROM pg.instrument WHERE 1=1"
+            params = []
+            
+            if market:
+                query += " AND market = $1"
+                params.append(market)
+            if product:
+                query += f" AND product = ${len(params) + 1}"
+                params.append(product)
+            
+            rows = await conn.fetch(query, *params)
+            
+            instruments = [
+                InstrumentResponse(
+                    instrument_id=row["instrument_id"],
+                    market=row["market"],
+                    product=row["product"],
+                    location_code=row["location_code"],
+                    timezone=row["timezone"],
+                    unit=row["unit"],
+                    currency=row["currency"],
+                )
+                for row in rows
+            ]
+            
+            return instruments
+    except Exception as e:
+        logger.error(f"Error fetching instruments: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Price ticks endpoint
+@app.get("/api/v1/prices/ticks", response_model=list[TickResponse])
+@cache_response("price_ticks", CacheStrategy.DYNAMIC)
+async def get_price_ticks(
+    instrument_id: list[str] = Query(...),
+    start_time: datetime = Query(...),
+    end_time: datetime = Query(...),
+    price_type: str = Query("mid"),
+    user=Depends(verify_token),
+):
+    """Get historical price ticks."""
+    track_request("get_price_ticks")
+    
+    # Check entitlements
+    for inst_id in instrument_id:
+        if not await check_entitlement(user, inst_id, "api"):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Not entitled to API access for {inst_id}",
+            )
+    
+    try:
+        ch_client = get_clickhouse_client()
+        
+        query = """
+        SELECT 
+            event_time,
+            instrument_id,
+            location_code,
+            price_type,
+            value,
+            volume,
+            currency,
+            unit,
+            source
+        FROM market_intelligence.market_price_ticks
+        WHERE instrument_id IN %(ids)s
+          AND event_time BETWEEN %(start)s AND %(end)s
+          AND price_type = %(price_type)s
+        ORDER BY event_time DESC
+        LIMIT 10000
+        """
+        
+        result = ch_client.execute(
+            query,
+            {
+                "ids": tuple(instrument_id),
+                "start": start_time,
+                "end": end_time,
+                "price_type": price_type,
+            },
+        )
+        
+        ticks = [
+            TickResponse(
+                event_time=row[0],
+                instrument_id=row[1],
+                location_code=row[2],
+                price_type=row[3],
+                value=row[4],
+                volume=row[5],
+                currency=row[6],
+                unit=row[7],
+                source=row[8],
+            )
+            for row in result
+        ]
+        
+        return ticks
+    except Exception as e:
+        logger.error(f"Error fetching ticks: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Forward curves endpoint
+@app.get("/api/v1/curves/forward", response_model=list[CurvePoint])
+@cache_response("forward_curves", CacheStrategy.SEMI_STATIC)
+async def get_forward_curves(
+    instrument_id: list[str] = Query(...),
+    as_of_date: date = Query(...),
+    scenario_id: str = Query("BASE"),
+    user=Depends(verify_token),
+):
+    """Get forward curve points."""
+    track_request("get_forward_curves")
+    
+    # Check entitlements
+    for inst_id in instrument_id:
+        if not await check_entitlement(user, inst_id, "api"):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Not entitled to API access for {inst_id}",
+            )
+    
+    try:
+        ch_client = get_clickhouse_client()
+        
+        query = """
+        SELECT 
+            delivery_start,
+            delivery_end,
+            tenor_type,
+            price,
+            currency,
+            unit
+        FROM market_intelligence.forward_curve_points
+        WHERE instrument_id IN %(ids)s
+          AND as_of_date = %(date)s
+          AND scenario_id = %(scenario)s
+        ORDER BY delivery_start
+        """
+        
+        result = ch_client.execute(
+            query,
+            {
+                "ids": tuple(instrument_id),
+                "date": as_of_date,
+                "scenario": scenario_id,
+            },
+        )
+        
+        points = [
+            CurvePoint(
+                delivery_start=row[0],
+                delivery_end=row[1],
+                tenor_type=row[2],
+                price=row[3],
+                currency=row[4],
+                unit=row[5],
+            )
+            for row in result
+        ]
+        
+        return points
+    except Exception as e:
+        logger.error(f"Error fetching curves: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Fundamentals endpoint
+@app.get("/api/v1/fundamentals")
+async def get_fundamentals(
+    market: str = Query(...),
+    entity_id: str = Query(...),
+    variable: str = Query(...),
+    start_ts: datetime = Query(...),
+    end_ts: datetime = Query(...),
+    scenario_id: str = Query("BASE"),
+    user=Depends(verify_token),
+):
+    """Get fundamentals time series."""
+    track_request("get_fundamentals")
+    
+    try:
+        ch_client = get_clickhouse_client()
+        
+        query = """
+        SELECT 
+            ts,
+            entity_id,
+            variable,
+            value,
+            unit,
+            scenario_id,
+            source
+        FROM market_intelligence.fundamentals_series
+        WHERE market = %(market)s
+          AND entity_id = %(entity_id)s
+          AND variable = %(variable)s
+          AND ts BETWEEN %(start)s AND %(end)s
+          AND scenario_id = %(scenario)s
+        ORDER BY ts
+        """
+        
+        result = ch_client.execute(
+            query,
+            {
+                "market": market,
+                "entity_id": entity_id,
+                "variable": variable,
+                "start": start_ts,
+                "end": end_ts,
+                "scenario": scenario_id,
+            },
+        )
+        
+        return [
+            {
+                "ts": row[0],
+                "entity_id": row[1],
+                "variable": row[2],
+                "value": row[3],
+                "unit": row[4],
+                "scenario_id": row[5],
+                "source": row[6],
+            }
+            for row in result
+        ]
+    except Exception as e:
+        logger.error(f"Error fetching fundamentals: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# WebSocket streaming endpoint
+@app.websocket("/api/v1/stream")
+async def websocket_stream(websocket: WebSocket):
+    """Real-time price streaming via WebSocket."""
+    await websocket.accept()
+
+    instrument_ids = []
+
+    try:
+        # Authenticate
+        auth_msg = await websocket.receive_json()
+
+        if auth_msg.get("type") == "subscribe":
+            instrument_ids = auth_msg.get("instruments", [])
+            commodity_types = auth_msg.get("commodities", [])
+            subscribe_all = bool(auth_msg.get("all", False))
+            api_key = auth_msg.get("api_key")
+
+            # Production: validate JWT; Dev: allow dev-key
+            if os.getenv("LOCAL_DEV", "true") != "true":
+                try:
+                    await verify_ws_token(api_key)
+                except Exception:
+                    await websocket.send_json({"type": "error", "message": "Unauthorized"})
+                    await websocket.close()
+                    return
+
+            # Optional entitlement checks in production
+            if os.getenv("LOCAL_DEV", "true") != "true":
+                # verify_ws_token already validated; reuse its claims for entitlements
+                try:
+                    user_claims = await verify_ws_token(api_key)
+                except Exception:
+                    await websocket.send_json({"type": "error", "message": "Unauthorized"})
+                    await websocket.close()
+                    return
+
+                for inst_id in instrument_ids:
+                    entitled = await check_entitlement(user_claims, inst_id, "stream")
+                    if not entitled:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"Not entitled to stream {inst_id}"
+                        })
+                        await websocket.close()
+                        return
+
+            # Register connection
+            await stream_manager.register(websocket, instrument_ids, commodity_types=commodity_types, subscribe_all=subscribe_all)
+
+            # Send confirmation
+            await websocket.send_json({
+                "type": "subscribed",
+                "instruments": instrument_ids,
+                "commodities": commodity_types,
+                "all": subscribe_all,
+                "message": f"Subscribed to {len(instrument_ids)} instruments"
+            })
+
+            # Start streaming mock data for local development
+            if os.getenv("LOCAL_DEV", "true") == "true":
+                await stream_mock_data(websocket, instrument_ids)
+            else:
+                # In production, would stream from Kafka
+                await stream_kafka_data(websocket, instrument_ids)
+
+        else:
+            await websocket.send_json({
+                "type": "error",
+                "message": "Invalid subscription message"
+            })
+
+    except WebSocketDisconnect:
+        await stream_manager.unregister(websocket)
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        await stream_manager.unregister(websocket)
+
+
+async def stream_mock_data(websocket: WebSocket, instrument_ids: list[str]):
+    """Stream mock price data for local development."""
+    import random
+    import json
+
+    while True:
+        try:
+            # Generate mock price updates
+            for instrument_id in instrument_ids:
+                # Generate realistic price based on instrument
+                if "MISO" in instrument_id:
+                    base_price = 35.0
+                elif "PJM" in instrument_id:
+                    base_price = 40.0
+                elif "CAISO" in instrument_id:
+                    base_price = 45.0
+                else:
+                    base_price = 40.0
+
+                # Add some random variation
+                price = base_price + random.uniform(-2, 2)
+                price = max(0, price)  # Ensure non-negative
+
+                price_update = {
+                    "type": "price_update",
+                    "data": {
+                        "instrument_id": instrument_id,
+                        "value": round(price, 2),
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "source": "mock",
+                        "market": "power",
+                        "product": "lmp"
+                    }
+                }
+
+                await websocket.send_json(price_update)
+
+            # Send updates every 5 seconds
+            await asyncio.sleep(5)
+
+        except WebSocketDisconnect:
+            break
+        except Exception as e:
+            logger.error(f"Error streaming mock data: {e}")
+            break
+
+
+async def stream_kafka_data(websocket: WebSocket, instrument_ids: list[str]):
+    """Stream real price data from Kafka (placeholder)."""
+    # In production, this would consume from Kafka and filter for subscribed instruments
+    # For now, just send periodic heartbeat
+    while True:
+        try:
+            await websocket.send_json({
+                "type": "heartbeat",
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            await asyncio.sleep(30)
+        except WebSocketDisconnect:
+            break
+
+
+# Server-Sent Events endpoint for real-time streaming over HTTP
+@app.get("/api/v1/stream/sse")
+async def sse_stream(
+    request: Request,
+    instruments: list[str] = Query(default=[]),
+    commodities: list[str] = Query(default=[]),
+    all: bool = Query(default=False, description="Subscribe to all instrument updates"),
+    user=Depends(verify_token),
+):
+    """HTTP SSE endpoint for real-time price updates.
+
+    Emits event-stream data frames with periodic keep-alives. Supports filters by
+    instrument IDs or commodity types, and wildcard subscription.
+    """
+    # Optional entitlement checks can be added here using 'user'
+
+    queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
+    await stream_manager.register_http(queue, instruments, commodity_types=commodities, subscribe_all=all)
+
+    async def event_generator():
+        try:
+            # Initial ack
+            yield "event: subscribed\n".encode("utf-8")
+            payload = json.dumps({"instruments": instruments, "commodities": commodities, "all": all})
+            yield f"data: {payload}\n\n".encode("utf-8")
+
+            keepalive_interval = 15
+            last_sent = asyncio.get_event_loop().time()
+
+            while True:
+                # Heartbeat keep-alive
+                now = asyncio.get_event_loop().time()
+                if now - last_sent >= keepalive_interval:
+                    yield b":ka\n\n"
+                    last_sent = now
+
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=keepalive_interval)
+                    data = json.dumps(item, default=str)
+                    yield f"data: {data}\n\n".encode("utf-8")
+                    last_sent = asyncio.get_event_loop().time()
+                except asyncio.TimeoutError:
+                    # Will emit keepalive above
+                    continue
+
+                if await request.is_disconnected():
+                    break
+        finally:
+            await stream_manager.unregister_http(queue)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# Error handlers
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """Standard error response format."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "type": "about:blank",
+            "title": exc.detail,
+            "status": exc.status_code,
+            "detail": exc.detail,
+        },
+    )
+
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info",
+    )

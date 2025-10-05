@@ -9,10 +9,20 @@ python = ">=3.10,<3.13"
 fastapi = "^0.104.0"
 uvicorn = "^0.24.0"
 carbon254-libs-python = { path = "../../libs/python", develop = true }
+httpx = "^0.27.0"
+asyncpg = "^0.29.0"
+clickhouse-driver = "^0.2.6"
+prometheus-client = "^0.19.0"
+python-jose = "^3.3.0"
+cachetools = "^5.3.2"
+jinja2 = "^3.1.2"
+pydantic = "^2.5.3"
+strawberry-graphql = "^0.209.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"
 httpx = "^0.27.0"
+schemathesis = "^3.20.2"
 
 [build-system]
 requires = ["poetry-core>=1.6.0"]

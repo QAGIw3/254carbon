@@ -464,3 +464,7 @@ This software is confidential and proprietary to 254Carbon. Unauthorized copying
 ---
 
 **Built with ❤️ by the 254Carbon team**
+
+### Infrastructure Alignment
+- Helmfile under `infra/helmfile` is the source of truth for deployments.
+- Root-level Kubernetes manifests (`*-deployment.yaml`) are moved to `docs/architecture/*.bak` pending deprecation; use Helmfile for all new changes.
