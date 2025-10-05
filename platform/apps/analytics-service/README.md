@@ -19,6 +19,14 @@ This service consolidates the following previous services:
 5. **satellite-intel** → Satellite Module
 6. **quantum-optimizer** → Quantum Module
 
+## Consolidation Roadmap
+
+This service will be migrated into `services/analytics-platform` as part of the modular monolith refactor.
+
+- Shared utilities now live under `libs/python/src/carbon254/analytics`.
+- Public API contracts will move to `services/analytics-platform` with versioned OpenAPI specs.
+- During migration, routes remain stable; plan for phased cutoff using feature flags.
+
 ## Architecture
 
 ```

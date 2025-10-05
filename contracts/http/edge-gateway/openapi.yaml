@@ -1,0 +1,30 @@
+openapi: 3.1.0
+info:
+  title: Edge Gateway API
+  version: 0.0.1
+  description: |
+    Consolidated API surface combining legacy gateway endpoints. This contract is authoritative for external clients.
+servers:
+  - url: https://api.254carbon.com
+    description: Production gateway
+  - url: https://staging.api.254carbon.com
+    description: Staging gateway
+paths:
+  /health:
+    get:
+      summary: Gateway health check
+      operationId: getGatewayHealth
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "../../shared/health.yaml#/components/schemas/HealthResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

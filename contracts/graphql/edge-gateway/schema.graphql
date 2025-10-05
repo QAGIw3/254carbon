@@ -1,0 +1,12 @@
+schema {
+  query: Query
+}
+
+type Query {
+  health: HealthResponse!
+}
+
+type HealthResponse {
+  status: String!
+}
+

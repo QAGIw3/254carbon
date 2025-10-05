@@ -38,3 +38,9 @@ Create connection secrets:
   - Example: `postgresql://mlflow:****@postgresql.market-intelligence.svc.cluster.local:5432/mlflow`
 
 Update `environments/dev/values-postgres.yaml` to adjust DB names/users as needed.
+
+## Source of Truth
+
+- Helmfile located under `infra/helmfile/` drives all service deployments.
+- Legacy root-level Kubernetes manifests (e.g., `*-deployment.yaml`, `ingress.yaml`) are deprecated and will be removed once pipelines are aligned.
+- Argo CD consumes Helmfile outputs for promotion across environments.

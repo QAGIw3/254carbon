@@ -1,32 +1,3 @@
-# Market Intelligence Commodities Extension
-
-## Schema rollout
-
-- Unified on `market_intelligence` ClickHouse database; legacy MergeTree retained as `market_price_ticks_legacy` for migration.
-- New composite-partitioned `market_price_ticks` (`PARTITION BY (toYYYYMM(event_time), commodity_type)`), quality/spec tables, futures curves, and contract rollover audit table.
-- Kafka landing tables + MVs ingest `commodities.ticks.v1` and `commodities.futures.v1` topics.
-- Compatibility views under `ch.*` allow phased app migrations.
-
-## Connector updates
-
-- Added `BaseCommodityConnector` (canonical Kafka wiring, rollover helper).
-- Implemented live `EIAPetroleumConnector` (daily schedule) and stubbed CME/Platts/Argus connectors with paused Airflow DAGs.
-
-## Airflow
-
-- New DAGs: `eia_petroleum_ingestion` (daily + DQ check), `cme_oil_ingestion`, `platts_oil_ingestion`, `argus_oil_ingestion` (paused stubs).
-
-## Service layer
-
-- Gateway API queries now hit `market_intelligence.*`; analytics/commodity endpoints support oil/gas/coal/biofuels filters.
-- Added commodity futures/spec endpoints leveraging new schema.
-
-## Migration plan
-
-1. Deploy schema changes (idempotent) → backfill `market_price_ticks` from legacy → validate counts.
-2. Swap application queries to `market_intelligence.*`; monitor via DQ DAGs.
-3. Enable CME/Platts/Argus DAGs once credentials are provided; tune connectors from stub to live.
-4. Update documentation/ops runbooks post verification.
 # 254Carbon Market Intelligence Platform
 
 **Enterprise-grade market data platform for power, gas, and carbon markets**
@@ -59,6 +30,28 @@ The 254Carbon Market Intelligence Platform is a comprehensive solution for real-
 ---
 
 ## 🏗️ Architecture
+
+### Modular Monolith Consolidation
+
+The platform is actively migrating from dozens of microservices to domain-aligned modular monoliths. The new layout under `services/` consolidates functionality without sacrificing clear boundaries:
+
+```text
+services/
+  edge-gateway/        # Unified API & GraphQL edge layer
+  analytics-platform/  # Forecasting, risk, research, ML APIs
+  data-platform/       # Connectors, streaming, data quality
+  identity-platform/   # AuthN/Z, entitlements, audit
+  observability/       # Metrics, logging, tracing
+libs/
+  python/              # Shared Python packages (config, db, http, analytics)
+  js/                  # Shared TypeScript clients and utilities
+contracts/
+  http/ graphql/ events/  # Source of truth for external and event contracts
+```
+
+- Shared utilities are exported via `carbon254-*` packages for Python/TypeScript consumers.
+- Contracts drive client generation and compatibility tests; see `contracts/http/edge-gateway/openapi.yaml`.
+- Existing microservices remain under `platform/apps/` until migration completes; see `docs/architecture/service-inventory.md` for the mapping.
 
 ```
 External APIs → Connectors → Kafka → ClickHouse
@@ -200,36 +193,38 @@ To add more services to Ingress, edit `ingress.yaml` and add additional `paths` 
 
 ## 📊 Core Services
 
-### API Gateway
-- **Purpose**: Unified API for all data access with authentication & authorization
-- **Location**: `/platform/apps/gateway/`
-- **Endpoints**: `/instruments`, `/prices/ticks`, `/curves/forward`, `/fundamentals`
-- **Features**: OIDC auth, entitlements checking, rate limiting, WebSocket streaming
+### Edge Gateway
+- **Purpose**: Consolidated edge layer for REST and GraphQL entrypoints
+- **Location**: `/services/edge-gateway`
+- **Contracts**: `contracts/http/edge-gateway/openapi.yaml`, `contracts/graphql/edge-gateway`
+- **Features**: OIDC auth, rate limit middleware, circuit breakers, contract-first APIs
 
-### Curve Service
-- **Purpose**: Forward curve generation with QP optimization
-- **Location**: `/platform/apps/curve-service/`
+### Analytics Platform
+- **Purpose**: Unified analytics, forecasting, and research APIs
+- **Location**: `/services/analytics-platform`
+- **Features**: Shared feature engineering (`carbon254.analytics`), consolidated routers, scenario tooling
 - **Features**: Smooth curves, tenor reconciliation, scenario support, lineage tracking
 
-### Scenario Engine
-- **Purpose**: Scenario management and forecast execution
-- **Location**: `/platform/apps/scenario-engine/`
+### Data Platform
+- **Purpose**: Ingestion, streaming, and data quality operations
+- **Location**: `/services/data-platform`
+- **Features**: Kafka producers/consumers (`carbon254.kafka`), schema validation, connector orchestration
 - **Features**: DSL parser, assumption management, run tracking
 
-### Backtesting Service
-- **Purpose**: Forecast accuracy validation and monitoring
-- **Location**: `/platform/apps/backtesting-service/`
-- **Features**: MAPE/WAPE/RMSE calculation, historical comparison, Grafana integration
+### Identity Platform
+- **Purpose**: Authentication, authorization, and entitlements
+- **Location**: `/services/identity-platform`
+- **Features**: Unified token services, entitlements engine, audit logging
 
 ### Download Center
 - **Purpose**: Data export and bulk download management
 - **Location**: `/platform/apps/download-center/`
 - **Features**: CSV/Parquet export, signed URLs, entitlement enforcement
 
-### Web Hub
-- **Purpose**: React-based user interface
-- **Location**: `/platform/apps/web-hub/`
-- **Features**: Dashboard, explorer, curve viewer, scenario builder
+### Observability Platform
+- **Purpose**: Metrics, logging, tracing foundation
+- **Location**: `/services/observability`
+- **Features**: Prometheus exporters, OpenTelemetry configuration, shared logging helpers
 
 ### Routing Service
 - **Purpose**: Multi-source redundancy with intelligent failover, blending, and trust scoring

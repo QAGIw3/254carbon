@@ -19,10 +19,7 @@ import pandas as pd
 import yaml
 from clickhouse_driver import Client
 
-try:
-    from .commodity_feature_engineer import CommodityFeatureEngineer  # package-relative
-except Exception:
-    from commodity_feature_engineer import CommodityFeatureEngineer  # fallback to top-level
+from carbon254.analytics import CommodityFeatureEngineer
 from data_access import DataAccessLayer
 
 logger = logging.getLogger(__name__)

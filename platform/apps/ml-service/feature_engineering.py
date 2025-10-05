@@ -11,7 +11,7 @@ import pandas as pd
 import yaml
 from clickhouse_driver import Client
 
-from commodity_feature_engineer import CommodityFeatureEngineer
+from carbon254.analytics import CommodityFeatureEngineer
 from data_access import DataAccessLayer
 
 logger = logging.getLogger(__name__)

@@ -1,0 +1,2 @@
+"""Edge Gateway ASGI application."""
+

@@ -1,0 +1,22 @@
+{
+  "name": "@carbon254/libs-js",
+  "version": "0.0.0-dev",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint 'src/**/*.{ts,tsx}'",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "typescript": "^5.4.0",
+    "eslint": "^8.56.0",
+    "vitest": "^1.1.0"
+  }
+}
+
