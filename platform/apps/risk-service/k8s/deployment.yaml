@@ -16,6 +16,7 @@ spec:
       containers:
       - name: risk-service
         image: 254carbon/risk-service:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 8008
         env:

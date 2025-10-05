@@ -1,5 +1,11 @@
 """
-Machine learning-based congestion prediction for LMP decomposition.
+Congestion prediction for LMP decomposition
+
+Overview
+--------
+Trains ensemble regressors to forecast congestion components based on
+historical features, binding constraints, and engineered inputs. Designed to
+work alongside decomposition pipelines.
 """
 import logging
 import os

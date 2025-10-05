@@ -1,7 +1,17 @@
 """
 AI Copilot Engine
 
-Conversational AI for energy market intelligence with multi-model support and RAG.
+Overview
+--------
+Implements a minimal conversational engine used by the Copilot API. It provides
+multi-provider model selection, lightweight entity extraction, and placeholders
+for retrieval-augmented generation (RAG) and real-time data fetching.
+
+Notes
+-----
+- State is stored in-memory for simplicity; use Redis for production.
+- LLM calls are mocked for local development and tests.
+- Extend `_retrieve_context` to connect to a vector DB or knowledge store.
 """
 import logging
 from datetime import datetime
@@ -29,10 +39,19 @@ class Language(str, Enum):
 
 
 class AICopilot:
-    """AI Copilot engine with RAG and multi-model support."""
+    """AI Copilot engine with RAG and multi-model support.
+
+    Responsibilities
+    ----------------
+    - Maintain short conversation history
+    - Retrieve context and real-time data for grounding
+    - Call the selected LLM and return citations and suggested actions
+    """
     
     def __init__(self):
-        self.conversations = {}  # In-memory storage (use Redis in production)
+        # In-memory storage for conversation history
+        # Replace with Redis or database in production
+        self.conversations = {}
         self.system_prompts = self._load_system_prompts()
     
     def _load_system_prompts(self) -> Dict[str, str]:
@@ -58,7 +77,12 @@ Always cite your data sources and quantify your analysis.""",
         model: ModelProvider,
         context: Optional[Dict] = None
     ) -> Dict[str, Any]:
-        """Process conversational query with RAG."""
+        """Process conversational query with RAG.
+
+        Builds a message list from: system prompt, prior turns, user query, and
+        any retrieved context or real-time data. Then routes the request to the
+        chosen model provider.
+        """
         if not conversation_id:
             conversation_id = f"conv-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
         
@@ -94,7 +118,10 @@ Always cite your data sources and quantify your analysis.""",
         }
     
     def _extract_entities(self, query: str) -> Dict[str, Any]:
-        """Extract entities from query."""
+        """Extract entities from query.
+
+        Very simple heuristics for demo purposes; replace with NLP.
+        """
         entities = {}
         query_lower = query.lower()
         
@@ -107,7 +134,10 @@ Always cite your data sources and quantify your analysis.""",
         return entities
     
     async def _retrieve_context(self, query: str, entities: Dict) -> List[Dict]:
-        """Retrieve relevant context using vector database (RAG)."""
+        """Retrieve relevant context using vector database (RAG).
+
+        Integrate with a vector database (e.g., Chroma/PGVector) in production.
+        """
         return [
             {
                 "content": "PJM operates the largest wholesale electricity market in North America...",
@@ -117,7 +147,10 @@ Always cite your data sources and quantify your analysis.""",
         ]
     
     async def _fetch_data(self, entities: Dict) -> Dict[str, Any]:
-        """Fetch real-time data from platform services."""
+        """Fetch real-time data from platform services.
+
+        Replace with service calls (e.g., gateway, ClickHouse) as needed.
+        """
         data = {}
         if "market" in entities:
             data["current_price"] = 45.50
@@ -128,7 +161,10 @@ Always cite your data sources and quantify your analysis.""",
         self, query: str, history: List[Dict], context: List[Dict],
         data: Dict, language: Language
     ) -> List[Dict]:
-        """Build message list for LLM."""
+        """Build message list for LLM.
+
+        Concatenates system prompt, prior turns, and the user’s query.
+        """
         messages = [
             {"role": "system", "content": self.system_prompts.get(language, self.system_prompts[Language.ENGLISH])}
         ]
@@ -137,20 +173,31 @@ Always cite your data sources and quantify your analysis.""",
         return messages
     
     async def _call_openai(self, messages: List[Dict], model: str) -> str:
-        """Call OpenAI API."""
+        """Call OpenAI API.
+
+        Stubbed to return deterministic text in development.
+        """
         logger.info(f"Calling OpenAI {model}")
         return "Based on current market conditions, prices are elevated due to strong demand and reduced supply."
     
     async def _call_claude(self, messages: List[Dict]) -> str:
-        """Call Anthropic Claude API."""
+        """Call Anthropic Claude API.
+
+        Stubbed to return deterministic text in development.
+        """
         logger.info("Calling Claude")
         return "Market analysis indicates normal trading patterns with moderate volatility."
     
     def _extract_sources(self, context: List[Dict], data: Dict) -> List[Dict]:
-        """Extract citations from context and data."""
+        """Extract citations from context and data.
+
+        Produces a thin list suitable for UI highlighting.
+        """
         return [{"source": "Market Data", "citation": "Platform API", "timestamp": datetime.utcnow().isoformat()}]
     
     def _suggest_actions(self, query: str, response: str, entities: Dict) -> List[str]:
-        """Suggest follow-up actions."""
-        return ["View detailed price charts", "Set up price alerts", "Generate full report"]
+        """Suggest follow-up actions.
 
+        Simple heuristics for demo purposes.
+        """
+        return ["View detailed price charts", "Set up price alerts", "Generate full report"]

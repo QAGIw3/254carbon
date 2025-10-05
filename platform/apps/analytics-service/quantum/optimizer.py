@@ -1,7 +1,13 @@
 """
 Quantum Optimization Service
 
-Leverages quantum computing for energy market optimization problems.
+Leverages (simulated) quantum computing for energy market optimization
+problems including portfolio selection, unit commitment, and OPF-like flows.
+
+Notes
+-----
+- Backends are mocked/simulated for development. Use provider SDKs for prod.
+- Returns include estimated speedups vs. naïve classical baselines.
 """
 import logging
 from datetime import datetime
@@ -164,4 +170,3 @@ class QuantumOptimizer:
             }
         else:
             raise HTTPException(status_code=501, detail=f"{backend} not implemented")
-

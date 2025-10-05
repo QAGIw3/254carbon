@@ -1,13 +1,25 @@
 """
 Analytics Service
 
-Unified ML, risk, and market analytics service consolidating:
+Overview
+--------
+Unified ML, risk, and market analytics service consolidating multiple
+domain-oriented services under one FastAPI application:
+
 - ML forecasting (from ml-service)
-- Risk analytics (from risk-service)  
+- Risk analytics (from risk-service)
 - LMP decomposition (from lmp-decomposition-service)
 - Market insights (from market-insights)
 - Satellite intelligence (from satellite-intel)
 - Quantum optimization (from quantum-optimizer)
+
+Key Notes
+---------
+- Routers under `routers/` map to these domains and use engines under the
+  corresponding subpackages (e.g., `forecasting`, `risk`, `insights`).
+- MLflow tracking is supported via `MLFLOW_TRACKING_URI` when configured.
+- This service is designed for composability: each router can be evolved
+  independently with minimal coupling.
 """
 import logging
 import os
@@ -58,7 +70,7 @@ app = FastAPI(
     version="2.0.0",
 )
 
-# CORS middleware
+# CORS middleware allows browser-based apps to call the API during prototyping.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -143,4 +155,3 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8008)
-

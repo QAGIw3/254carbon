@@ -91,7 +91,7 @@ def _series_to_points(series: pd.Series) -> List[Dict[str, Any]]:
 class DecompositionRequest(BaseModel):
     instrument_id: str = Field(..., description="Instrument identifier")
     commodity_type: str = Field(..., description="Commodity type (e.g., gas, power, oil)")
-    method: str = Field("stl", description="Decomposition method", regex="^(stl|classical)$")
+    method: str = Field("stl", description="Decomposition method", pattern="^(stl|classical)$")
     start_date: Optional[datetime] = Field(None, description="Optional start date filter")
     end_date: Optional[datetime] = Field(None, description="Optional end date filter")
     persist: bool = Field(True, description="Persist results to ClickHouse")

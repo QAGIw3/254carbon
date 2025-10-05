@@ -1,7 +1,15 @@
 """
 NLP Query Parser
 
-Natural language query understanding for market intelligence.
+Overview
+--------
+Parses natural language questions into structured intents, entities, and a
+plan of action (SQL or API calls) along with a light-weight narrative.
+
+Implementation Notes
+--------------------
+- Intent/entity extraction is heuristic for development and tests.
+- Replace with a proper NLP pipeline or LLM function-calling in production.
 """
 import logging
 from datetime import datetime, timedelta, date
@@ -11,13 +19,25 @@ logger = logging.getLogger(__name__)
 
 
 class NLPEngine:
-    """Natural language processing engine."""
+    """Natural language processing engine.
+
+    Responsibilities
+    ----------------
+    - Classify intent (data query, comparison, prediction, general)
+    - Extract key entities (market, metric, dates)
+    - Build SQL or downstream API call hints
+    - Generate a brief narrative for UI display
+    """
     
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key
     
     async def parse_query(self, query: str, context: Optional[Dict] = None) -> Dict[str, Any]:
-        """Parse natural language query into structured format."""
+        """Parse natural language query into structured format.
+
+        Returns a dict with: intent, entities, optional SQL/API plan, and
+        a short narrative suitable for display.
+        """
         intent = self._classify_intent(query)
         entities = self._extract_entities(query)
         
@@ -42,7 +62,7 @@ class NLPEngine:
         }
     
     def _classify_intent(self, query: str) -> str:
-        """Classify query intent."""
+        """Classify query intent using simple lexical cues."""
         query_lower = query.lower()
         
         if any(word in query_lower for word in ["what", "show", "get"]):
@@ -55,7 +75,7 @@ class NLPEngine:
             return "general"
     
     def _extract_entities(self, query: str) -> Dict[str, Any]:
-        """Extract entities from query."""
+        """Extract entities from query (market, dates, metric)."""
         entities = {}
         query_lower = query.lower()
         
@@ -77,7 +97,7 @@ class NLPEngine:
         return entities
     
     def _generate_sql(self, query: str, entities: Dict[str, Any]) -> str:
-        """Generate SQL query from natural language."""
+        """Generate SQL query from natural language using simple templates."""
         market = entities.get("market", "PJM")
         metric = entities.get("metric", "price")
         
@@ -96,7 +116,7 @@ class NLPEngine:
         return sql
     
     def _generate_api_calls(self, query: str, entities: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Generate API calls from natural language."""
+        """Generate API calls from natural language (suggested downstream calls)."""
         return [{
             "endpoint": "/api/v1/prices/historical",
             "method": "GET",
@@ -109,7 +129,7 @@ class NLPEngine:
     async def _generate_narrative(
         self, query: str, entities: Dict[str, Any], context: Optional[Dict] = None
     ) -> str:
-        """Generate narrative response using LLM."""
+        """Generate narrative response (LLM placeholder)."""
         market = entities.get("market", "the market")
         metric = entities.get("metric", "prices")
         return f"I'll analyze {metric} in {market} for you."
@@ -117,7 +137,7 @@ class NLPEngine:
     async def generate_insights(
         self, market: str, timeframe: str, data_context: Optional[Dict] = None
     ) -> Dict[str, Any]:
-        """Generate automated market insights."""
+        """Generate automated market insights (light-weight stub)."""
         return {
             "title": f"{market} Market Update - {timeframe.title()}",
             "summary": f"Analysis of {market} power market conditions",
@@ -128,4 +148,3 @@ class NLPEngine:
             ],
             "detailed_analysis": f"The {market} market showed typical patterns during {timeframe}.",
         }
-

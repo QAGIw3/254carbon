@@ -1,5 +1,10 @@
 """
 Satellite Intelligence API Router
+
+Purpose
+-------
+Serves satellite-derived intelligence (e.g., flaring, activity metrics) and
+related analytics built by the `satellite` engines.
 """
 import logging
 from datetime import date
@@ -169,4 +174,3 @@ async def get_coverage_stats():
         "historical_data_years": 8,
         "imagery_resolution_best": "3 meters",
     }
-

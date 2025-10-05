@@ -1,5 +1,17 @@
 """
 RegTech Compliance API Router
+
+Purpose
+-------
+Exposes endpoints for tracking regulatory updates, analyzing compliance gaps,
+and generating reports. Uses the `RegTechEngine` to encapsulate domain logic.
+
+Endpoints
+---------
+- GET `/api/v1/regtech/regulations` — updates since a date
+- GET `/api/v1/regtech/compliance/gaps` — gap analysis by entity
+- POST `/api/v1/regtech/reports/generate` — report generation
+- GET `/api/v1/regtech/penalty-risk/{entity_id}` — penalty risk summary
 """
 import logging
 from datetime import date
@@ -104,4 +116,3 @@ async def assess_penalty_risk(entity_id: str, jurisdiction: Jurisdiction):
     except Exception as e:
         logger.error(f"Error assessing penalty risk: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

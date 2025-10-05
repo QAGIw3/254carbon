@@ -1,5 +1,16 @@
 """
 AI Copilot API Router
+
+Purpose
+-------
+Exposes REST and WebSocket endpoints for conversational interactions with the
+Copilot engine. Designed for both synchronous requests and streaming chats.
+
+Endpoints
+---------
+- POST `/api/v1/copilot/chat` — single-turn chat completion
+- WS   `/api/v1/copilot/ws/{conversation_id}` — streaming conversation
+- DELETE `/api/v1/copilot/conversation/{conversation_id}` — clear history
 """
 import logging
 from typing import Optional, Dict, Any, List
@@ -14,6 +25,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/copilot", tags=["copilot"])
 
 # Initialize copilot engine
+# In production, wire to persistent state (e.g. Redis) and observability.
 copilot = AICopilot()
 
 
@@ -39,7 +51,11 @@ class ConversationResponse(BaseModel):
 
 @router.post("/chat", response_model=ConversationResponse)
 async def chat_with_copilot(request: ConversationRequest):
-    """Chat with AI Copilot."""
+    """Chat with AI Copilot.
+
+    Accepts optional `conversation_id` to maintain short history and allows
+    model/language overrides per request.
+    """
     try:
         logger.info(f"Chat request: {request.query[:50]}...")
         
@@ -60,7 +76,11 @@ async def chat_with_copilot(request: ConversationRequest):
 
 @router.websocket("/ws/{conversation_id}")
 async def websocket_chat(websocket: WebSocket, conversation_id: str):
-    """WebSocket endpoint for real-time chat."""
+    """WebSocket endpoint for real-time chat.
+
+    Receives text frames from the client and streams JSON responses. This is a
+    simplified implementation intended for prototyping and demos.
+    """
     await websocket.accept()
     
     try:
@@ -83,9 +103,11 @@ async def websocket_chat(websocket: WebSocket, conversation_id: str):
 
 @router.delete("/conversation/{conversation_id}")
 async def clear_conversation(conversation_id: str):
-    """Clear conversation history."""
+    """Clear conversation history.
+
+    Removes in-memory history for the provided conversation identifier.
+    """
     if conversation_id in copilot.conversations:
         del copilot.conversations[conversation_id]
         return {"status": "deleted", "conversation_id": conversation_id}
     return {"status": "not_found", "conversation_id": conversation_id}
-

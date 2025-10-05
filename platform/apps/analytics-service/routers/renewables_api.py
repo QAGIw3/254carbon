@@ -1,4 +1,11 @@
-"""FastAPI router exposing renewables analytics endpoints."""
+"""
+Renewables Analytics API Router
+
+Purpose
+-------
+Exposes capacity additions, generation forecasts, policy impacts, and related
+renewable energy analytics for planning and reporting.
+"""
 
 from __future__ import annotations
 

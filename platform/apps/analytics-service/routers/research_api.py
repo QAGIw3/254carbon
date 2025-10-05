@@ -1,4 +1,11 @@
-"""FastAPI router exposing commodity research analytics endpoints."""
+"""
+Commodity Research API Router
+
+Purpose
+-------
+Exposes research datasets and derived analytics used for market studies and
+dashboards, including summary statistics and query utilities.
+"""
 
 from __future__ import annotations
 

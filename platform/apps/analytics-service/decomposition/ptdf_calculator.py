@@ -1,6 +1,10 @@
 """
-PTDF (Power Transfer Distribution Factor) calculations.
-Enhanced with sparse matrix operations and advanced algorithms.
+PTDF (Power Transfer Distribution Factor) calculations
+
+Overview
+--------
+Computes PTDF using DC power flow with sparse matrix optimizations, optional
+topology caching, and database-backed topology retrieval.
 """
 import logging
 import json
@@ -330,4 +334,3 @@ class PTDFCalculator:
         if self.db_pool is not None:
             await self.db_pool.close()
             self.db_pool = None
-

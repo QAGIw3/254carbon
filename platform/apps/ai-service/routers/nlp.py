@@ -1,5 +1,16 @@
 """
 NLP Service API Router
+
+Purpose
+-------
+Transforms natural language into structured actions and generates light-weight
+insights. Delegates to `NLPEngine` for intent classification and entity
+extraction, and optionally emits SQL/API call plans and narrative text.
+
+Endpoints
+---------
+- POST `/api/v1/nlp/query` — parse NL query into structure
+- POST `/api/v1/nlp/insights` — generate short market insights
 """
 import logging
 from typing import Optional, Dict, Any, List
@@ -80,4 +91,3 @@ async def generate_market_insights(request: InsightRequest):
     except Exception as e:
         logger.error(f"Error generating insights: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

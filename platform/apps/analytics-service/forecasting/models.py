@@ -1,5 +1,11 @@
 """
-ML model implementations and registry.
+ML model implementations and registry
+
+Overview
+--------
+Wraps forecasting models (tree-based and transformer) and a simple model
+registry for versioning and activation. Includes utilities for point and
+interval predictions and serialization to disk.
 """
 import logging
 from datetime import datetime

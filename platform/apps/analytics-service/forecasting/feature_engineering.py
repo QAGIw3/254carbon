@@ -1,4 +1,12 @@
-"""Feature engineering for price forecasting models."""
+"""
+Feature engineering for price forecasting models
+
+Overview
+--------
+Builds ML-ready features from fundamentals and price history, including lags,
+moving averages, seasonality, calendar features, and custom scenario inputs.
+Supports ClickHouse and Postgres data sources and produces pandas DataFrames.
+"""
 import logging
 from copy import deepcopy
 from datetime import date, datetime, timedelta
@@ -11,7 +19,10 @@ import pandas as pd
 import yaml
 from clickhouse_driver import Client
 
-from commodity_feature_engineer import CommodityFeatureEngineer
+try:
+    from .commodity_feature_engineer import CommodityFeatureEngineer  # package-relative
+except Exception:
+    from commodity_feature_engineer import CommodityFeatureEngineer  # fallback to top-level
 from data_access import DataAccessLayer
 
 logger = logging.getLogger(__name__)

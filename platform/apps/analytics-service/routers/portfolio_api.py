@@ -1,4 +1,11 @@
-"""Portfolio optimization API for multi-commodity strategies."""
+"""
+Portfolio API Router
+
+Purpose
+-------
+Provides portfolio construction, risk metrics, and optimization workflows
+across commodities, delegating to risk and optimization engines.
+"""
 
 from __future__ import annotations
 

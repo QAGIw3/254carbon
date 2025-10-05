@@ -1,4 +1,11 @@
-"""FastAPI router exposing supply chain analytics endpoints."""
+"""
+Supply Chain Analytics API Router
+
+Purpose
+-------
+Exposes supply-chain metrics and analyses (inventories, flows, bottlenecks)
+to support operational and trading workflows.
+"""
 
 from __future__ import annotations
 

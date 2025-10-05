@@ -16,6 +16,7 @@ spec:
       containers:
       - name: data-quality-service
         image: 254carbon/data-quality-service:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 8010
         env:

@@ -1,4 +1,11 @@
-"""FastAPI router exposing refining analytics endpoints."""
+"""
+Refining Analytics API Router
+
+Purpose
+-------
+Exposes refinery utilization, margin analysis, crack spreads, and related
+analytics endpoints for downstream workflows.
+"""
 
 from __future__ import annotations
 

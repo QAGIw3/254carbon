@@ -1,5 +1,10 @@
 """
 Market Insights API Router
+
+Purpose
+-------
+Exposes anomaly detection, cross-market arbitrage, and daily briefings.
+Uses `MarketInsightsEngine` to encapsulate the domain logic.
 """
 import logging
 from datetime import date
@@ -114,4 +119,3 @@ async def get_daily_briefing(
     except Exception as e:
         logger.error(f"Error generating briefing: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

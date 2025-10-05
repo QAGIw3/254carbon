@@ -1,7 +1,15 @@
 """
 RegTech Compliance Engine
 
-Automated regulatory compliance for energy markets.
+Overview
+--------
+Encapsulates regulatory tracking, compliance gap analysis, report generation,
+and penalty risk assessment for energy markets.
+
+Integration Notes
+-----------------
+- Replace static rule/DB stubs with integrations to regulatory feeds.
+- Persist reports and gap analyses for auditability.
 """
 import logging
 from datetime import datetime, date
@@ -28,7 +36,11 @@ class RegulationType(str, Enum):
 
 
 class RegTechEngine:
-    """Regulatory intelligence and compliance engine."""
+    """Regulatory intelligence and compliance engine.
+
+    Provides high-level methods for: regulation tracking, gap analysis,
+    report generation, and penalty-risk scoring.
+    """
     
     def __init__(self):
         self.regulations_db = self._load_regulations()
@@ -124,4 +136,3 @@ class RegTechEngine:
             "estimated_penalty_range": [50000, 500000] if high_risk_count > 0 else [0, 10000],
             "risk_score": min(high_risk_count * 25, 100),
         }
-

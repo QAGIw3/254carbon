@@ -1,3 +1,7 @@
+##
+# AI Service Deployment manifest
+# Provides a Deployment and ClusterIP Service for the AI API.
+##
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +23,7 @@ spec:
         imagePullPolicy: Never
         ports:
         - containerPort: 8020
+        # Environment variables for LLM providers and backing services
         env:
         - name: OPENAI_API_KEY
           valueFrom:
@@ -43,6 +48,7 @@ spec:
           limits:
             memory: "2Gi"
             cpu: "1"
+        # Probes use `/health` for readiness/liveness
         readinessProbe:
           httpGet:
             path: /health
@@ -68,4 +74,3 @@ spec:
   - port: 8020
     targetPort: 8020
   type: ClusterIP
-

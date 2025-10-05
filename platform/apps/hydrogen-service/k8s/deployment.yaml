@@ -16,6 +16,7 @@ spec:
       containers:
       - name: hydrogen-service
         image: 254carbon/hydrogen-service:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 8012
         env:

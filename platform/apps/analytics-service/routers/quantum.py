@@ -1,5 +1,10 @@
 """
 Quantum Optimization API Router
+
+Purpose
+-------
+Exposes quantum-inspired/simulated optimization APIs for portfolio, unit
+commitment, and transmission flow problems. Delegates to `QuantumOptimizer`.
 """
 import logging
 from typing import List, Dict, Any, Optional
@@ -175,4 +180,3 @@ async def get_quantum_stats():
             "d_wave": 73,
         },
     }
-

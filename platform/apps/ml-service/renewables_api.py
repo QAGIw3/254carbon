@@ -118,7 +118,7 @@ class CarbonIntensityRequest(BaseModel):
     pathway: str = "conventional"
     include_land_use: bool = True
     transport_distance: float = Field(1000.0, ge=0)
-    transport_mode: str = Field("truck", regex="^(truck|rail|ship)$")
+    transport_mode: str = Field("truck", pattern="^(truck|rail|ship)$")
     model_version: str = "v1"
 
 

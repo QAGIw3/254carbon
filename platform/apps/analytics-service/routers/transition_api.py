@@ -1,4 +1,11 @@
-"""FastAPI router exposing energy transition analytics endpoints."""
+"""
+Energy Transition API Router
+
+Purpose
+-------
+Provides decarbonization pathways, renewable adoption forecasts, and stranded
+asset risk analytics. Coordinates with persistence for scenario tracking.
+"""
 
 from __future__ import annotations
 
@@ -458,4 +465,3 @@ __all__ = [
     "RenewableAdoptionRequest",
     "StrandedAssetRiskRequest",
 ]
-

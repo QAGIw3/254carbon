@@ -28,7 +28,13 @@ except Exception:  # pragma: no cover - optional dependency
 
 from data_access import DataAccessLayer
 from multi_commodity_portfolio_optimizer import MultiCommodityPortfolioOptimizer
-from platform.shared.data_quality_framework import DataQualityFramework
+try:
+    from platform.shared.data_quality_framework import DataQualityFramework
+except Exception:  # fallback when shared package isn't in the container image
+    try:
+        from data_quality_framework import DataQualityFramework  # local lightweight fallback
+    except Exception:
+        DataQualityFramework = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -39,16 +45,17 @@ _optimizer = MultiCommodityPortfolioOptimizer()
 _ch_client = _data_access.client
 
 _ARBITRAGE_SIGNAL_TOPIC = os.getenv("ARBITRAGE_SIGNAL_TOPIC", "arbitrage.signals.v1")
-_dq = DataQualityFramework()
+_dq = DataQualityFramework() if DataQualityFramework is not None else None
 _STALE_THRESHOLD_DAYS = int(os.getenv("ARBITRAGE_STALE_DAYS", "7"))
 _MAX_NET_PROFIT = float(os.getenv("ARBITRAGE_MAX_PROFIT", "1000000"))
 
 try:
-    _dq.register_metric_rules(
-        "arbitrage",
-        {"net_profit": {"value_min": -_MAX_NET_PROFIT, "value_max": _MAX_NET_PROFIT}},
-        overwrite=True,
-    )
+    if _dq is not None:
+        _dq.register_metric_rules(
+            "arbitrage",
+            {"net_profit": {"value_min": -_MAX_NET_PROFIT, "value_max": _MAX_NET_PROFIT}},
+            overwrite=True,
+        )
 except ValueError:
     logger.debug("Arbitrage metric rules already registered")
 
@@ -282,7 +289,7 @@ async def detect_arbitrage(request: ArbitrageDetectRequest) -> ArbitrageDetectio
         if confidence < 0.0 or confidence > 1.0:
             logger.debug("Discarding opportunity %s/%s due to confidence %.2f", instrument1, instrument2, confidence)
             continue
-        net_profit_rule = _dq.get_metric_rules("arbitrage").get("net_profit", {})
+        net_profit_rule = (_dq.get_metric_rules("arbitrage") if _dq is not None else {}).get("net_profit", {})
         lower_bound = float(net_profit_rule.get("value_min", -_MAX_NET_PROFIT))
         upper_bound = float(net_profit_rule.get("value_max", _MAX_NET_PROFIT))
         if not (lower_bound <= net_profit <= upper_bound):

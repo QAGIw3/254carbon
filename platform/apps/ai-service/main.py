@@ -1,10 +1,31 @@
 """
 AI Service
 
-Unified LLM-based services consolidating:
-- AI Copilot (from ai-copilot)
-- NLP Query Understanding (from nlp-service)
-- RegTech Compliance AI (from regtech-ai)
+Overview
+--------
+Unified LLM-based services consolidating multiple AI capabilities into a single
+FastAPI application:
+
+- AI Copilot (from ai-copilot) for conversational assistance and RAG
+- NLP Query Understanding (from nlp-service) for intent/entity parsing
+- RegTech Compliance AI (from regtech-ai) for regulatory analytics
+
+Key Endpoints
+-------------
+- `/api/v1/copilot/*`: chat (REST) and `/ws/{conversation_id}` (WebSocket)
+- `/api/v1/nlp/*`: natural language query parsing and insights
+- `/api/v1/regtech/*`: regulatory updates, gap analysis, reports
+- `/health`: liveness/readiness probe
+- `/docs`: OpenAPI UI
+
+Environment
+-----------
+External keys such as `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` are optional in
+development but should be configured in production via Kubernetes secrets.
+
+Usage
+-----
+Run locally with `uvicorn main:app --reload --port 8020`.
 """
 import logging
 
@@ -26,6 +47,7 @@ app = FastAPI(
 )
 
 # CORS middleware
+# Allow cross-origin requests for browser-based tooling and integrations.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,6 +57,7 @@ app.add_middleware(
 )
 
 # Include all routers
+# Each router groups related endpoints and delegates to engines.
 app.include_router(copilot.router)
 app.include_router(nlp.router)
 app.include_router(regtech.router)
@@ -72,4 +95,3 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8020)
-

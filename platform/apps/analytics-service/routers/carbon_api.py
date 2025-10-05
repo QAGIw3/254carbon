@@ -1,4 +1,12 @@
-"""FastAPI router exposing carbon pricing analytics endpoints."""
+"""
+Carbon Pricing API Router
+
+Purpose
+-------
+Exposes carbon market analytics and forecasts, supports scenario inputs, and
+persists results for auditability. Pairs with transition analytics for policy
+impacts.
+"""
 
 from __future__ import annotations
 
@@ -575,4 +583,3 @@ __all__ = [
     "CarbonLeakageRiskRequest",
     "PolicyImpactRequest",
 ]
-

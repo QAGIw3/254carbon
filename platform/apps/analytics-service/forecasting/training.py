@@ -1,5 +1,10 @@
 """
-Model training with hyperparameter tuning.
+Model training with hyperparameter tuning
+
+Overview
+--------
+Provides training utilities for tree-based models and transformer-based
+models, including grid search over time-series splits and basic metrics.
 """
 import logging
 import math

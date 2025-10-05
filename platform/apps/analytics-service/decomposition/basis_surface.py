@@ -1,5 +1,11 @@
 """
-Hub-to-node basis surface modeling with advanced algorithms.
+Hub-to-node basis surface modeling
+
+Overview
+--------
+Models spatial price basis relationships (hub-to-node) using a combination of
+linear, polynomial, and Gaussian Process regressors with caching. Used as an
+input to LMP decomposition and congestion analytics.
 """
 import logging
 import json
@@ -272,4 +278,3 @@ class BasisSurfaceModeler:
         except Exception as exc:
             logger.warning(f"Failed to fit kriging model: {exc}")
             return {"status": "fit_failed", "error": str(exc)}
-

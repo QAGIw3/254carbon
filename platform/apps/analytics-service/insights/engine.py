@@ -2,6 +2,15 @@
 Market Insights Engine
 
 Automated market intelligence and anomaly detection.
+
+Responsibilities
+----------------
+- Detect anomalies using simple statistical heuristics
+- Identify cross-market arbitrage opportunities
+- Analyze fundamental drivers and generate daily briefings
+
+Implementation notes: functions are deterministic/mock-friendly to ease
+local development and testing without live market data.
 """
 import logging
 from datetime import datetime, date
@@ -254,4 +263,3 @@ Monitor natural gas storage levels for medium-term price direction.
             "opportunities": opp_summaries[:3],
             "outlook": outlook,
         }
-

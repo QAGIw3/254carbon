@@ -1,5 +1,11 @@
 """
-Automated ML model retraining pipeline with performance monitoring.
+Automated ML model retraining pipeline with performance monitoring
+
+Overview
+--------
+Monitors production model performance, triggers retraining when metrics
+degrade beyond thresholds, and registers new versions in the model registry.
+Outputs alerts and can push metrics to Prometheus.
 """
 import asyncio
 import json

@@ -1,4 +1,11 @@
-"""Dataset utilities for multimodal, multi-commodity transformer training."""
+"""
+Dataset utilities for multimodal, multi-commodity transformer training
+
+Overview
+--------
+Defines a sliding-window dataset that aligns multimodal inputs per commodity
+for transformer-based forecasting models.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
