@@ -1,0 +1,3 @@
+# MISO adapter dependencies
+# (Relies on parent gateway/api-gateway dependencies)
+

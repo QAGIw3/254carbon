@@ -18,9 +18,9 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks, Body
 from pydantic import BaseModel
 
-from auth import verify_token, has_permission
-from entitlements import check_entitlement
-from cache import create_cache_decorator
+from ...auth import verify_token, has_permission
+from ...entitlements import check_entitlement
+from ...cache import create_cache_decorator
 
 logger = logging.getLogger(__name__)
 

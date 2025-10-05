@@ -1,0 +1,1 @@
+"""Analytics Platform ASGI application."""

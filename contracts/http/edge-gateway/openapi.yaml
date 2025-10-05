@@ -20,11 +20,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "../../shared/health.yaml#/components/schemas/HealthResponse"
+                $ref: "#/components/schemas/HealthResponse"
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+      required:
+        - status
 

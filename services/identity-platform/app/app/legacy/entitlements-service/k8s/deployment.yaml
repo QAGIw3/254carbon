@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: entitlements-service
+  namespace: market-intelligence
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: entitlements-service
+  template:
+    metadata:
+      labels:
+        app: entitlements-service
+    spec:
+      containers:
+      - name: entitlements-service
+        image: 254carbon/entitlements-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8011
+        env:
+        - name: DATABASE_URL
+          value: postgresql://postgres:postgres@postgresql:5432/market_intelligence
+        - name: PORT
+          value: "8011"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8011
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8011
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: entitlements-service
+  namespace: market-intelligence
+spec:
+  selector:
+    app: entitlements-service
+  ports:
+  - port: 8011
+    targetPort: 8011
+    name: http
+  type: ClusterIP
+

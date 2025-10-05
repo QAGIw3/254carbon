@@ -1,0 +1,2 @@
+"""Data Platform application package."""
+

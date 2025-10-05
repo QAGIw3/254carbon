@@ -1,0 +1,74 @@
+##
+# Analytics Service Deployment manifest
+# Deploys ML, risk, insights, and quantum APIs behind a ClusterIP Service.
+##
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: market-intelligence
+spec:
+  replicas: 1  # Adjust based on expected traffic/CPU
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+      - name: analytics-service
+        image: 254carbon/analytics-service:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8008
+        # Backing services and integrations
+        env:
+        - name: CLICKHOUSE_HOST
+          value: "clickhouse"
+        - name: CLICKHOUSE_PORT
+          value: "9000"
+        - name: REDIS_HOST
+          value: "redis"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: POSTGRES_HOST
+          value: "postgresql"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: MLFLOW_TRACKING_URI
+          value: "http://mlflow:5000"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        # Probes use `/health` for readiness/liveness
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8008
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8008
+          initialDelaySeconds: 60
+          periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: market-intelligence
+spec:
+  selector:
+    app: analytics-service
+  ports:
+  - port: 8008
+    targetPort: 8008
+  type: ClusterIP

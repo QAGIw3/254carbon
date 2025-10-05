@@ -17,10 +17,10 @@ from pydantic import BaseModel
 import pandas as pd
 import numpy as np
 
-from auth import verify_token, has_permission
-from entitlements import check_entitlement
-from db import get_clickhouse_client
-from cache import create_cache_decorator, CacheStrategy
+from ...auth import verify_token, has_permission
+from ...entitlements import check_entitlement
+from ...db import get_clickhouse_client
+from ...cache import create_cache_decorator, CacheStrategy
 
 logger = logging.getLogger(__name__)
 
